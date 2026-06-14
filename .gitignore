@@ -1,0 +1,74 @@
+# ============================================================
+# Metro Railway S&T Staff Management System — .gitignore
+# ============================================================
+
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+backend/.venv/
+.venv/
+venv/
+env/
+
+# SQLite database file (local data, do not commit)
+backend/database.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Backend backup exports
+backend/backups/
+backend/exports/
+*.xlsx
+*.pdf
+
+# Python coverage / test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+
+# --- Node.js / Next.js Frontend ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.cache/
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.user
+*.sublime-project
+*.sublime-workspace
+
+# --- Misc ---
+*.log
+*.tmp
+*.swp
+*~
