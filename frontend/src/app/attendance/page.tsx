@@ -980,14 +980,7 @@ export default function AttendanceGrid() {
             {exporting === 'excel' ? 'Excel...' : 'Export Excel'}
           </button>
 
-          <button
-            onClick={() => handleAttendanceExport('pdf')}
-            disabled={exporting !== null}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer"
-          >
-            <FileText size={14} />
-            {exporting === 'pdf' ? 'PDF...' : 'Export PDF'}
-          </button>
+
 
           <button
             onClick={handleOpenSimulation}

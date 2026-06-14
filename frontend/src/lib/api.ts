@@ -9,16 +9,21 @@ export interface Employee {
   default_rest_day: string;
   joining_date?: string;
   weekly_schedule?: 
-    | { [day: string]: string }
     | {
-        type: string;
+        type: 'simple';
+        [day: string]: any;
+        custom_night_weeks?: { from_date: string; to_date: string }[];
+      }
+    | {
+        type: 'rotating';
         anchor_date?: string;
         week1: { [day: string]: string };
         week2: { [day: string]: string };
         week3: { [day: string]: string };
         week4: { [day: string]: string };
         custom_night_weeks?: { from_date: string; to_date: string }[];
-      };
+      }
+    | { [day: string]: string };
 }
 
 export interface AttendanceCode {

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
-  FileText, 
   Moon, 
   CalendarDays,
   AlertTriangle,
@@ -354,14 +353,7 @@ export default function NightDutyNDA() {
             {exporting === 'excel' ? 'Exporting...' : 'Export Excel'}
           </button>
 
-          <button
-            onClick={() => handleExport('pdf')}
-            disabled={exporting !== null}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer"
-          >
-            <FileText size={14} />
-            {exporting === 'pdf' ? 'Exporting...' : 'Export PDF'}
-          </button>
+
         </div>
       </div>
 
