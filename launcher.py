@@ -238,6 +238,17 @@ LOADING_HTML = """
             container.innerText += "\\n" + msg;
             container.scrollTop = container.scrollHeight;
         }
+
+        function setFrozenMode() {
+            document.getElementById("node-item").style.display = "none";
+            document.getElementById("venv-item").style.display = "none";
+            document.getElementById("deps-item").style.display = "none";
+            document.getElementById("frontend-item").style.display = "none";
+            var backendText = document.getElementById("backend-text");
+            if (backendText) {
+                backendText.innerText = "Initializing database & starting ERP microservice...";
+            }
+        }
     </script>
 </body>
 </html>
@@ -272,11 +283,24 @@ class LauncherService:
 
     def check_port_active(self, port):
         """Attempts to connect to localhost port to confirm binding."""
+        for host in ('127.0.0.1', 'localhost'):
+            try:
+                with socket.create_connection((host, port), timeout=0.5):
+                    return True
+            except OSError:
+                continue
+        return False
+
+    def check_http_ready(self, url):
+        """Checks if HTTP service is fully ready and responding to requests."""
         try:
-            with socket.create_connection(('127.0.0.1', port), timeout=0.5):
-                return True
-        except OSError:
-            return False
+            req = urllib.request.Request(url, headers={"User-Agent": "StaffAttendanceLauncher"})
+            with urllib.request.urlopen(req, timeout=0.8) as response:
+                if response.status in (200, 301, 302, 307, 308, 404):
+                    return True
+        except Exception:
+            pass
+        return False
 
     def stream_process_logs(self, pipe, prefix):
         """Reads process pipes line by line and outputs to webview log box."""
@@ -298,196 +322,277 @@ class LauncherService:
         self.window = window
         time.sleep(1) # Let window render fully first
         
-        # Absolute paths setup
-        backend_dir = os.path.join(APP_ROOT, "backend")
-        frontend_dir = os.path.join(APP_ROOT, "frontend")
-        node_modules_dir = os.path.join(frontend_dir, "node_modules")
-        requirements_path = os.path.join(backend_dir, "requirements.txt")
+        is_frozen = getattr(sys, 'frozen', False)
         
-        venv_python = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
-        venv_pip = os.path.join(backend_dir, ".venv", "Scripts", "pip.exe")
-        
-        # Step 1: Check Node.js
-        window.evaluate_js("updateStatus('node', 'checking')")
-        node_path = self.check_command_installed("node")
-        npm_path = self.check_command_installed("npm")
-        
-        if not node_path or not npm_path:
-            window.evaluate_js("updateStatus('node', 'fail', 'Node.js & NPM not found on System PATH!')")
-            window.evaluate_js("addLog('[Error] Node.js or NPM is not installed globally on this computer.')")
-            window.evaluate_js("addLog('        Please download and install Node.js from https://nodejs.org/')")
-            return
+        if is_frozen:
+            # Standalone Frozen Mode: serve static frontend via embedded FastAPI/Uvicorn
+            window.evaluate_js("setFrozenMode()")
+            window.evaluate_js("updateStatus('backend', 'checking')")
+            window.evaluate_js("updateProgress(30)")
+            window.evaluate_js("addLog('[System] Standalone frozen mode detected.')")
+            window.evaluate_js("addLog('[System] Initializing database in Documents folder...')")
             
-        window.evaluate_js("updateStatus('node', 'ok', 'Node.js & NPM found successfully.')")
-        window.evaluate_js("updateProgress(20)")
-
-        # Step 2: Check Python venv (.venv)
-        window.evaluate_js("updateStatus('venv', 'checking')")
-        
-        if not os.path.exists(venv_python):
-            window.evaluate_js("addLog('[Venv] Virtual environment \'.venv\' not found. Creating virtual environment...')")
-            window.evaluate_js("updateStatus('venv', 'checking', 'Creating Python backend virtual environment (.venv)...')")
-            
-            # Find system python
-            sys_python = self.check_command_installed("python")
-            if not sys_python:
-                window.evaluate_js("updateStatus('venv', 'fail', 'Python not found on System PATH!')")
-                window.evaluate_js("addLog('[Error] Local Python environment is required to set up the backend.')")
+            try:
+                import uvicorn
+                from backend.main import app as fastapi_app
+                
+                window.evaluate_js("addLog('[Backend] Starting FastAPI web server on port 8000...')")
+                
+                def start_uvicorn():
+                    try:
+                        uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_level="warning")
+                    except Exception as ex:
+                        if self.window:
+                            self.window.evaluate_js(f"addLog('[Error] Uvicorn failed to start: {ex}')")
+                            
+                uvicorn_thread = threading.Thread(target=start_uvicorn, daemon=True)
+                uvicorn_thread.start()
+                
+            except Exception as e:
+                window.evaluate_js("updateStatus('backend', 'fail', 'Failed to start backend database service!')")
+                window.evaluate_js(f"addLog('[Error] Backend import or start failed: {e}')")
                 return
                 
-            try:
-                # Create venv with 3-minute timeout and absolute paths
-                window.evaluate_js(f"addLog('[Venv] Running: {sys_python} -m venv .venv in backend/')")
-                proc = subprocess.Popen([sys_python, "-m", "venv", ".venv"], cwd=backend_dir, creationflags=subprocess.CREATE_NO_WINDOW)
-                proc.wait(timeout=180)
-                if proc.returncode != 0:
-                    raise Exception(f"Venv command failed with exit code: {proc.returncode}")
-                window.evaluate_js("addLog('[Venv] Virtual environment successfully created.')")
-            except Exception as e:
-                window.evaluate_js("updateStatus('venv', 'fail', 'Failed to create Python virtual environment!')")
-                window.evaluate_js(f"addLog('[Error] Failed venv creation: {e}')")
+            window.evaluate_js("updateProgress(60)")
+            window.evaluate_js("addLog('[System] Waiting for backend port 8000 to respond...')")
+            
+            # Wait for backend port 8000 to become active
+            start_time = time.time()
+            timeout = 15
+            backend_ready = False
+            while time.time() - start_time < timeout:
+                if self.shutdown_triggered:
+                    return
+                backend_ready = self.check_http_ready("http://127.0.0.1:8000/")
+                if not backend_ready:
+                    backend_ready = self.check_port_active(BACKEND_PORT)
+                if backend_ready:
+                    break
+                time.sleep(0.5)
+                
+            if not backend_ready:
+                window.evaluate_js("updateStatus('backend', 'fail', 'Backend service failed to start on port 8000!')")
+                window.evaluate_js("addLog('[Error] Port 8000 timeout exceeded!')")
                 return
-        
-        # Venv exists, install requirements if needed
-        window.evaluate_js("updateStatus('venv', 'checking', 'Checking backend dependencies...')")
-        try:
-            window.evaluate_js("addLog('[Venv] Installing requirements in virtualenv (pip install)...')")
-            proc = subprocess.Popen([venv_pip, "install", "-r", requirements_path], cwd=backend_dir, creationflags=subprocess.CREATE_NO_WINDOW)
-            proc.wait(timeout=300) # 5 minutes timeout
-            if proc.returncode != 0:
-                raise Exception(f"Pip install requirements failed with exit code: {proc.returncode}")
-            window.evaluate_js("addLog('[Venv] Backend dependencies up to date.')")
-        except Exception as e:
-            window.evaluate_js("updateStatus('venv', 'fail', 'Failed to install backend packages!')")
-            window.evaluate_js(f"addLog('[Error] Pip install failed: {e}')")
-            return
-
-        window.evaluate_js("updateStatus('venv', 'ok', 'Python virtual environment & dependencies ready.')")
-        window.evaluate_js("updateProgress(40)")
-
-        # Step 3: Check frontend dependencies (node_modules)
-        window.evaluate_js("updateStatus('deps', 'checking')")
-        if not os.path.exists(node_modules_dir):
-            window.evaluate_js("addLog('[Frontend] node_modules not found. Installing frontend dependencies (npm install)...')")
-            window.evaluate_js("updateStatus('deps', 'checking', 'Installing frontend dependencies (npm install)...')")
+                
+            window.evaluate_js("updateStatus('backend', 'ok', 'ERP microservice is running.')")
+            window.evaluate_js("updateProgress(100)")
+            window.evaluate_js("addLog('[System] Handing over execution to the Web client...')")
+            time.sleep(1.0)
+            
             try:
-                # Use npm.cmd on Windows to resolve properly
-                proc = subprocess.Popen(["npm.cmd", "install"], cwd=frontend_dir, creationflags=subprocess.CREATE_NO_WINDOW)
+                window.evaluate_js("window.location.href = 'http://127.0.0.1:8000'")
+            except Exception:
+                pass
+            try:
+                window.load_url("http://127.0.0.1:8000")
+            except Exception:
+                pass
+                
+        else:
+            # --- Development Mode (Existing flow) ---
+            # Absolute paths setup
+            backend_dir = os.path.join(APP_ROOT, "backend")
+            frontend_dir = os.path.join(APP_ROOT, "frontend")
+            node_modules_dir = os.path.join(frontend_dir, "node_modules")
+            requirements_path = os.path.join(backend_dir, "requirements.txt")
+            
+            venv_python = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
+            venv_pip = os.path.join(backend_dir, ".venv", "Scripts", "pip.exe")
+            
+            # Step 1: Check Node.js
+            window.evaluate_js("updateStatus('node', 'checking')")
+            node_path = self.check_command_installed("node")
+            npm_path = self.check_command_installed("npm")
+            
+            if not node_path or not npm_path:
+                window.evaluate_js("updateStatus('node', 'fail', 'Node.js & NPM not found on System PATH!')")
+                window.evaluate_js("addLog('[Error] Node.js or NPM is not installed globally on this computer.')")
+                window.evaluate_js("addLog('        Please download and install Node.js from https://nodejs.org/')")
+                return
+                
+            window.evaluate_js("updateStatus('node', 'ok', 'Node.js & NPM found successfully.')")
+            window.evaluate_js("updateProgress(20)")
+    
+            # Step 2: Check Python venv (.venv)
+            window.evaluate_js("updateStatus('venv', 'checking')")
+            
+            if not os.path.exists(venv_python):
+                window.evaluate_js("addLog('[Venv] Virtual environment \'.venv\' not found. Creating virtual environment...')")
+                window.evaluate_js("updateStatus('venv', 'checking', 'Creating Python backend virtual environment (.venv)...')")
+                
+                # Find system python
+                sys_python = self.check_command_installed("python")
+                if not sys_python:
+                    window.evaluate_js("updateStatus('venv', 'fail', 'Python not found on System PATH!')")
+                    window.evaluate_js("addLog('[Error] Local Python environment is required to set up the backend.')")
+                    return
+                    
+                try:
+                    # Create venv with 3-minute timeout and absolute paths
+                    window.evaluate_js(f"addLog('[Venv] Running: {sys_python} -m venv .venv in backend/')")
+                    proc = subprocess.Popen([sys_python, "-m", "venv", ".venv"], cwd=backend_dir, creationflags=subprocess.CREATE_NO_WINDOW)
+                    proc.wait(timeout=180)
+                    if proc.returncode != 0:
+                        raise Exception(f"Venv command failed with exit code: {proc.returncode}")
+                    window.evaluate_js("addLog('[Venv] Virtual environment successfully created.')")
+                except Exception as e:
+                    window.evaluate_js("updateStatus('venv', 'fail', 'Failed to create Python virtual environment!')")
+                    window.evaluate_js(f"addLog('[Error] Failed venv creation: {e}')")
+                    return
+            
+            # Venv exists, install requirements if needed
+            window.evaluate_js("updateStatus('venv', 'checking', 'Checking backend dependencies...')")
+            try:
+                window.evaluate_js("addLog('[Venv] Installing requirements in virtualenv (pip install)...')")
+                proc = subprocess.Popen([venv_pip, "install", "-r", requirements_path], cwd=backend_dir, creationflags=subprocess.CREATE_NO_WINDOW)
                 proc.wait(timeout=300) # 5 minutes timeout
                 if proc.returncode != 0:
-                    raise Exception(f"npm install failed with exit code: {proc.returncode}")
-                window.evaluate_js("addLog('[Frontend] Frontend packages successfully installed.')")
+                    raise Exception(f"Pip install requirements failed with exit code: {proc.returncode}")
+                window.evaluate_js("addLog('[Venv] Backend dependencies up to date.')")
             except Exception as e:
-                window.evaluate_js("updateStatus('deps', 'fail', 'Failed to install frontend dependencies!')")
-                window.evaluate_js(f"addLog('[Error] NPM install failed: {e}')")
+                window.evaluate_js("updateStatus('venv', 'fail', 'Failed to install backend packages!')")
+                window.evaluate_js(f"addLog('[Error] Pip install failed: {e}')")
                 return
-                
-        window.evaluate_js("updateStatus('deps', 'ok', 'Frontend dependencies ready.')")
-        window.evaluate_js("updateProgress(60)")
-
-        # Step 4: Launch backend
-        window.evaluate_js("updateStatus('backend', 'checking')")
-        try:
-            window.evaluate_js("addLog('[Backend] Starting FastAPI backend (main.py)...')")
-            self.backend_proc = subprocess.Popen(
-                [venv_python, "main.py"],
-                cwd=backend_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            # Read stdout/stderr logs in separate threads to avoid freezing
-            t1 = threading.Thread(target=self.stream_process_logs, args=(self.backend_proc.stdout, "[Backend] "), daemon=True)
-            t2 = threading.Thread(target=self.stream_process_logs, args=(self.backend_proc.stderr, "[Backend Error] "), daemon=True)
-            t1.start()
-            t2.start()
-        except Exception as e:
-            window.evaluate_js("updateStatus('backend', 'fail', 'Failed to start backend process!')")
-            window.evaluate_js(f"addLog('[Error] Backend startup failure: {e}')")
-            self.cleanup_processes()
-            return
-
-        # Step 5: Launch frontend
-        window.evaluate_js("updateStatus('frontend', 'checking')")
-        try:
-            window.evaluate_js("addLog('[Frontend] Starting Next.js server (npm run dev)...')")
-            self.frontend_proc = subprocess.Popen(
-                ["npm.cmd", "run", "dev"],
-                cwd=frontend_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            t3 = threading.Thread(target=self.stream_process_logs, args=(self.frontend_proc.stdout, "[Frontend] "), daemon=True)
-            t4 = threading.Thread(target=self.stream_process_logs, args=(self.frontend_proc.stderr, "[Frontend Error] "), daemon=True)
-            t3.start()
-            t4.start()
-        except Exception as e:
-            window.evaluate_js("updateStatus('frontend', 'fail', 'Failed to start frontend process!')")
-            window.evaluate_js(f"addLog('[Error] Frontend startup failure: {e}')")
-            self.cleanup_processes()
-            return
-
-        # Step 6: Wait for ports (Socket checking)
-        window.evaluate_js("addLog('[System] Waiting for backend and frontend services to bind to ports...')")
-        window.evaluate_js("updateProgress(80)")
-        
-        start_time = time.time()
-        timeout = 45 # 45 seconds total timeout
-        backend_ready = False
-        frontend_ready = False
-        
-        while time.time() - start_time < timeout:
-            if self.shutdown_triggered:
-                return
-                
-            # Verify if process is still alive
-            if self.backend_proc.poll() is not None:
-                window.evaluate_js(f"updateStatus('backend', 'fail', 'Backend process crashed! Code: {self.backend_proc.returncode}')")
+    
+            window.evaluate_js("updateStatus('venv', 'ok', 'Python virtual environment & dependencies ready.')")
+            window.evaluate_js("updateProgress(40)")
+    
+            # Step 3: Check frontend dependencies (node_modules)
+            window.evaluate_js("updateStatus('deps', 'checking')")
+            if not os.path.exists(node_modules_dir):
+                window.evaluate_js("addLog('[Frontend] node_modules not found. Installing frontend dependencies (npm install)...')")
+                window.evaluate_js("updateStatus('deps', 'checking', 'Installing frontend dependencies (npm install)...')")
+                try:
+                    # Use npm.cmd on Windows to resolve properly
+                    proc = subprocess.Popen(["npm.cmd", "install"], cwd=frontend_dir, creationflags=subprocess.CREATE_NO_WINDOW)
+                    proc.wait(timeout=300) # 5 minutes timeout
+                    if proc.returncode != 0:
+                        raise Exception(f"npm install failed with exit code: {proc.returncode}")
+                    window.evaluate_js("addLog('[Frontend] Frontend packages successfully installed.')")
+                except Exception as e:
+                    window.evaluate_js("updateStatus('deps', 'fail', 'Failed to install frontend dependencies!')")
+                    window.evaluate_js(f"addLog('[Error] NPM install failed: {e}')")
+                    return
+                    
+            window.evaluate_js("updateStatus('deps', 'ok', 'Frontend dependencies ready.')")
+            window.evaluate_js("updateProgress(60)")
+    
+            # Step 4: Launch backend
+            window.evaluate_js("updateStatus('backend', 'checking')")
+            try:
+                window.evaluate_js("addLog('[Backend] Starting FastAPI backend (main.py)...')")
+                self.backend_proc = subprocess.Popen(
+                    [venv_python, "main.py"],
+                    cwd=backend_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                # Read stdout/stderr logs in separate threads to avoid freezing
+                t1 = threading.Thread(target=self.stream_process_logs, args=(self.backend_proc.stdout, "[Backend] "), daemon=True)
+                t2 = threading.Thread(target=self.stream_process_logs, args=(self.backend_proc.stderr, "[Backend Error] "), daemon=True)
+                t1.start()
+                t2.start()
+            except Exception as e:
+                window.evaluate_js("updateStatus('backend', 'fail', 'Failed to start backend process!')")
+                window.evaluate_js(f"addLog('[Error] Backend startup failure: {e}')")
                 self.cleanup_processes()
                 return
-                
-            if self.frontend_proc.poll() is not None:
-                window.evaluate_js(f"updateStatus('frontend', 'fail', 'Frontend process crashed! Code: {self.frontend_proc.returncode}')")
+    
+            # Step 5: Launch frontend
+            window.evaluate_js("updateStatus('frontend', 'checking')")
+            try:
+                window.evaluate_js("addLog('[Frontend] Starting Next.js server (npm run dev)...')")
+                self.frontend_proc = subprocess.Popen(
+                    ["npm.cmd", "run", "dev"],
+                    cwd=frontend_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                t3 = threading.Thread(target=self.stream_process_logs, args=(self.frontend_proc.stdout, "[Frontend] "), daemon=True)
+                t4 = threading.Thread(target=self.stream_process_logs, args=(self.frontend_proc.stderr, "[Frontend Error] "), daemon=True)
+                t3.start()
+                t4.start()
+            except Exception as e:
+                window.evaluate_js("updateStatus('frontend', 'fail', 'Failed to start frontend process!')")
+                window.evaluate_js(f"addLog('[Error] Frontend startup failure: {e}')")
                 self.cleanup_processes()
                 return
-                
-            if not backend_ready:
-                backend_ready = self.check_port_active(BACKEND_PORT)
-                if backend_ready:
-                    window.evaluate_js("updateStatus('backend', 'ok', 'FastAPI backend is running.')")
-                    window.evaluate_js("addLog('[System] Port 8000 (Backend) responded. Backend ready!')")
-                    
-            if not frontend_ready:
-                frontend_ready = self.check_port_active(FRONTEND_PORT)
-                if frontend_ready:
-                    window.evaluate_js("updateStatus('frontend', 'ok', 'Next.js frontend is running.')")
-                    window.evaluate_js("addLog('[System] Port 3000 (Frontend) responded. Frontend ready!')")
-                    
-            if backend_ready and frontend_ready:
-                break
-                
-            time.sleep(1)
+    
+            # Step 6: Wait for ports (Socket checking)
+            window.evaluate_js("addLog('[System] Waiting for backend and frontend services to bind to ports...')")
+            window.evaluate_js("updateProgress(80)")
             
-        if not (backend_ready and frontend_ready):
-            window.evaluate_js("addLog('[Error] Startup timeout exceeded! Port response verification failed.')")
-            if not backend_ready:
-                window.evaluate_js("updateStatus('backend', 'fail', 'Backend port 8000 timeout!')")
-            if not frontend_ready:
-                window.evaluate_js("updateStatus('frontend', 'fail', 'Frontend port 3000 timeout!')")
-            self.cleanup_processes()
-            return
+            start_time = time.time()
+            timeout = 45 # 45 seconds total timeout
+            backend_ready = False
+            frontend_ready = False
+            
+            while time.time() - start_time < timeout:
+                if self.shutdown_triggered:
+                    return
+                    
+                # Verify if process is still alive
+                if self.backend_proc.poll() is not None:
+                    window.evaluate_js(f"updateStatus('backend', 'fail', 'Backend process crashed! Code: {self.backend_proc.returncode}')")
+                    self.cleanup_processes()
+                    return
+                    
+                if self.frontend_proc.poll() is not None:
+                    window.evaluate_js(f"updateStatus('frontend', 'fail', 'Frontend process crashed! Code: {self.frontend_proc.returncode}')")
+                    self.cleanup_processes()
+                    return
+                    
+                if not backend_ready:
+                    backend_ready = self.check_http_ready("http://127.0.0.1:8000/")
+                    if not backend_ready:
+                        backend_ready = self.check_port_active(BACKEND_PORT)
+                    if backend_ready:
+                        window.evaluate_js("updateStatus('backend', 'ok', 'FastAPI backend is running.')")
+                        window.evaluate_js("addLog('[System] Port 8000 (Backend) responded. Backend ready!')")
+                        
+                if not frontend_ready:
+                    frontend_ready = self.check_http_ready("http://127.0.0.1:3000/")
+                    if not frontend_ready:
+                        frontend_ready = self.check_port_active(FRONTEND_PORT)
+                    if frontend_ready:
+                        window.evaluate_js("updateStatus('frontend', 'ok', 'Next.js frontend is running.')")
+                        window.evaluate_js("addLog('[System] Port 3000 (Frontend) responded. Frontend ready!')")
+                        
+                if backend_ready and frontend_ready:
+                    break
+                    
+                time.sleep(1)
+                
+            if not (backend_ready and frontend_ready):
+                window.evaluate_js("addLog('[Error] Startup timeout exceeded! Port response verification failed.')")
+                if not backend_ready:
+                    window.evaluate_js("updateStatus('backend', 'fail', 'Backend port 8000 timeout!')")
+                if not frontend_ready:
+                    window.evaluate_js("updateStatus('frontend', 'fail', 'Frontend port 3000 timeout!')")
+                self.cleanup_processes()
+                return
+    
+            # Startup complete!
+            window.evaluate_js("updateProgress(100)")
+            window.evaluate_js("addLog('[System] Setup initialization complete. Services are fully active!')")
+            time.sleep(2.0) # Safe buffer to ensure Next.js dev server has compiled and is serving requests
+            
+            # Handover: Redirect webview window directly to http://localhost:3000 using both JS and native load_url
+            window.evaluate_js("addLog('[System] Handing over execution to the Web Roster Client...')")
+            try:
+                window.evaluate_js("window.location.href = 'http://localhost:3000'")
+            except Exception:
+                pass
+            try:
+                window.load_url("http://localhost:3000")
+            except Exception:
+                pass
 
-        # Startup complete!
-        window.evaluate_js("updateProgress(100)")
-        window.evaluate_js("addLog('[System] Setup initialization complete. Services are fully active!')")
-        time.sleep(0.5)
-        
-        # Handover: Redirect webview window directly to http://localhost:3000!
-        window.evaluate_js("addLog('[System] Handing over execution to the Web Roster Client...')")
-        window.load_url("http://localhost:3000")
 
     def check_for_updates(self):
         """Queries Github releases to see if updates are available."""
@@ -553,11 +658,10 @@ def main():
     
     # 1. Single instance lock check
     if not service.check_single_instance():
-        # Tkinter fallback just for dialog box since webview hasn't started
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror("Instance Running", "An instance of Metro Railway S&T ERP Launcher is already running!")
-        root.destroy()
+        try:
+            ctypes.windll.user32.MessageBoxW(0, "An instance of Metro Railway S&T ERP Launcher is already running!", "Instance Running", 0x10)
+        except Exception:
+            print("An instance of Metro Railway S&T ERP Launcher is already running!")
         sys.exit(0)
 
     # 2. Expose JS API
@@ -572,7 +676,6 @@ def main():
         height=800,
         min_size=(1024, 768),
         background_color='#121212',
-        icon=icon_path if os.path.exists(icon_path) else None,
         js_api=api
     )
 

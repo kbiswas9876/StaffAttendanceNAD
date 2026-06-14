@@ -1,5 +1,6 @@
 import io
 import os
+import sys
 import json
 import sqlite3
 import shutil
@@ -9,7 +10,8 @@ from datetime import datetime, date
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 # ReportLab imports
@@ -19,11 +21,27 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 
-DB_PATH = "database.db"
-BACKUP_DIR = "backups"
+# Setup persistent directory in User's Documents to keep Desktop clean
+doc_dir = os.path.join(os.path.expanduser("~"), "Documents", "MetroRailwayERP")
+os.makedirs(doc_dir, exist_ok=True)
+DB_PATH = os.path.join(doc_dir, "database.db")
+BACKUP_DIR = os.path.join(doc_dir, "backups")
 
 # Ensure directories exist
 os.makedirs(BACKUP_DIR, exist_ok=True)
+
+# Copy default database from PyInstaller bundle if it doesn't exist
+if not os.path.exists(DB_PATH):
+    if getattr(sys, 'frozen', False):
+        default_db = os.path.join(sys._MEIPASS, "database.db")
+    else:
+        default_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+        
+    if os.path.exists(default_db):
+        try:
+            shutil.copy(default_db, DB_PATH)
+        except Exception as e:
+            print(f"Failed to copy default database: {e}")
 
 app = FastAPI(title="Metro Railway Kolkata S&T Staff Management System Backend")
 
@@ -1988,7 +2006,45 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 
+# Resolve frontend/out directory
+if getattr(sys, 'frozen', False):
+    frontend_out_dir = os.path.join(sys._MEIPASS, "out")
+else:
+    frontend_out_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "out"))
+
+# Mount _next folder for static resources
+if os.path.exists(os.path.join(frontend_out_dir, "_next")):
+    app.mount("/_next", StaticFiles(directory=os.path.join(frontend_out_dir, "_next")), name="next-assets")
+
+# Route to serve other static files or HTML clean URLs
+@app.get("/{path_name:path}")
+async def serve_frontend(path_name: str):
+    # Strip leading/trailing slashes
+    clean_path = path_name.strip("/")
+    
+    if not clean_path:
+        index_path = os.path.join(frontend_out_dir, "index.html")
+        if os.path.isfile(index_path):
+            return FileResponse(index_path)
+            
+    # 1. Try to serve exact file from out directory (e.g. favicon.ico, app_logo.png, etc.)
+    file_path = os.path.join(frontend_out_dir, clean_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+        
+    # 2. Try clean routing (e.g. clean_path = "employees" -> employees.html)
+    html_path = os.path.join(frontend_out_dir, f"{clean_path}.html")
+    if os.path.isfile(html_path):
+        return FileResponse(html_path)
+        
+    # 3. Fallback to 404 or index.html for client-side routing
+    four_oh_four = os.path.join(frontend_out_dir, "404.html")
+    if os.path.isfile(four_oh_four):
+        return FileResponse(four_oh_four)
+    return FileResponse(os.path.join(frontend_out_dir, "index.html"))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
 

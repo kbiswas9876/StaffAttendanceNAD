@@ -248,28 +248,28 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } transition-all duration-300 ease-in-out bg-[#F3F2EC] border-r border-[#E2E0D9] flex flex-col z-20 no-print`}
+        } transition-all duration-300 ease-in-out bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9]">
           {isSidebarOpen ? (
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-black shadow-md shrink-0 select-none">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100">
                 KM
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-black tracking-widest text-slate-800 font-sans">KOLKATA METRO</span>
+                <span className="text-xs font-black tracking-widest text-slate-850 font-sans">KOLKATA METRO</span>
                 <span className="text-[8px] font-extrabold text-blue-600 tracking-widest uppercase font-mono mt-0.5">SIGNAL & TELECOM</span>
               </div>
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-black mx-auto shadow-md select-none">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-black mx-auto shadow-md shadow-blue-500/10 select-none ring-2 ring-blue-100">
               KM
             </div>
           )}
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 rounded bg-[#E5E3DC] hover:bg-[#D9D7CE] text-slate-600 transition cursor-pointer"
+            className="p-1 rounded bg-[#E5E3DC] hover:bg-[#D9D7CE] text-slate-600 hover:text-slate-850 transition cursor-pointer"
           >
             {isSidebarOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
@@ -283,14 +283,17 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
               <Link
                 key={item.path}
                 href={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-150 group cursor-pointer select-none ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-200 group cursor-pointer select-none relative border ${
                   isActive 
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' 
-                    : 'text-slate-655 hover:bg-blue-50/45 hover:text-blue-600'
+                    ? 'bg-white border-[#E2E0D9] text-blue-700 shadow-xs border-l-4 border-l-blue-600' 
+                    : 'border-transparent text-slate-600 hover:bg-[#EFEDE6] hover:text-slate-850'
                 }`}
               >
-                <item.icon size={20} className={isActive ? 'text-white' : 'text-slate-500 group-hover:text-blue-600 transition-colors'} />
+                <item.icon size={20} className={isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-850 transition-colors'} />
                 {isSidebarOpen && <span>{item.name}</span>}
+                {isActive && isSidebarOpen && (
+                  <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                )}
               </Link>
             );
           })}
@@ -604,7 +607,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         )}
 
         {/* Child Router Content */}
-        <main className="flex-1 overflow-auto bg-[#F8FAFC] relative">
+        <main className="flex-1 overflow-auto bg-[#F8FAFC] relative page-transition">
           {children}
         </main>
       </div>

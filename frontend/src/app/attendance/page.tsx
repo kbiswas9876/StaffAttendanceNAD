@@ -1072,8 +1072,29 @@ export default function AttendanceGrid() {
       {/* Grid Container */}
       <div className="flex-1 glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden max-h-[60vh] bg-white shadow-sm">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-slate-400 font-semibold text-sm">
-            Loading roster sheet data...
+          <div className="flex-1 flex flex-col overflow-hidden animate-pulse">
+            <div className="border-b border-slate-200 bg-slate-50 flex">
+              <div className="py-3 px-4 w-[180px] border-r border-slate-200 shrink-0"><div className="h-4 w-24 bg-[#E5E3DC] rounded" /></div>
+              {[...Array(15)].map((_, i) => (
+                <div key={i} className="flex-1 py-3 px-1 border-r border-slate-100 flex justify-center"><div className="h-4 w-6 bg-[#E5E3DC] rounded" /></div>
+              ))}
+            </div>
+            <div className="divide-y divide-slate-100 overflow-y-hidden flex-1">
+              {[...Array(8)].map((_, r) => (
+                <div key={r} className="flex items-center min-h-[60px]">
+                  <div className="py-2 px-3 w-[180px] border-r border-slate-200 flex flex-col justify-center gap-1.5 shrink-0">
+                    <div className="h-3.5 w-28 bg-[#E5E3DC] rounded" />
+                    <div className="h-3 w-16 bg-[#E5E3DC] rounded" />
+                    <div className="h-3 w-20 bg-[#E5E3DC] rounded" />
+                  </div>
+                  {[...Array(15)].map((_, c) => (
+                    <div key={c} className="flex-1 p-2.5 border-r border-slate-100 flex justify-center">
+                      <div className="h-6 w-8 bg-[#E5E3DC]/75 rounded-md" />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex-1 overflow-auto relative">

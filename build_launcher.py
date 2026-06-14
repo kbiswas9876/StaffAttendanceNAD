@@ -38,6 +38,8 @@ def build_executable():
         "--noconsole",
         "--icon=icon.ico",
         "--name=MetroRailwayERP",
+        "--add-data=frontend/out;out",
+        "--add-data=backend/database.db;.",
         "launcher.py"
     ]
     

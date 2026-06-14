@@ -120,13 +120,17 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         
         {/* Card 1: Total Staff */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/10 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-5 flex items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/10 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
           <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <Users size={22} className="stroke-[2.5]" />
           </div>
-          <div>
+          <div className="flex-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Staff Count</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-0.5">{loading ? '...' : totalStaff}</h3>
+            {loading ? (
+              <div className="h-7 w-16 bg-[#E5E3DC] animate-pulse rounded mt-1" />
+            ) : (
+              <h3 className="text-2xl font-black text-slate-800 mt-0.5">{totalStaff}</h3>
+            )}
             <p className="text-[11px] text-slate-500 font-bold mt-0.5">
               {sseCount} SSE | {jeCount} JE | {techCount + helperCount} Staff
             </p>
@@ -134,15 +138,17 @@ export default function Dashboard() {
         </div>
 
         {/* Card 2: Today's Presence */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/10 border border-slate-200/80 hover:border-emerald-300 rounded-2xl p-5 flex items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/10 border border-slate-200/80 hover:border-emerald-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <UserCheck size={22} className="stroke-[2.5]" />
           </div>
-          <div>
+          <div className="flex-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Today's Presence</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-0.5">
-              {loading ? '...' : `${presentToday} / ${totalStaff}`}
-            </h3>
+            {loading ? (
+              <div className="h-7 w-24 bg-[#E5E3DC] animate-pulse rounded mt-1" />
+            ) : (
+              <h3 className="text-2xl font-black text-slate-800 mt-0.5">{presentToday} / {totalStaff}</h3>
+            )}
             <p className="text-[11px] text-slate-500 font-bold mt-0.5">
               {onLeaveToday} On Leave | {restToday} Weekly Rest
             </p>
@@ -150,13 +156,17 @@ export default function Dashboard() {
         </div>
 
         {/* Card 3: Night Duty shifts */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-purple-50/10 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-5 flex items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-purple-50/10 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
           <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <Moon size={22} className="stroke-[2.5]" />
           </div>
-          <div>
+          <div className="flex-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Night Duties</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-0.5">{loading ? '...' : totalNightDutyShifts}</h3>
+            {loading ? (
+              <div className="h-7 w-16 bg-[#E5E3DC] animate-pulse rounded mt-1" />
+            ) : (
+              <h3 className="text-2xl font-black text-slate-800 mt-0.5">{totalNightDutyShifts}</h3>
+            )}
             <p className="text-[11px] text-slate-500 font-bold mt-0.5">
               Accumulated shifts in current cycle
             </p>
@@ -164,13 +174,17 @@ export default function Dashboard() {
         </div>
 
         {/* Card 4: Leaves Logged */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-amber-50/10 border border-slate-200/80 hover:border-amber-300 rounded-2xl p-5 flex items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-amber-50/10 border border-slate-200/80 hover:border-amber-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
           <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <CalendarCheck size={22} className="stroke-[2.5]" />
           </div>
-          <div>
+          <div className="flex-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Leaves Logged</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-0.5">{loading ? '...' : totalLeavesUsed}</h3>
+            {loading ? (
+              <div className="h-7 w-16 bg-[#E5E3DC] animate-pulse rounded mt-1" />
+            ) : (
+              <h3 className="text-2xl font-black text-slate-800 mt-0.5">{totalLeavesUsed}</h3>
+            )}
             <p className="text-[11px] text-slate-500 font-bold mt-0.5">
               Total CL & LAP entries this cycle
             </p>
@@ -206,11 +220,15 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {loading ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
-                      Loading employee directory...
-                    </td>
-                  </tr>
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="py-4 px-5"><div className="h-4 w-24 bg-[#E5E3DC] rounded" /></td>
+                      <td className="py-4 px-5"><div className="h-4 w-32 bg-[#E5E3DC] rounded" /></td>
+                      <td className="py-4 px-5"><div className="h-4 w-20 bg-[#E5E3DC] rounded" /></td>
+                      <td className="py-4 px-5"><div className="h-4 w-12 bg-[#E5E3DC] rounded" /></td>
+                      <td className="py-4 px-5"><div className="h-4 w-16 bg-[#E5E3DC] rounded" /></td>
+                    </tr>
+                  ))
                 ) : employees.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-400">
@@ -252,7 +270,16 @@ export default function Dashboard() {
 
           <div className="space-y-4 flex-1 overflow-y-auto max-h-[350px]">
             {loading ? (
-              <p className="text-center py-6 text-sm text-slate-400">Loading special orders...</p>
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2.5 animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="h-3.5 w-16 bg-[#E5E3DC] rounded" />
+                    <div className="h-3.5 w-24 bg-[#E5E3DC] rounded" />
+                  </div>
+                  <div className="h-3 w-32 bg-[#E5E3DC] rounded" />
+                  <div className="h-3 w-20 bg-[#E5E3DC] rounded" />
+                </div>
+              ))
             ) : specialEvents.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center py-8 text-center">
                 <p className="text-xs text-slate-400 font-bold">No special events registered in this cycle.</p>

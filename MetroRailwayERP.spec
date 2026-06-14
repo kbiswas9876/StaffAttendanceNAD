@@ -5,7 +5,7 @@ a = Analysis(
     ['launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('frontend/out', 'out'), ('backend/database.db', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

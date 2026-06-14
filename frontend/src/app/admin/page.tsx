@@ -22,7 +22,8 @@ import {
   RefreshCw,
   Clock,
   ChevronRight,
-  Info
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   getEmployees, createEmployee, updateEmployee, deleteEmployee, Employee,
@@ -151,7 +152,7 @@ const monthsList = [
 ];
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates'>('employees');
   const [loading, setLoading] = useState(true);
 
   // Data lists
@@ -261,6 +262,51 @@ export default function AdminPanel() {
 
   // 7. Backups states
   const [isBackupRunning, setIsBackupRunning] = useState(false);
+
+  // Updates check states
+  const [currentVersion] = useState('v1.2.0'); // Installed version
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle');
+  const [latestRelease, setLatestRelease] = useState<{
+    tag_name: string;
+    name: string;
+    published_at: string;
+    body: string;
+    html_url: string;
+  } | null>(null);
+
+  const checkSystemUpdates = async () => {
+    setUpdateStatus('checking');
+    try {
+      const res = await fetch('https://api.github.com/repos/kbiswas9876/StaffAttendanceNAD/releases/latest');
+      if (res.status === 404) {
+        setLatestRelease(null);
+        setUpdateStatus('latest');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(`Failed to query releases: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setLatestRelease({
+        tag_name: data.tag_name,
+        name: data.name,
+        published_at: new Date(data.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        body: data.body,
+        html_url: data.html_url
+      });
+      
+      // Compare versions
+      if (data.tag_name !== currentVersion) {
+        setUpdateStatus('available');
+      } else {
+        setUpdateStatus('latest');
+      }
+    } catch (err) {
+      console.error("Failed to check for updates", err);
+      setUpdateStatus('error');
+      showToast("Error checking for updates from GitHub", "error");
+    }
+  };
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -1008,7 +1054,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs navigation grid */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 border-b border-slate-200 pb-3">
+      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2 border-b border-slate-200 pb-3">
         {[
           { id: 'employees', label: 'Enroll & Transfer', icon: Users },
           { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
@@ -1017,7 +1063,8 @@ export default function AdminPanel() {
           { id: 'codes', label: 'Roster Codes', icon: Settings },
           { id: 'holidays', label: 'Holidays Master', icon: CalendarDays },
           { id: 'backups', label: 'DB Backups', icon: Database },
-          { id: 'audit', label: 'Audit Logs', icon: History }
+          { id: 'audit', label: 'Audit Logs', icon: History },
+          { id: 'updates', label: 'System Update', icon: RefreshCw }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1042,8 +1089,45 @@ export default function AdminPanel() {
       </div>
 
       {loading ? (
-        <div className="h-64 flex items-center justify-center text-slate-400 text-sm font-bold">
-          Loading administration records...
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
+          {/* Left Column Form Skeleton */}
+          <div className="space-y-6">
+            <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
+              <div className="h-4 w-36 bg-[#E5E3DC] rounded pb-1" />
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-3 w-16 bg-[#E5E3DC] rounded" />
+                    <div className="h-9 w-full bg-[#FAF9F6] border border-slate-200/50 rounded-lg" />
+                  </div>
+                ))}
+                <div className="h-9 w-24 bg-[#E5E3DC] rounded-lg mt-2" />
+              </div>
+            </div>
+          </div>
+          {/* Right Column List Skeleton */}
+          <div className="lg:col-span-2 glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden bg-white shadow-sm">
+            <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <div className="h-4 w-44 bg-[#E5E3DC] rounded" />
+              <div className="h-6 w-16 bg-[#E5E3DC] rounded" />
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex border-b border-slate-200 pb-2">
+                <div className="flex-1"><div className="h-3 w-20 bg-[#E5E3DC] rounded" /></div>
+                <div className="flex-1"><div className="h-3 w-28 bg-[#E5E3DC] rounded" /></div>
+                <div className="flex-1"><div className="h-3 w-24 bg-[#E5E3DC] rounded" /></div>
+                <div className="w-16"><div className="h-3 w-10 bg-[#E5E3DC] rounded" /></div>
+              </div>
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex py-3 border-b border-slate-100 items-center">
+                  <div className="flex-1"><div className="h-4 w-24 bg-[#E5E3DC] rounded" /></div>
+                  <div className="flex-1"><div className="h-4 w-32 bg-[#E5E3DC] rounded" /></div>
+                  <div className="flex-1"><div className="h-4 w-20 bg-[#E5E3DC] rounded" /></div>
+                  <div className="w-16 flex gap-1"><div className="h-6 w-10 bg-[#E5E3DC] rounded" /></div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2405,6 +2489,102 @@ export default function AdminPanel() {
                 </table>
               </div>
             </div>
+          )}
+
+          {activeTab === 'updates' && (
+            <>
+              {/* Left Column: Version & Info */}
+              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+                  <RefreshCw size={15} className="text-blue-600 animate-spin" style={{ animationDuration: '3s' }} />
+                  Software Update Center
+                </h3>
+                
+                <div className="space-y-4 text-xs font-semibold">
+                  <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Installed Version:</span>
+                    <span className="font-mono text-slate-850 bg-slate-100 px-2 py-0.5 rounded font-bold">{currentVersion}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Release Channel:</span>
+                    <span className="font-bold text-emerald-600">Stable (Production)</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Hosting Platform:</span>
+                    <span className="font-mono text-slate-500">GitHub Releases</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={checkSystemUpdates}
+                  disabled={updateStatus === 'checking'}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-sm shadow-blue-500/10"
+                >
+                  <RefreshCw size={14} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
+                  {updateStatus === 'checking' ? "Checking GitHub..." : "Check for Updates"}
+                </button>
+              </div>
+
+              {/* Right Column: Update details (spans 2 columns) */}
+              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col p-5 space-y-4 animate-scale-up">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b">
+                  Release Information
+                </h3>
+                
+                {updateStatus === 'idle' && (
+                  <div className="h-48 flex flex-col items-center justify-center text-center text-slate-400">
+                    <RefreshCw size={32} className="text-slate-200 mb-2 animate-pulse" />
+                    <p className="text-xs font-bold">No update search triggered yet.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Click the button on the left to verify with the GitHub releases repository.</p>
+                  </div>
+                )}
+
+                {updateStatus === 'latest' && (
+                  <div className="h-48 flex flex-col items-center justify-center text-center text-emerald-600 bg-emerald-50/30 rounded-xl border border-emerald-100 p-4">
+                    <CheckCircle size={32} className="text-emerald-500 mb-2 animate-bounce" />
+                    <p className="text-xs font-bold uppercase tracking-wider">System is up to date!</p>
+                    <p className="text-[10px] text-slate-500 mt-1">You are currently running the latest version of KM S&T ERP ({currentVersion}).</p>
+                  </div>
+                )}
+
+                {updateStatus === 'available' && latestRelease && (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-200 flex justify-between items-center animate-fade-in">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-extrabold text-blue-700 uppercase tracking-wide">New Update Available!</span>
+                        <span className="text-[10px] text-slate-500 font-bold">{latestRelease.name} ({latestRelease.tag_name})</span>
+                      </div>
+                      <a 
+                        href={latestRelease.html_url} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition shadow-md shadow-blue-500/10 text-center"
+                      >
+                        Download Update
+                      </a>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                        <span>Release Log</span>
+                        <span>Date: {latestRelease.published_at}</span>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-[180px] overflow-y-auto font-mono text-[10px] leading-relaxed text-slate-700 whitespace-pre-wrap">
+                        {latestRelease.body || "No release notes provided."}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {updateStatus === 'error' && (
+                  <div className="h-48 flex flex-col items-center justify-center text-center text-rose-600 bg-rose-50/30 rounded-xl border border-rose-100 p-4">
+                    <AlertTriangle size={32} className="text-rose-500 mb-2" />
+                    <p className="text-xs font-bold uppercase tracking-wider">Update Check Failed</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Could not connect to GitHub API. Please check your internet connection and try again.</p>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
         </div>
