@@ -61,14 +61,23 @@ A **premium-quality, fully offline desktop application** for managing Signal & T
 
 ### Running Locally
 
-**Option A — Batch Launcher (Recommended)**
+**Option A — Standalone Desktop Launcher (Recommended & Easiest)**
 
-Double-click `run_app.bat` from the project root. It will:
-- Start the FastAPI backend on `http://localhost:8000`
-- Start the Next.js frontend on `http://localhost:3000`
-- Open the application in standalone Microsoft Edge App Mode
+Simply run the compiled executable: **`dist/MetroRailwayERP.exe`** (you can create a Desktop shortcut to it for quick access). 
+* **Zero Configuration**: On the first run, the launcher automatically checks for Node.js, sets up the Python backend virtual environment, installs any missing Python/NPM packages in the background, and runs the servers invisibly.
+* **App Window Mode**: Opens the application interface directly in Microsoft Edge App Mode, making it look and feel like a native desktop application.
+* **Process Safety**: Prevents duplicate instances using a single-instance lock and forcefully terminates all background process trees (`taskkill /F /T`) upon window closure to ensure zero memory leaks and free ports.
 
-**Option B — Manual**
+To compile or re-package the launcher after code edits:
+```bash
+python build_launcher.py
+```
+
+**Option B — Batch Launcher**
+
+Double-click `run_app.bat` from the project root. It will start both backend and frontend servers in separate command prompt windows.
+
+**Option C — Manual**
 
 ```bash
 # Terminal 1 — Backend
