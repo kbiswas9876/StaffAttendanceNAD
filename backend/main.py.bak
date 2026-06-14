@@ -518,7 +518,6 @@ class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
         super(NumberedCanvas, self).__init__(*args, **kwargs)
         self._saved_page_states = []
-        self._pageCompression = 0
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -1436,7 +1435,7 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"inline; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 # --- Endpoint 2: Export Night Duty PDF ---
@@ -1573,7 +1572,7 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 # --- Endpoint 3: Export Attendance Sheet Excel ---
@@ -1757,7 +1756,7 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"inline; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 # --- Endpoint 4: Export Attendance PDF ---
@@ -1985,7 +1984,7 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 if __name__ == "__main__":
