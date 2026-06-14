@@ -88,11 +88,28 @@ export default function Dashboard() {
   const totalNightDutyShifts = attendance.filter(a => a.status === 'P/N').length;
   const totalLeavesUsed = attendance.filter(a => ['CL', 'LAP', 'Sick', 'SCL'].includes(a.status)).length;
   
-  // Today's presence metrics based on mid-cycle date representation
-  const todayAttendance = attendance.filter(a => a.date === DASHBOARD_TODAY);
-  const presentToday = todayAttendance.filter(a => ['P', 'P/N'].includes(a.status)).length;
-  const onLeaveToday = todayAttendance.filter(a => ['CL', 'LAP', 'Sick', 'SCL'].includes(a.status)).length;
-  const restToday = todayAttendance.filter(a => a.status === 'R' || a.status === 'CR').length;
+  // Leaves details
+  const clCount = attendance.filter(a => a.status === 'CL').length;
+  const lapCount = attendance.filter(a => a.status === 'LAP').length;
+  const sickCount = attendance.filter(a => a.status === 'Sick').length;
+
+  // CR tracking
+  const totalCRAvailed = attendance.filter(a => a.status === 'CR').length;
+  
+  let totalCREarned = 0;
+  employees.forEach(emp => {
+    const empLogs = attendance.filter(a => a.emp_id === emp.emp_id);
+    empLogs.forEach(log => {
+      if (['P', 'P/N'].includes(log.status)) {
+        const logDate = new Date(log.date);
+        const weekday = logDate.toLocaleDateString('en-US', { weekday: 'long' });
+        if (weekday === emp.default_rest_day) {
+          totalCREarned++;
+        }
+      }
+    });
+  });
+  const totalCRAccrued = Math.max(0, totalCREarned - totalCRAvailed);
 
   return (
     <div className="p-6 space-y-6">
@@ -137,20 +154,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Card 2: Today's Presence */}
+        {/* Card 2: Compensatory Rest (CR) */}
         <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/10 border border-slate-200/80 hover:border-emerald-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
-            <UserCheck size={22} className="stroke-[2.5]" />
+            <CalendarDays size={22} className="stroke-[2.5]" />
           </div>
           <div className="flex-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Today's Presence</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Compensatory Rest</span>
             {loading ? (
               <div className="h-7 w-24 bg-[#E5E3DC] animate-pulse rounded mt-1" />
             ) : (
-              <h3 className="text-2xl font-black text-slate-800 mt-0.5">{presentToday} / {totalStaff}</h3>
+              <h3 className="text-2xl font-black text-slate-800 mt-0.5">{totalCRAvailed} Consumed</h3>
             )}
             <p className="text-[11px] text-slate-500 font-bold mt-0.5">
-              {onLeaveToday} On Leave | {restToday} Weekly Rest
+              {totalCREarned} Earned | {totalCRAccrued} Accrued (Available)
             </p>
           </div>
         </div>
@@ -186,7 +203,7 @@ export default function Dashboard() {
               <h3 className="text-2xl font-black text-slate-800 mt-0.5">{totalLeavesUsed}</h3>
             )}
             <p className="text-[11px] text-slate-500 font-bold mt-0.5">
-              Total CL & LAP entries this cycle
+              {clCount} CL | {lapCount} LAP | {sickCount} Medical
             </p>
           </div>
         </div>

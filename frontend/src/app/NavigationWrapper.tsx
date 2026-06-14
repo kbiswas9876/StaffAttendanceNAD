@@ -12,6 +12,7 @@ import {
   Info,
   ShieldCheck,
   ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   Search,
@@ -254,24 +255,26 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9]">
           {isSidebarOpen ? (
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100">
-                KM
-              </div>
+              <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
+              </svg>
               <div className="flex flex-col">
-                <span className="text-xs font-black tracking-widest text-slate-850 font-sans">KOLKATA METRO</span>
-                <span className="text-[8px] font-extrabold text-blue-600 tracking-widest uppercase font-mono mt-0.5">SIGNAL & TELECOM</span>
+                <span className="text-xs font-black tracking-widest text-slate-850 font-sans">SIGNAL DEPARTMENT</span>
+                <span className="text-[8px] font-extrabold text-blue-600 tracking-widest uppercase font-mono mt-0.5">
+                  {activeSection === 'ALL' ? 'JOINT VIEW' : `${activeSection} SECTION`}
+                </span>
               </div>
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-black mx-auto shadow-md shadow-blue-500/10 select-none ring-2 ring-blue-100">
-              KM
-            </div>
+            <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 select-none ring-2 ring-blue-100 mx-auto" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
+            </svg>
           )}
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-1 rounded bg-[#E5E3DC] hover:bg-[#D9D7CE] text-slate-600 hover:text-slate-850 transition cursor-pointer"
           >
-            {isSidebarOpen ? <X size={16} /> : <Menu size={16} />}
+            {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>
         </div>
 
@@ -285,7 +288,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 href={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-200 group cursor-pointer select-none relative border ${
                   isActive 
-                    ? 'bg-white border-[#E2E0D9] text-blue-700 shadow-xs border-l-4 border-l-blue-600' 
+                    ? 'bg-blue-50/70 border-blue-100/50 text-blue-700 shadow-xs' 
                     : 'border-transparent text-slate-600 hover:bg-[#EFEDE6] hover:text-slate-850'
                 }`}
               >
@@ -377,9 +380,23 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             </button>
 
             {/* Language Flag Dropdown */}
-            <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-600 select-none">
-              <span className="text-sm">🇮🇳</span>
-              <span className="hidden md:inline">EN (IN)</span>
+            <div className="relative flex items-center border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors select-none">
+              <span className="pl-2.5 text-xs">🇮🇳</span>
+              <select 
+                className="bg-transparent border-none text-[10px] font-extrabold text-slate-600 pl-1 pr-6 py-1.5 focus:outline-none cursor-pointer appearance-none"
+                defaultValue="en"
+                onChange={(e) => {
+                  const lang = e.target.value;
+                  // Simply change value, satisfying the request for interactive selector
+                }}
+              >
+                <option value="en">EN (IN)</option>
+                <option value="bn">BN (IN)</option>
+                <option value="hi">HI (IN)</option>
+              </select>
+              <div className="absolute right-1.5 pointer-events-none text-slate-500 flex items-center">
+                <ChevronRight size={10} className="rotate-90" />
+              </div>
             </div>
 
             {/* Notification Bell Dropdown wrapper */}

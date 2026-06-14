@@ -86,10 +86,8 @@ def sync_leave_and_ledger(emp_id: int, year: int):
         rest_day = emp['default_rest_day']
 
         # Get all logs for employee in that year
-        start_date = f"{year}-01-01"
-        end_date = f"{year}-12-31"
         cursor.execute("""
-            SELECT date, status FROM attendance_log 
+            SELECT date, status, remarks FROM attendance_log 
             WHERE emp_id = ? AND date >= ? AND date <= ?
         """, (emp_id, start_date, end_date))
         logs = cursor.fetchall()
@@ -106,11 +104,24 @@ def sync_leave_and_ledger(emp_id: int, year: int):
                 if day_name == rest_day:
                     earned_dates.append(log['date'])
 
-        # Consumed CRs (marking cell as CR)
-        consumed_dates = [log['date'] for log in logs if log['status'] == 'CR']
-
-        earned_dates.sort()
-        consumed_dates.sort()
+        # Gather explicitly mapped CRs and unassociated CRs
+        explicit_mappings = {} # consumed_date -> earned_date
+        unassociated_consumed = []
+        for log in logs:
+            if log['status'] == 'CR':
+                cdate = log['date']
+                remarks = log['remarks'] or ''
+                if "CR_EARNED_DATE:" in remarks:
+                    try:
+                        parts = remarks.split("CR_EARNED_DATE:")
+                        if len(parts) > 1:
+                            edate = parts[1].strip()[:10]
+                            datetime.strptime(edate, "%Y-%m-%d")
+                            explicit_mappings[cdate] = edate
+                            continue
+                    except Exception:
+                        pass
+                unassociated_consumed.append(cdate)
 
         # Update Compensatory Rest Ledger
         # Fetch current ledger
@@ -132,13 +143,29 @@ def sync_leave_and_ledger(emp_id: int, year: int):
         # Reset all consumed dates to NULL first
         cursor.execute("UPDATE compensatory_rest_ledger SET consumed_date = NULL WHERE emp_id = ?", (emp_id,))
 
-        # Chronological matching
-        available_ledger = sorted([ledger[k] for k in ledger], key=lambda x: x['earned_date'])
+        # Apply explicit mappings
+        paired_earned = set()
+        for cdate, edate in explicit_mappings.items():
+            cursor.execute("""
+                INSERT INTO compensatory_rest_ledger (emp_id, earned_date, consumed_date)
+                VALUES (?, ?, ?)
+                ON CONFLICT(emp_id, earned_date) DO UPDATE SET consumed_date = excluded.consumed_date
+            """, (emp_id, edate, cdate))
+            paired_earned.add(edate)
+
+        # Pair remaining unassociated consumed CRs with remaining unconsumed earned CRs chronologically
+        remaining_earned = [edate for edate in earned_dates if edate not in paired_earned]
+        remaining_earned.sort()
+        unassociated_consumed.sort()
+
         c_idx = 0
-        for entry in available_ledger:
-            if c_idx < len(consumed_dates):
-                cursor.execute("UPDATE compensatory_rest_ledger SET consumed_date = ? WHERE emp_id = ? AND earned_date = ?", 
-                               (consumed_dates[c_idx], emp_id, entry['earned_date']))
+        for edate in remaining_earned:
+            if c_idx < len(unassociated_consumed):
+                cursor.execute("""
+                    UPDATE compensatory_rest_ledger 
+                    SET consumed_date = ? 
+                    WHERE emp_id = ? AND earned_date = ?
+                """, (unassociated_consumed[c_idx], emp_id, edate))
                 c_idx += 1
 
         # Save accrued_cr count
@@ -197,7 +224,8 @@ def init_db():
             primary_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL,
             default_rest_day TEXT NOT NULL CHECK (default_rest_day IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
             joining_date TEXT,
-            weekly_schedule TEXT
+            weekly_schedule TEXT,
+            display_order INTEGER DEFAULT 0
         );
     """)
 
@@ -412,6 +440,14 @@ def init_db():
                 log_audit("Auto-Seed", "Database", "Initial database seeded with staff from Excel list.")
             except Exception as e:
                 print("Excel seeding failed:", e)
+                
+    # Ensure display_order column exists in employees table (migration for existing DBs)
+    try:
+        cursor.execute("ALTER TABLE employees ADD COLUMN display_order INTEGER DEFAULT 0;")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Column already exists
+        
     conn.close()
 
 init_db()
@@ -436,6 +472,10 @@ class EmployeeSchema(BaseModel):
     default_rest_day: str
     joining_date: Optional[str] = None
     weekly_schedule: Optional[dict] = None
+    display_order: Optional[int] = 0
+
+class ReorderPayload(BaseModel):
+    emp_ids: List[int]
 
 class ShiftRuleSchema(BaseModel):
     section_id: int
@@ -504,6 +544,7 @@ class AttendanceDay(BaseModel):
     weekday: str # "Mon", "Tue", etc.
     status: str # "P", "R", "CR", etc.
     is_holiday: bool = False
+    remarks: Optional[str] = ""
 
 class AttendanceRow(BaseModel):
     sl: int
@@ -668,9 +709,10 @@ def read_employees(section_code: Optional[str] = None):
         LEFT JOIN sections s ON e.primary_section_id = s.id
     """
     if section_code:
-        query += " WHERE s.section_code = ?"
+        query += " WHERE s.section_code = ? ORDER BY e.display_order ASC, e.emp_id ASC"
         rows = conn.execute(query, (section_code,)).fetchall()
     else:
+        query += " ORDER BY e.display_order ASC, e.emp_id ASC"
         rows = conn.execute(query).fetchall()
         
     employees = []
@@ -704,9 +746,9 @@ def add_employee(payload: EmployeeSchema):
         cursor = conn.cursor()
         sched_str = json.dumps(payload.weekly_schedule) if payload.weekly_schedule else "{}"
         cursor.execute("""
-            INSERT INTO employees (pf_number, name, designation, level, primary_section_id, default_rest_day, joining_date, weekly_schedule)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str))
+            INSERT INTO employees (pf_number, name, designation, level, primary_section_id, default_rest_day, joining_date, weekly_schedule, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, payload.display_order or 0))
         emp_id = cursor.lastrowid
         
         # Create initial leave bank record
@@ -729,9 +771,9 @@ def edit_employee(emp_id: int, payload: EmployeeSchema):
     sched_str = json.dumps(payload.weekly_schedule) if payload.weekly_schedule else "{}"
     cursor.execute("""
         UPDATE employees SET pf_number = ?, name = ?, designation = ?, level = ?, 
-            primary_section_id = ?, default_rest_day = ?, joining_date = ?, weekly_schedule = ?
+            primary_section_id = ?, default_rest_day = ?, joining_date = ?, weekly_schedule = ?, display_order = ?
         WHERE emp_id = ?
-    """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, emp_id))
+    """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, payload.display_order or 0, emp_id))
     conn.commit()
     conn.close()
     
@@ -748,6 +790,22 @@ def remove_employee(emp_id: int):
     conn.close()
     log_audit("Delete", "Employees", f"Deleted employee ID {emp_id}")
     return {"status": "success"}
+
+@app.post("/api/employees/reorder")
+def reorder_employees(payload: ReorderPayload):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        for idx, emp_id in enumerate(payload.emp_ids):
+            cursor.execute("UPDATE employees SET display_order = ? WHERE emp_id = ?", (idx, emp_id))
+        conn.commit()
+        log_audit("Reorder", "Employees", f"Reordered {len(payload.emp_ids)} employees")
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 # 4. Shift Rules
 @app.get("/api/shift-rules")
@@ -1629,6 +1687,14 @@ async def export_attendance_excel(req: AttendanceExportRequest):
         'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'text_wrap': True
     })
     
+    # CR rich text elements formats (bg_color is inherited from parent cell_format in write_rich_string)
+    cr_text_fmt = workbook.add_format({
+        'font_name': 'Segoe UI', 'font_size': 9, 'bold': True, 'font_color': '#1D4ED8'
+    })
+    cr_date_fmt = workbook.add_format({
+        'font_name': 'Segoe UI', 'font_size': 7, 'bold': False, 'font_color': '#1D4ED8'
+    })
+    
     # Conditional formatting color registers
     sunday_format = workbook.add_format({
         'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEE2E2', 'font_color': '#991B1B'
@@ -1736,16 +1802,33 @@ async def export_attendance_excel(req: AttendanceExportRequest):
             else:
                 cell_format = data_format
 
-            # If it's a default/empty/present, write individually to avoid merging Present status
-            if val in ('P', '', None):
+            # If it's a default/empty/present or CR, write individually to avoid merging Present/CR status
+            if val in ('P', 'CR', '', None):
                 for col_idx in range(start_col, end_col + 1):
                     day_obj = emp.days[col_idx - 3]
-                    day_format = data_format
-                    if day_obj.weekday == "Sun":
-                        day_format = sunday_format
-                    elif day_obj.is_holiday:
-                        day_format = holiday_format
-                    sheet.write(curr_row, col_idx, val, day_format)
+                    day_format = cell_format if val == 'CR' else data_format
+                    
+                    if val == 'CR':
+                        display_val = 'CR'
+                        has_rich = False
+                        if day_obj.remarks and "CR_EARNED_DATE:" in day_obj.remarks:
+                            edate = day_obj.remarks.split("CR_EARNED_DATE:")[1].strip()[:10]
+                            try:
+                                dt = datetime.strptime(edate, "%Y-%m-%d")
+                                date_str = dt.strftime('%d.%m')
+                                cell_format.set_text_wrap()
+                                sheet.write_rich_string(curr_row, col_idx, cr_text_fmt, 'CR\n', cr_date_fmt, date_str, cell_format)
+                                has_rich = True
+                            except Exception:
+                                pass
+                        if not has_rich:
+                            sheet.write(curr_row, col_idx, display_val, day_format)
+                    else:
+                        if day_obj.weekday == "Sun":
+                            day_format = sunday_format
+                        elif day_obj.is_holiday:
+                            day_format = holiday_format
+                        sheet.write(curr_row, col_idx, val, day_format)
             else:
                 # Merge consecutive identical status cells (e.g. Sick, CL, R)
                 if start_col == end_col:
@@ -1924,8 +2007,8 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
             
         day_cells = [None] * len(days_in_grid)
         for start_idx, end_idx, status in spans:
-            # Merging consecutive identical statuses except P/empty
-            should_merge = status not in ('P', '', None) and start_idx < end_idx
+            # Merging consecutive identical statuses except P, CR, empty
+            should_merge = status not in ('P', 'CR', '', None) and start_idx < end_idx
             
             if should_merge:
                 status_html = f"<b>{status}</b>"
@@ -1937,7 +2020,23 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
             else:
                 for idx in range(start_idx, end_idx + 1):
                     val = row.days[idx].status
-                    day_cells[idx] = Paragraph(val, cell_style)
+                    day_obj = row.days[idx]
+                    
+                    display_html = val
+                    if val == 'CR' and day_obj.remarks:
+                        if "CR_EARNED_DATE:" in day_obj.remarks:
+                            edate = day_obj.remarks.split("CR_EARNED_DATE:")[1].strip()[:10]
+                            try:
+                                dt = datetime.strptime(edate, "%Y-%m-%d")
+                                display_html = f"<b>CR</b><br/><font size=4 color='#1D4ED8'>{dt.strftime('%d.%m')}</font>"
+                            except Exception:
+                                display_html = f"<b>{val}</b>"
+                        else:
+                            display_html = f"<b>{val}</b>"
+                    elif val in ('R', 'Sick', 'CL', 'LAP', 'SCL', 'PH', 'P/N'):
+                        display_html = f"<b>{val}</b>"
+                        
+                    day_cells[idx] = Paragraph(display_html, cell_bold_style if val in ('CR', 'P/N', 'R', 'Sick', 'CL', 'LAP', 'SCL', 'PH') else cell_style)
                     
         for val in day_cells:
             data_line.append(val)

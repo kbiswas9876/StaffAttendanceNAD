@@ -191,6 +191,7 @@ export default function AttendanceGrid() {
   const [customModal, setCustomModal] = useState<{ isOpen: boolean; empId: number; dateStr: string } | null>(null);
   const [customCodeInput, setCustomCodeInput] = useState('');
   const [crModal, setCrModal] = useState<{ isOpen: boolean; empId: number; dateStr: string; availableEntries: CRLedgerEntry[] } | null>(null);
+  const [manualCrDate, setManualCrDate] = useState<string>('');
   
   // Roster Simulation/Preview Modal state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -348,7 +349,8 @@ export default function AttendanceGrid() {
           day: day.dayNum,
           weekday: day.weekday,
           status: log?.status || '',
-          is_holiday: day.isSunday
+          is_holiday: day.isSunday,
+          remarks: log?.remarks || ''
         };
       });
 
@@ -1154,28 +1156,47 @@ export default function AttendanceGrid() {
                       {days.map((day) => {
                         const log = empGrid[day.dateStr];
                         const status = log ? log.status : '';
+                        const earnedDateShort = log?.remarks && log.remarks.startsWith('CR_EARNED_DATE:')
+                          ? (() => {
+                              const parts = log.remarks.split('CR_EARNED_DATE:');
+                              if (parts[1]) {
+                                const dParts = parts[1].split('-');
+                                if (dParts[1] && dParts[2]) {
+                                  return `${dParts[2]}.${dParts[1]}`;
+                                }
+                              }
+                              return '';
+                            })()
+                          : '';
 
                         return (
                           <td
                             key={day.dateStr}
-                            className="p-1 border-r border-slate-200 relative"
+                            className="p-1 border-r border-slate-200 relative animate-fade-in"
                             style={getCellStyle(status, day.isSunday)}
                           >
-                            <select
-                              value={status}
-                              onChange={(e) => handleCellChange(emp.emp_id, day.dateStr, e.target.value)}
-                              className="w-full h-full text-center bg-transparent border-none appearance-none font-bold text-[10px] focus:outline-none cursor-pointer p-1"
-                              style={{ color: getCellStyle(status, day.isSunday).color }}
-                            >
-                              <option value="" className="bg-white text-slate-450">—</option>
-                              {allCodes.map((c) => (
-                                <option key={c.code} value={c.code} className="bg-white text-slate-800" style={{ color: c.text_color }}>
-                                  {c.code}
-                                </option>
-                              ))}
-                              <option value="CUSTOM_CODE" className="bg-white text-blue-600 font-bold">Custom...</option>
-                              <option value="DELETE" className="bg-white text-rose-600 font-bold">Delete</option>
-                            </select>
+                            <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px]">
+                              <select
+                                value={status}
+                                onChange={(e) => handleCellChange(emp.emp_id, day.dateStr, e.target.value)}
+                                className="w-full text-center bg-transparent border-none appearance-none font-bold text-[10px] focus:outline-none cursor-pointer pb-0.5"
+                                style={{ color: getCellStyle(status, day.isSunday).color }}
+                              >
+                                <option value="" className="bg-white text-slate-450">—</option>
+                                {allCodes.map((c) => (
+                                  <option key={c.code} value={c.code} className="bg-white text-slate-800" style={{ color: c.text_color }}>
+                                    {c.code}
+                                  </option>
+                                ))}
+                                <option value="CUSTOM_CODE" className="bg-white text-blue-600 font-bold">Custom...</option>
+                                <option value="DELETE" className="bg-white text-rose-600 font-bold">Delete</option>
+                              </select>
+                              {status === 'CR' && earnedDateShort && (
+                                <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px]">
+                                  {earnedDateShort}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         );
                       })}
@@ -1556,86 +1577,151 @@ export default function AttendanceGrid() {
       )}
 
       {/* CR Selection Modal */}
-      {crModal && crModal.isOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
-          <div className="bg-white border border-slate-200 w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                <CalendarDays size={16} className="text-blue-600" />
-                Select Compensatory Rest (CR) Source
-              </h3>
-              <button onClick={() => setCrModal(null)} className="text-slate-400 hover:text-slate-655 text-xs font-bold">✕</button>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                Select an accrued earned rest day work or manual entry to associate with this CR consumption on <strong>{crModal.dateStr}</strong>:
-              </p>
+      {crModal && crModal.isOpen && (() => {
+        const handleApplyEarnedDate = (earnedDateStr: string, entryId?: number) => {
+          if (!earnedDateStr) {
+            showToast("Please enter or select a valid earned date.", "error");
+            return;
+          }
+          const availedDate = new Date(crModal.dateStr);
+          const earnedDate = new Date(earnedDateStr);
+          
+          if (earnedDate > availedDate) {
+            showToast("Earned date cannot be after the availed date.", "error");
+            return;
+          }
+          
+          const diffTime = availedDate.getTime() - earnedDate.getTime();
+          const diffDays = diffTime / (1000 * 60 * 60 * 24);
+          
+          const proceed = () => {
+            if (entryId) {
+              setCrAssociations(prev => ({ ...prev, [`${crModal.empId}_${crModal.dateStr}`]: entryId }));
+            }
+            setGridData((prev) => {
+              const empGrid = { ...(prev[crModal.empId] || {}) };
+              const oldLog = empGrid[crModal.dateStr];
+              empGrid[crModal.dateStr] = {
+                ...oldLog,
+                emp_id: crModal.empId,
+                date: crModal.dateStr,
+                status: 'CR',
+                is_night: false,
+                remarks: `CR_EARNED_DATE:${earnedDateStr}`
+              };
+              return { ...prev, [crModal.empId]: empGrid };
+            });
+            setIsModified(true);
+            setCrModal(null);
+            setManualCrDate('');
+            showToast(`Associated CR with earned date: ${earnedDateStr}`, "success");
+          };
 
-              <div className="max-h-[220px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 bg-slate-50/50">
-                {crModal.availableEntries.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-400 font-semibold">
-                    No available unconsumed CR earned records found.
-                  </div>
-                ) : (
-                  crModal.availableEntries.map((entry) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      onClick={() => {
-                        setCrAssociations(prev => ({ ...prev, [`${crModal.empId}_${crModal.dateStr}`]: entry.id! }));
-                        setGridData((prev) => {
-                          const empGrid = { ...(prev[crModal.empId] || {}) };
-                          const oldLog = empGrid[crModal.dateStr];
-                          empGrid[crModal.dateStr] = {
-                            ...oldLog,
-                            emp_id: crModal.empId,
-                            date: crModal.dateStr,
-                            status: 'CR',
-                            is_night: false
-                          };
-                          return { ...prev, [crModal.empId]: empGrid };
-                        });
-                        setIsModified(true);
-                        setCrModal(null);
-                        showToast(`Associated CR with earned date: ${entry.earned_date}`, "success");
-                      }}
-                      className="w-full text-left p-3 hover:bg-blue-50/60 transition flex justify-between items-center cursor-pointer group"
-                    >
-                      <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">Earned Date: {entry.earned_date}</span>
-                      <span className="text-[10px] bg-blue-50 border border-blue-200 text-blue-700 font-bold px-2 py-0.5 rounded-full">Available</span>
-                    </button>
-                  ))
-                )}
+          if (diffDays > 31) {
+            setConfirmDialog({
+              isOpen: true,
+              title: "CR Expiry Warning",
+              message: `Compensatory Rest should ideally be availed within 1 month. The earned date (${earnedDateStr}) is ${Math.round(diffDays)} days prior to the availed date (${crModal.dateStr}). Proceed anyway?`,
+              onConfirm: () => {
+                setConfirmDialog(null);
+                proceed();
+              }
+            });
+          } else {
+            proceed();
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
+            <div className="bg-white border border-slate-200 w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50/50">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                  <CalendarDays size={16} className="text-blue-600" />
+                  Select Compensatory Rest (CR) Source
+                </h3>
+                <button onClick={() => { setCrModal(null); setManualCrDate(''); }} className="text-slate-400 hover:text-slate-655 text-xs font-bold">✕</button>
               </div>
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-slate-650 font-semibold leading-relaxed">
+                  Select an accrued earned rest day work or enter manually to associate with CR on <strong className="text-blue-600">{crModal.dateStr}</strong>:
+                </p>
 
-              <div className="flex justify-between items-center pt-3 border-t border-slate-100 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGridData((prev) => {
-                      const empGrid = { ...(prev[crModal.empId] || {}) };
-                      const oldLog = empGrid[crModal.dateStr];
-                      empGrid[crModal.dateStr] = {
-                        ...oldLog,
-                        emp_id: crModal.empId,
-                        date: crModal.dateStr,
-                        status: 'CR',
-                        is_night: false
-                      };
-                      return { ...prev, [crModal.empId]: empGrid };
-                    });
-                    setIsModified(true);
-                    setCrModal(null);
-                  }}
-                  className="px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-650 font-bold text-xs uppercase cursor-pointer"
-                >
-                  Proceed Unassociated
-                </button>
+                {/* Suggestions List */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Suggested Earned Dates:</span>
+                  <div className="max-h-[140px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 bg-slate-50/50">
+                    {crModal.availableEntries.length === 0 ? (
+                      <div className="p-3 text-center text-[11px] text-slate-400 font-semibold italic">
+                        No available unconsumed CR earned records found.
+                      </div>
+                    ) : (
+                      crModal.availableEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => handleApplyEarnedDate(entry.earned_date, entry.id)}
+                          className="w-full text-left p-2.5 hover:bg-blue-50/60 transition flex justify-between items-center cursor-pointer group"
+                        >
+                          <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">Earned Date: {entry.earned_date}</span>
+                          <span className="text-[9px] bg-blue-50 border border-blue-200 text-blue-700 font-bold px-2 py-0.5 rounded-full">Available</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
 
-                <div className="flex gap-2">
+                {/* Manual Picker */}
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Or Enter Earned Date Manually:</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={manualCrDate}
+                      onChange={(e) => setManualCrDate(e.target.value)}
+                      max={crModal.dateStr}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleApplyEarnedDate(manualCrDate)}
+                      className="px-3.5 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase cursor-pointer transition shadow-xs"
+                    >
+                      Associate Date
+                    </button>
+                  </div>
+                </div>
+
+                {/* Footer buttons */}
+                <div className="flex justify-between items-center pt-3 border-t border-slate-100 gap-2">
                   <button
                     type="button"
-                    onClick={() => setCrModal(null)}
+                    onClick={() => {
+                      setGridData((prev) => {
+                        const empGrid = { ...(prev[crModal.empId] || {}) };
+                        const oldLog = empGrid[crModal.dateStr];
+                        empGrid[crModal.dateStr] = {
+                          ...oldLog,
+                          emp_id: crModal.empId,
+                          date: crModal.dateStr,
+                          status: 'CR',
+                          is_night: false,
+                          remarks: ''
+                        };
+                        return { ...prev, [crModal.empId]: empGrid };
+                      });
+                      setIsModified(true);
+                      setCrModal(null);
+                      setManualCrDate('');
+                    }}
+                    className="px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-650 font-bold text-xs uppercase cursor-pointer"
+                  >
+                    Proceed Unassociated
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCrModal(null); setManualCrDate(''); }}
                     className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase cursor-pointer"
                   >
                     Cancel
@@ -1644,8 +1730,8 @@ export default function AttendanceGrid() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Cell Delete Confirmation Modal */}
       {pendingDeleteCell && (

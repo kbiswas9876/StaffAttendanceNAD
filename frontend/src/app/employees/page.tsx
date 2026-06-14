@@ -24,7 +24,8 @@ import {
   Layers,
   Sparkles,
   Inbox,
-  Edit
+  Edit,
+  GripVertical
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
@@ -43,7 +44,8 @@ import {
   AttendanceLog, 
   SpecialEvent, 
   updateLeaveBank,
-  getWeeklyScheduleDefault 
+  getWeeklyScheduleDefault,
+  reorderEmployees
 } from '../../lib/api';
 
 // --- EMPLOYEE PROFILE 360 COMPONENT ---
@@ -263,7 +265,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <button 
@@ -520,6 +522,45 @@ function StaffDirectory() {
   const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
 
+  // Drag and drop sorting states
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragEnabledId, setDragEnabledId] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+  };
+
+  const handleDragEnter = (e: React.DragEvent, targetIndex: number) => {
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+    
+    const newEmployees = [...employees];
+    const draggedItem = newEmployees[draggedIndex];
+    newEmployees.splice(draggedIndex, 1);
+    newEmployees.splice(targetIndex, 0, draggedItem);
+    
+    setEmployees(newEmployees);
+    setDraggedIndex(targetIndex);
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedIndex(null);
+    setDragEnabledId(null);
+    const empIds = employees.map(emp => emp.emp_id);
+    try {
+      await reorderEmployees(empIds);
+      showToast("Staff order updated successfully", "success");
+    } catch (err) {
+      console.error("Failed to save reordered employees:", err);
+      showToast("Failed to save order updates", "error");
+    }
+  };
+
   // Form states
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
@@ -660,7 +701,7 @@ function StaffDirectory() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
@@ -688,6 +729,7 @@ function StaffDirectory() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50">
+                <th className="py-3 px-3 w-10 text-center no-print"></th>
                 <th className="py-3 px-5">PF Number</th>
                 <th className="py-3 px-5">Name</th>
                 <th className="py-3 px-5">Designation</th>
@@ -701,6 +743,7 @@ function StaffDirectory() {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
+                    <td className="py-4 px-3 no-print"><div className="h-4 w-4 bg-[#E5E3DC] rounded mx-auto" /></td>
                     <td className="py-4 px-5"><div className="h-4 w-28 bg-[#E5E3DC] rounded" /></td>
                     <td className="py-4 px-5"><div className="h-4 w-36 bg-[#E5E3DC] rounded" /></td>
                     <td className="py-4 px-5"><div className="h-4 w-20 bg-[#E5E3DC] rounded" /></td>
@@ -712,13 +755,30 @@ function StaffDirectory() {
                 ))
               ) : employees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     No employees enrolled in this section.
                   </td>
                 </tr>
               ) : (
-                employees.map((emp) => (
-                  <tr key={emp.emp_id} className="hover:bg-slate-50/50 transition-colors">
+                employees.map((emp, index) => (
+                  <tr 
+                    key={emp.emp_id} 
+                    draggable={dragEnabledId === emp.emp_id}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnter={(e) => handleDragEnter(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={`hover:bg-slate-50/50 transition-colors select-none ${
+                      draggedIndex === index ? 'opacity-40 bg-blue-50/20' : ''
+                    }`}
+                  >
+                    <td 
+                      className="py-3.5 px-2 text-center no-print cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"
+                      onMouseDown={() => setDragEnabledId(emp.emp_id)}
+                      onMouseUp={() => setDragEnabledId(null)}
+                    >
+                      <GripVertical size={16} />
+                    </td>
                     <td className="py-3.5 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
                     <td className="py-3.5 px-5 font-bold text-slate-800">
                       <button 

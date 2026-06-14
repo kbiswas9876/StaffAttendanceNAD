@@ -24,6 +24,7 @@ export interface Employee {
         custom_night_weeks?: { from_date: string; to_date: string }[];
       }
     | { [day: string]: string };
+  display_order?: number;
 }
 
 export interface AttendanceCode {
@@ -213,6 +214,13 @@ export const updateEmployee = async (employee: Employee): Promise<Employee> => {
 export const deleteEmployee = async (empId: number): Promise<void> => {
   await apiFetch<any>(`/employees/${empId}`, {
     method: "DELETE"
+  });
+};
+
+export const reorderEmployees = async (empIds: number[]): Promise<{ status: string }> => {
+  return apiFetch<{ status: string }>("/employees/reorder", {
+    method: "POST",
+    body: JSON.stringify({ emp_ids: empIds })
   });
 };
 
