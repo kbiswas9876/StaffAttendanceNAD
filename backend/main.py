@@ -1646,7 +1646,7 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     # Set cell sizes for dates (31 columns: index 3 to 33)
     for c in range(3, 34):
         sheet.set_column(c, c, 4.5)
-    sheet.set_column(34, 34, 15) # Remarks (index 34)
+    sheet.set_column(34, 34, 28) # Remarks (index 34)
 
     # Days arrays
     days_in_grid = req.rows[0].days if req.rows else []
@@ -1739,8 +1739,15 @@ async def export_attendance_excel(req: AttendanceExportRequest):
 
     # 4. Signatures
     sig_row = curr_row + 3
-    sheet.write(sig_row, 1, req.signatory_left, sig_format)
-    sheet.write(sig_row, 30, f"For {req.signatory_right}", sig_format)
+    sheet.set_row(sig_row, 40)
+    sig_left_format = workbook.add_format({
+        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True, 'align': 'left', 'valign': 'top', 'text_wrap': True
+    })
+    sig_right_format = workbook.add_format({
+        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True, 'align': 'right', 'valign': 'top', 'text_wrap': True
+    })
+    sheet.merge_range(sig_row, 1, sig_row, 3, req.signatory_left, sig_left_format)
+    sheet.merge_range(sig_row, 28, sig_row, 34, f"For {req.signatory_right}", sig_right_format)
 
     workbook.close()
     output.seek(0)
@@ -1793,7 +1800,7 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         fontSize=5.5,
         leading=6.5,
         alignment=1,
-        wordWrap='LTR'
+        textColor=colors.HexColor('#0F172A')
     )
     
     cell_bold_style = ParagraphStyle(
@@ -1801,7 +1808,8 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         parent=cell_style,
         fontName='Helvetica-Bold',
         fontSize=5.5,
-        leading=6.5
+        leading=6.5,
+        textColor=colors.HexColor('#0F172A')
     )
 
     day_header_style = ParagraphStyle(
@@ -1851,13 +1859,15 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
 
     # Construct grid styles, highlight sundays in table style backgrounds
     t_style = [
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#94A3B8")),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F1F5F9")),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('ALIGN', (1,1), (1,-1), 'CENTER'), # Center Name/PF
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 1),
+        ('RIGHTPADDING', (0,0), (-1,-1), 1),
     ]
 
     # Color Sundays columns dynamically (starting at index 3 instead of 4)
@@ -1893,7 +1903,7 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
             spans.append((start_idx, end_idx, status))
             i += 1
             
-        day_cells = [None] * 31
+        day_cells = [None] * len(days_in_grid)
         for start_idx, end_idx, status in spans:
             # Merging consecutive identical statuses except P/empty
             should_merge = status not in ('P', '', None) and start_idx < end_idx
@@ -1937,24 +1947,34 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
 
     # Printable area centered with margins
     # Total width for landscape A4 = 841.89 - 56*2 = 729.89pt
-    # 3 fixed cols: 18 + 106 + 70 = 194
-    # Day cols: up to 31 days x 16.5 = 511.5
-    # Remarks: 24
-    # Total: 194 + 511.5 + 24 = 729.5 (fits perfectly)
-    col_widths = [18, 106, 70] + [16.5] * len(days_in_grid) + [24]
+    # col widths safely within boundaries to avoid page overflow:
+    col_widths = [14, 90, 60] + [15] * len(days_in_grid) + [45]
+    total_table_width = 14 + 90 + 60 + (15 * len(days_in_grid)) + 45
     
     grid_table = Table(table_data, colWidths=col_widths, repeatRows=1)
     grid_table.setStyle(TableStyle(t_style))
     story.append(grid_table)
     story.append(Spacer(1, 15))
  
-    # Signatures (Exactly 730 points wide to align with table boundaries)
+    # Signatures aligned dynamically to match total grid table width
+    sig_left_text = req.signatory_left.replace('\n', '<br/>')
+    sig_right_text = f"For {req.signatory_right}".replace('\n', '<br/>')
+    
     sig_data = [
-        [Paragraph(f"<b>{req.signatory_left}</b>", ParagraphStyle('LeftSigP', parent=cell_bold_style, fontSize=8, alignment=0)),
-         Paragraph(f"<b>For {req.signatory_right}</b>", ParagraphStyle('RightSigP', parent=cell_bold_style, fontSize=8, alignment=2))],
-        ["S&T Dept., Metro Railway, Kolkata", "Metro Railway, Kolkata"]
+        [Paragraph(f"<b>{sig_left_text}</b>", ParagraphStyle('LeftSigP', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, alignment=0)),
+         Paragraph(f"<b>{sig_right_text}</b>", ParagraphStyle('RightSigP', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, alignment=2))],
+        [Paragraph("S&T Dept., Metro Railway, Kolkata", ParagraphStyle('LeftSigSub', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9, alignment=0, textColor=colors.HexColor("#4A5568"))),
+         Paragraph("Metro Railway, Kolkata", ParagraphStyle('RightSigSub', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9, alignment=2, textColor=colors.HexColor("#4A5568")))]
     ]
-    sig_table = Table(sig_data, colWidths=[360, 360])
+    sig_col_width = total_table_width / 2.0
+    sig_table = Table(sig_data, colWidths=[sig_col_width, sig_col_width])
+    sig_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+    ]))
     story.append(sig_table)
 
     doc.build(story, canvasmaker=NumberedCanvas)
@@ -1969,5 +1989,5 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
 

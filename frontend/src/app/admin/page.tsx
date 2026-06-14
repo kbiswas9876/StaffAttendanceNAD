@@ -182,6 +182,8 @@ export default function AdminPanel() {
   const [empName, setEmpName] = useState('');
   const [empPF, setEmpPF] = useState('');
   const [empDesig, setEmpDesig] = useState('Assistant');
+  const [isCustomDesig, setIsCustomDesig] = useState(false);
+  const [customDesigText, setCustomDesigText] = useState('');
   const [empLevel, setEmpLevel] = useState(1);
   const [empSection, setEmpSection] = useState('KKVS');
   const [empRestDay, setEmpRestDay] = useState('Wednesday');
@@ -329,19 +331,25 @@ export default function AdminPanel() {
 
   const handleDesignationChange = (val: string) => {
     setEmpDesig(val);
-    
-    // Auto-adjust pay level based on designation
-    let defaultLevel = 1;
-    if (val === 'SSE/Sig/IC') defaultLevel = 8;
-    else if (val === 'SSE/Sig') defaultLevel = 7;
-    else if (val === 'JE/Sig') defaultLevel = 6;
-    else if (val === 'Sr. Tech') defaultLevel = 6;
-    else if (val === 'Tech-I') defaultLevel = 5;
-    else if (val === 'Tech-II') defaultLevel = 4;
-    else if (val === 'Tech-III') defaultLevel = 3;
-    else if (val === 'Assistant') defaultLevel = 1;
-    
-    setEmpLevel(defaultLevel);
+    if (val === 'Custom') {
+      setIsCustomDesig(true);
+    } else {
+      setIsCustomDesig(false);
+      setCustomDesigText('');
+      
+      // Auto-adjust pay level based on designation
+      let defaultLevel = 1;
+      if (val === 'SSE/Sig/IC') defaultLevel = 8;
+      else if (val === 'SSE/Sig') defaultLevel = 7;
+      else if (val === 'JE/Sig') defaultLevel = 6;
+      else if (val === 'Sr. Tech') defaultLevel = 6;
+      else if (val === 'Tech-I') defaultLevel = 5;
+      else if (val === 'Tech-II') defaultLevel = 4;
+      else if (val === 'Tech-III') defaultLevel = 3;
+      else if (val === 'Assistant') defaultLevel = 1;
+      
+      setEmpLevel(defaultLevel);
+    }
   };
 
   // Form Submits & Actions
@@ -367,10 +375,16 @@ export default function AdminPanel() {
           custom_night_weeks: customNightWeeks
         };
 
+    const desigValue = isCustomDesig ? customDesigText.trim() : empDesig;
+    if (!desigValue) {
+      showToast("Please enter designation name.", "error");
+      return;
+    }
+
     const payload = {
       pf_number: empPF.trim(),
       name: empName.trim(),
-      designation: empDesig,
+      designation: desigValue,
       level: Number(empLevel),
       primary_section_id: sectionObj?.id || null,
       section_code: empSection || null,
@@ -398,6 +412,8 @@ export default function AdminPanel() {
       setEmpPF('');
       setEmpName('');
       setEmpJoiningDate('');
+      setIsCustomDesig(false);
+      setCustomDesigText('');
       setScheduleType('rotating');
       setEmpAnchorDate('2026-06-01');
       setCustomNightWeeks([]);
@@ -420,7 +436,18 @@ export default function AdminPanel() {
     setEditingEmployeeId(emp.emp_id);
     setEmpName(emp.name);
     setEmpPF(emp.pf_number);
-    setEmpDesig(emp.designation);
+    
+    const standardDesignations = ['SSE/Sig/IC', 'SSE/Sig', 'JE/Sig', 'Sr. Tech', 'Tech-I', 'Tech-II', 'Tech-III', 'Assistant'];
+    if (standardDesignations.includes(emp.designation)) {
+      setEmpDesig(emp.designation);
+      setIsCustomDesig(false);
+      setCustomDesigText('');
+    } else {
+      setEmpDesig('Custom');
+      setIsCustomDesig(true);
+      setCustomDesigText(emp.designation);
+    }
+    
     setEmpLevel(emp.level);
     setEmpSection(emp.section_code || '');
     setEmpRestDay(emp.default_rest_day);
@@ -1068,7 +1095,21 @@ export default function AdminPanel() {
                           <option value="Tech-II">Tech-II</option>
                           <option value="Tech-III">Tech-III</option>
                           <option value="Assistant">Assistant</option>
+                          <option value="Custom">Custom...</option>
                         </select>
+                        {isCustomDesig && (
+                          <div className="mt-2 animate-fade-in">
+                            <label className="block mb-1 uppercase tracking-wider text-[10px] text-blue-600">Custom Name</label>
+                            <input 
+                              type="text" 
+                              value={customDesigText}
+                              onChange={(e) => setCustomDesigText(e.target.value)}
+                              placeholder="e.g. Helper"
+                              className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500 font-semibold"
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block mb-1 uppercase tracking-wider text-[10px]">Pay Level</label>

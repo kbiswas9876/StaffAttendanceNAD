@@ -41,6 +41,74 @@ interface DayInfo {
   isSunday: boolean;
 }
 
+interface DeleteRosterModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const DeleteRosterModal: React.FC<DeleteRosterModalProps> = ({ isOpen, onClose, onConfirm }) => {
+  const [challengeInput, setChallengeInput] = useState('');
+
+  // Reset challenge input on open/close
+  useEffect(() => {
+    if (isOpen) {
+      setChallengeInput('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
+      <div className="bg-white border border-[#E2E0D9] w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 bg-rose-50 text-rose-800">
+          <AlertCircle size={18} className="text-rose-600" />
+          <h3 className="font-bold text-xs uppercase tracking-wider">Destructive Operation: Delete Month Roster</h3>
+        </div>
+        
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-slate-650 leading-relaxed font-semibold">
+            This will permanently delete all attendance logs and generated night duties for this month/section from the database.
+          </p>
+          <p className="text-xs text-slate-500 font-medium">
+            To confirm this change, please type <code className="bg-rose-50 border border-rose-200 text-rose-700 font-mono px-1 py-0.5 rounded font-bold">DELETE</code> in the validation input field below:
+          </p>
+          
+          <input 
+            type="text"
+            placeholder="Type DELETE here"
+            value={challengeInput}
+            onChange={(e) => setChallengeInput(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold placeholder-slate-400 text-slate-800 uppercase focus:outline-none focus:border-rose-500"
+          />
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-150">
+            <button
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-lg border border-slate-250 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={challengeInput.trim().toUpperCase() !== 'DELETE'}
+              className={`px-3.5 py-2 rounded-lg font-bold text-xs uppercase cursor-pointer flex items-center gap-1.5 ${
+                challengeInput.trim().toUpperCase() === 'DELETE'
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-450 border border-slate-250 cursor-not-allowed'
+              }`}
+            >
+              <Trash2 size={14} />
+              Delete Month Roster
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const getBaseRotatingShift = (sched: any, dateStr: string) => {
   if (sched.type !== 'rotating') {
     const date = new Date(dateStr);
@@ -130,7 +198,6 @@ export default function AttendanceGrid() {
 
   // Clear challenge modal state
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
-  const [clearChallengeInput, setClearChallengeInput] = useState('');
   const [pendingDeleteCell, setPendingDeleteCell] = useState<{ empId: number; dateStr: string; empName: string } | null>(null);
 
   // Bulk Entry modal states
@@ -226,7 +293,7 @@ export default function AttendanceGrid() {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        await fetch('http://localhost:8000/api/lines');
+        await fetch('http://127.0.0.1:8000/api/lines');
         setBackendStatus('online');
       } catch (e) {
         setBackendStatus('offline');
@@ -310,7 +377,7 @@ export default function AttendanceGrid() {
     };
 
     try {
-      const endpoint = `http://localhost:8000/api/export/attendance/${format}`;
+      const endpoint = `http://127.0.0.1:8000/api/export/attendance/${format}`;
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -574,15 +641,9 @@ export default function AttendanceGrid() {
   // Clear Grid securing with text challenge challenge confirmed
   const triggerClearGrid = () => {
     setIsClearModalOpen(true);
-    setClearChallengeInput('');
   };
 
   const confirmClearGrid = async () => {
-    if (clearChallengeInput.trim().toUpperCase() !== 'DELETE') {
-      showToast("Challenge code invalid. Please type 'DELETE'.", "error");
-      return;
-    }
-
     setIsClearModalOpen(false);
     setLoading(true);
 
@@ -1190,54 +1251,11 @@ export default function AttendanceGrid() {
       )}
 
       {/* Delete Month Roster Challenge Modal */}
-      {isClearModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
-          <div className="bg-white border border-[#E2E0D9] w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 bg-rose-50 text-rose-800">
-              <AlertCircle size={18} className="text-rose-600" />
-              <h3 className="font-bold text-xs uppercase tracking-wider">Destructive Operation: Delete Month Roster</h3>
-            </div>
-            
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-650 leading-relaxed font-semibold">
-                This will permanently delete all attendance logs and generated night duties for this month/section from the database.
-              </p>
-              <p className="text-xs text-slate-500 font-medium">
-                To confirm this change, please type <code className="bg-rose-50 border border-rose-200 text-rose-700 font-mono px-1 py-0.5 rounded font-bold">DELETE</code> in the validation input field below:
-              </p>
-              
-              <input 
-                type="text"
-                placeholder="Type DELETE here"
-                value={clearChallengeInput}
-                onChange={(e) => setClearChallengeInput(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold placeholder-slate-400 text-slate-800 uppercase focus:outline-none focus:border-rose-500"
-              />
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-150">
-                <button
-                  onClick={() => setIsClearModalOpen(false)}
-                  className="px-3.5 py-2 rounded-lg border border-slate-250 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmClearGrid}
-                  disabled={clearChallengeInput.trim().toUpperCase() !== 'DELETE'}
-                  className={`px-3.5 py-2 rounded-lg font-bold text-xs uppercase cursor-pointer flex items-center gap-1.5 ${
-                    clearChallengeInput.trim().toUpperCase() === 'DELETE'
-                      ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-450 border border-slate-250 cursor-not-allowed'
-                  }`}
-                >
-                  <Trash2 size={14} />
-                  Delete Month Roster
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteRosterModal 
+        isOpen={isClearModalOpen}
+        onClose={() => setIsClearModalOpen(false)}
+        onConfirm={confirmClearGrid}
+      />
 
       {/* Bulk Entry Modal Dialog */}
       {showBulkModal && (

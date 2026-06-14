@@ -103,7 +103,7 @@ export default function NightDutyNDA() {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        await fetch('http://localhost:8000/api/lines');
+        await fetch('http://127.0.0.1:8000/api/lines');
         setBackendStatus('online');
       } catch (e) {
         setBackendStatus('offline');
@@ -261,7 +261,7 @@ export default function NightDutyNDA() {
     };
 
     try {
-      const endpoint = `http://localhost:8000/api/export/night-duty/${format}`;
+      const endpoint = `http://127.0.0.1:8000/api/export/night-duty/${format}`;
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
