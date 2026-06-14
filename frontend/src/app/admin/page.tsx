@@ -134,7 +134,7 @@ export default function AdminPanel() {
   const [empLevel, setEmpLevel] = useState(1);
   const [empSection, setEmpSection] = useState('KKVS');
   const [empRestDay, setEmpRestDay] = useState('Wednesday');
-  const [scheduleType, setScheduleType] = useState<'simple' | 'rotating'>('simple');
+  const [scheduleType, setScheduleType] = useState<'simple' | 'rotating'>('rotating');
   const [empWeeklySchedule, setEmpWeeklySchedule] = useState<{ [day: string]: string }>(getWeeklyScheduleDefault('Wednesday'));
   const [rotatingSchedule, setRotatingSchedule] = useState<{
     week1: { [day: string]: string };
@@ -149,6 +149,10 @@ export default function AdminPanel() {
   });
   const [activeRotatingWeek, setActiveRotatingWeek] = useState<'week1' | 'week2' | 'week3' | 'week4'>('week1');
   const [empJoiningDate, setEmpJoiningDate] = useState('');
+  const [empAnchorDate, setEmpAnchorDate] = useState('2026-06-01');
+  const [customNightWeeks, setCustomNightWeeks] = useState<{ from_date: string; to_date: string; }[]>([]);
+  const [overrideFrom, setOverrideFrom] = useState('');
+  const [overrideTo, setOverrideTo] = useState('');
 
   // 1b. Employee Transfer Form
   const [transferEmpId, setTransferEmpId] = useState<string>('');
@@ -285,7 +289,15 @@ export default function AdminPanel() {
     
     const weeklySchedulePayload = scheduleType === 'simple' 
       ? empWeeklySchedule 
-      : { type: 'rotating', ...rotatingSchedule };
+      : {
+          type: 'rotating',
+          anchor_date: empAnchorDate,
+          week1: rotatingSchedule.week1,
+          week2: rotatingSchedule.week2,
+          week3: rotatingSchedule.week3,
+          week4: rotatingSchedule.week4,
+          custom_night_weeks: customNightWeeks
+        };
 
     const payload = {
       pf_number: empPF.trim(),
@@ -318,8 +330,11 @@ export default function AdminPanel() {
       setEmpPF('');
       setEmpName('');
       setEmpJoiningDate('');
-      setScheduleType('simple');
-      setEmpWeeklySchedule(getWeeklyScheduleDefault('Wednesday'));
+      setScheduleType('rotating');
+      setEmpAnchorDate('2026-06-01');
+      setCustomNightWeeks([]);
+      setOverrideFrom('');
+      setOverrideTo('');
       setRotatingSchedule({
         week1: getWeeklyScheduleDefault('Wednesday'),
         week2: getWeeklyScheduleDefault('Wednesday'),
@@ -345,15 +360,25 @@ export default function AdminPanel() {
     const sched = emp.weekly_schedule;
     if (sched && (sched as any).type === 'rotating') {
       setScheduleType('rotating');
+      setEmpAnchorDate((sched as any).anchor_date || '2026-06-01');
       setRotatingSchedule({
         week1: (sched as any).week1 || getWeeklyScheduleDefault(emp.default_rest_day),
         week2: (sched as any).week2 || getWeeklyScheduleDefault(emp.default_rest_day),
         week3: (sched as any).week3 || getWeeklyScheduleDefault(emp.default_rest_day),
         week4: (sched as any).week4 || getWeeklyScheduleDefault(emp.default_rest_day),
       });
+      setCustomNightWeeks((sched as any).custom_night_weeks || []);
     } else {
-      setScheduleType('simple');
-      setEmpWeeklySchedule((sched as { [day: string]: string }) || getWeeklyScheduleDefault(emp.default_rest_day));
+      setScheduleType('rotating');
+      setEmpAnchorDate('2026-06-01');
+      const baseSched = (sched as { [day: string]: string }) || getWeeklyScheduleDefault(emp.default_rest_day);
+      setRotatingSchedule({
+        week1: baseSched,
+        week2: baseSched,
+        week3: baseSched,
+        week4: baseSched,
+      });
+      setCustomNightWeeks([]);
     }
     setEmpJoiningDate(emp.joining_date || '');
   };
@@ -365,8 +390,11 @@ export default function AdminPanel() {
     setEmpDesig('Assistant');
     setEmpLevel(1);
     setEmpRestDay('Wednesday');
-    setScheduleType('simple');
-    setEmpWeeklySchedule(getWeeklyScheduleDefault('Wednesday'));
+    setScheduleType('rotating');
+    setEmpAnchorDate('2026-06-01');
+    setCustomNightWeeks([]);
+    setOverrideFrom('');
+    setOverrideTo('');
     setRotatingSchedule({
       week1: getWeeklyScheduleDefault('Wednesday'),
       week2: getWeeklyScheduleDefault('Wednesday'),
@@ -1025,33 +1053,53 @@ export default function AdminPanel() {
                     {/* Weekly Schedule template */}
                     <div className="bg-slate-50 p-3.5 border border-slate-200 rounded-xl space-y-3">
                       <div className="flex justify-between items-center pb-1 border-b">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Roster Schedule Template</span>
-                        <div className="flex bg-slate-200 rounded-lg p-0.5 text-[9px] font-bold">
-                          <button
-                            type="button"
-                            onClick={() => setScheduleType('simple')}
-                            className={`px-2 py-0.5 rounded ${scheduleType === 'simple' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
-                          >
-                            Single Week
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setScheduleType('rotating')}
-                            className={`px-2 py-0.5 rounded ${scheduleType === 'rotating' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
-                          >
-                            4-Week Rotating
-                          </button>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">4-Week Rotating Schedule Template</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block mb-0.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Roster Anchor Date</label>
+                          <input 
+                            type="date"
+                            value={empAnchorDate}
+                            onChange={(e) => setEmpAnchorDate(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800 cursor-pointer focus:outline-none"
+                            required
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <span className="text-[9px] text-slate-500 italic pb-1">This anchor date marks the start of "Week 1" cycle.</span>
                         </div>
                       </div>
 
-                      {scheduleType === 'simple' ? (
+                      <div className="space-y-2">
+                        {/* Week Tabs */}
+                        <div className="flex gap-1 border-b border-slate-200 pb-1">
+                          {(['week1', 'week2', 'week3', 'week4'] as const).map(wk => (
+                            <button
+                              key={wk}
+                              type="button"
+                              onClick={() => setActiveRotatingWeek(wk)}
+                              className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
+                            >
+                              {wk.replace('week', 'W')}
+                            </button>
+                          ))}
+                        </div>
+                        
                         <div className="grid grid-cols-4 gap-2">
                           {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
                             <div key={day} className="flex flex-col gap-0.5">
                               <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
                               <select
-                                value={empWeeklySchedule[day] || 'G'}
-                                onChange={(e) => setEmpWeeklySchedule(prev => ({ ...prev, [day]: e.target.value }))}
+                                value={rotatingSchedule[activeRotatingWeek]?.[day] || 'G'}
+                                onChange={(e) => setRotatingSchedule(prev => ({
+                                  ...prev,
+                                  [activeRotatingWeek]: {
+                                    ...prev[activeRotatingWeek],
+                                    [day]: e.target.value
+                                  }
+                                }))}
                                 className="border border-slate-200 rounded px-1 py-0.5 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
                               >
                                 <option value="G">G (Gen)</option>
@@ -1063,48 +1111,68 @@ export default function AdminPanel() {
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Week Tabs */}
-                          <div className="flex gap-1 border-b border-slate-200 pb-1">
-                            {(['week1', 'week2', 'week3', 'week4'] as const).map(wk => (
-                              <button
-                                key={wk}
-                                type="button"
-                                onClick={() => setActiveRotatingWeek(wk)}
-                                className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
-                              >
-                                {wk.replace('week', 'W')}
-                              </button>
-                            ))}
+                      </div>
+
+                      {/* Custom Night Weeks (Override) */}
+                      <div className="border-t border-slate-200 pt-2 space-y-2">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Custom Night Week Overrides</span>
+                        <div className="grid grid-cols-3 gap-1.5 items-end">
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 truncate block">From Date</label>
+                            <input 
+                              type="date"
+                              value={overrideFrom}
+                              onChange={(e) => setOverrideFrom(e.target.value)}
+                              className="w-full border border-slate-200 bg-white rounded px-1.5 py-0.5 text-[10px]"
+                            />
                           </div>
-                          
-                          <div className="grid grid-cols-4 gap-2">
-                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                              <div key={day} className="flex flex-col gap-0.5">
-                                <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                                <select
-                                  value={rotatingSchedule[activeRotatingWeek]?.[day] || 'G'}
-                                  onChange={(e) => setRotatingSchedule(prev => ({
-                                    ...prev,
-                                    [activeRotatingWeek]: {
-                                      ...prev[activeRotatingWeek],
-                                      [day]: e.target.value
-                                    }
-                                  }))}
-                                  className="border border-slate-200 rounded px-1 py-0.5 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 truncate block">To Date</label>
+                            <input 
+                              type="date"
+                              value={overrideTo}
+                              onChange={(e) => setOverrideTo(e.target.value)}
+                              className="w-full border border-slate-200 bg-white rounded px-1.5 py-0.5 text-[10px]"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!overrideFrom || !overrideTo) {
+                                alert("Please select both start and end dates.");
+                                return;
+                              }
+                              if (overrideFrom > overrideTo) {
+                                alert("Start date cannot be after end date.");
+                                return;
+                              }
+                              setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo }]);
+                              setOverrideFrom('');
+                              setOverrideTo('');
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold py-1 px-2 uppercase"
+                          >
+                            Add Override
+                          </button>
+                        </div>
+
+                        {customNightWeeks.length > 0 && (
+                          <div className="max-h-24 overflow-y-auto bg-slate-100 rounded-lg p-2 space-y-1">
+                            {customNightWeeks.map((w, index) => (
+                              <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-200/50 pb-0.5">
+                                <span>{w.from_date} to {w.to_date}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setCustomNightWeeks(prev => prev.filter((_, idx) => idx !== index))}
+                                  className="text-red-500 hover:text-red-700 font-extrabold"
                                 >
-                                  <option value="G">G (Gen)</option>
-                                  <option value="M">M (Morn)</option>
-                                  <option value="E">E (Eve)</option>
-                                  <option value="N">N (Night)</option>
-                                  <option value="R">R (Rest)</option>
-                                </select>
+                                  Remove
+                                </button>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
 
                     <div className="pt-2 flex justify-end gap-2.5">

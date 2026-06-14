@@ -310,19 +310,23 @@ def init_db():
         cursor.execute("INSERT INTO lines (line_name, color_code) VALUES ('Yellow Line', '#FFD100')")
         cursor.execute("INSERT INTO lines (line_name, color_code) VALUES ('Green Line', '#009639')")
         cursor.execute("INSERT INTO lines (line_name, color_code) VALUES ('Purple Line', '#7B2E8D')")
+        cursor.execute("INSERT INTO lines (line_name, color_code) VALUES ('Noapara Car Shed', '#475569')")
 
         cursor.execute("INSERT INTO sections (line_id, section_code, section_name, base_location) VALUES (1, 'KKVS', 'Kavi Subhash Section', 'Kavi Subhash')")
         cursor.execute("INSERT INTO sections (line_id, section_code, section_name, base_location) VALUES (1, 'KMUK', 'Tollygunge Section', 'Mahanayak Uttam Kumar')")
+        cursor.execute("INSERT INTO sections (line_id, section_code, section_name, base_location) VALUES (1, 'KNAP', 'Noapara Section', 'Noapara')")
+        cursor.execute("INSERT INTO sections (line_id, section_code, section_name, base_location) VALUES (2, 'KJHD', 'Joy Hind Section', 'Joy Hind')")
+        cursor.execute("INSERT INTO sections (line_id, section_code, section_name, base_location) VALUES (4, 'KJKA', 'Joka Section', 'Joka')")
+        cursor.execute("INSERT INTO sections (line_id, section_code, section_name, base_location) VALUES (5, 'KNCS', 'Noapara Car Shed Section', 'Noapara Car Shed')")
         
-        # Default Shift Rules
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (1, 'M', '06:00:00', '14:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 0)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (1, 'E', '14:00:00', '22:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 0)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (1, 'N', '22:00:00', '06:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 1)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (1, 'G', '09:00:00', '17:30:00', 'Monday,Tuesday,Thursday,Friday,Saturday', 0)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (2, 'M', '06:00:00', '14:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 0)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (2, 'E', '14:00:00', '22:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 0)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (2, 'N', '22:00:00', '06:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 1)")
-        cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (2, 'G', '09:00:00', '17:30:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', 0)")
+        # Seed default shift rules for all sections
+        cursor.execute("SELECT id FROM sections")
+        sec_ids = [r[0] for r in cursor.fetchall()]
+        for sec_id in sec_ids:
+            cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (?, 'M', '06:00:00', '14:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 0)", (sec_id,))
+            cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (?, 'E', '14:00:00', '22:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 0)", (sec_id,))
+            cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (?, 'N', '22:00:00', '06:00:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 1)", (sec_id,))
+            cursor.execute("INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty) VALUES (?, 'G', '09:00:00', '17:30:00', 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', 0)", (sec_id,))
 
     conn.commit()
 

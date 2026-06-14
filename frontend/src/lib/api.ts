@@ -12,10 +12,12 @@ export interface Employee {
     | { [day: string]: string }
     | {
         type: string;
+        anchor_date?: string;
         week1: { [day: string]: string };
         week2: { [day: string]: string };
         week3: { [day: string]: string };
         week4: { [day: string]: string };
+        custom_night_weeks?: { from_date: string; to_date: string }[];
       };
 }
 
