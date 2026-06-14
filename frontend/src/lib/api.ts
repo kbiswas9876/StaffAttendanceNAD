@@ -387,6 +387,30 @@ export const getBackupStatus = async (): Promise<{ integrity: string; last_backu
   return apiFetch<{ integrity: string; last_backup: string; database_size_bytes: number }>("/backups/status");
 };
 
+export const deleteAttendanceLog = async (empId: number, date: string): Promise<{ status: string }> => {
+  return apiFetch<{ status: string }>(`/attendance-log?emp_id=${empId}&date=${date}`, {
+    method: "DELETE"
+  });
+};
+
+export const deleteAttendanceLogsRange = async (
+  sectionCode: string,
+  startDate: string,
+  endDate: string
+): Promise<{ status: string; count: number }> => {
+  const path = `/attendance-log/range?start_date=${startDate}&end_date=${endDate}` + 
+    (sectionCode && sectionCode !== 'ALL' ? `&section_code=${sectionCode}` : '');
+  return apiFetch<{ status: string; count: number }>(path, {
+    method: "DELETE"
+  });
+};
+
+export const deleteBackup = async (filename: string): Promise<{ status: string }> => {
+  return apiFetch<{ status: string }>(`/backups/${filename}`, {
+    method: "DELETE"
+  });
+};
+
 // Helper for weekly schedule defaults
 export const getWeeklyScheduleDefault = (restDay: string): { [day: string]: string } => {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

@@ -28,7 +28,10 @@ import {
   AttendanceCode,
   getCRLedger,
   CRLedgerEntry,
-  updateCRLedgerEntry
+  updateCRLedgerEntry,
+  deleteAttendanceLog,
+  deleteAttendanceLogsRange,
+  createBackup
 } from '../../lib/api';
 
 interface DayInfo {
@@ -77,6 +80,7 @@ export default function AttendanceGrid() {
   // Clear challenge modal state
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [clearChallengeInput, setClearChallengeInput] = useState('');
+  const [pendingDeleteCell, setPendingDeleteCell] = useState<{ empId: number; dateStr: string; empName: string } | null>(null);
 
   // Bulk Entry modal states
   const [showBulkModal, setShowBulkModal] = useState<boolean>(false);
@@ -426,6 +430,12 @@ export default function AttendanceGrid() {
       return;
     }
 
+    if (value === 'DELETE') {
+      const emp = employees.find(e => e.emp_id === empId);
+      setPendingDeleteCell({ empId, dateStr, empName: emp ? emp.name : 'Employee' });
+      return;
+    }
+
     setGridData((prev) => {
       const empGrid = { ...(prev[empId] || {}) };
       const oldLog = empGrid[dateStr];
@@ -527,31 +537,35 @@ export default function AttendanceGrid() {
     setClearChallengeInput('');
   };
 
-  const confirmClearGrid = () => {
-    if (clearChallengeInput !== 'CLEAR') {
-      showToast("Challenge code invalid. Please type 'CLEAR'.", "error");
+  const confirmClearGrid = async () => {
+    if (clearChallengeInput !== 'DELETE') {
+      showToast("Challenge code invalid. Please type 'DELETE'.", "error");
       return;
     }
 
-    const clearedGrid = { ...gridData };
-    employees.forEach((emp) => {
-      const empGrid = { ...(clearedGrid[emp.emp_id] || {}) };
-      days.forEach((day) => {
-        empGrid[day.dateStr] = {
-          emp_id: emp.emp_id,
-          date: day.dateStr,
-          status: 'P',
-          is_night: false,
-          remarks: ''
-        };
-      });
-      clearedGrid[emp.emp_id] = empGrid;
-    });
-
-    setGridData(clearedGrid);
-    setIsModified(true);
     setIsClearModalOpen(false);
-    showToast("Grid cleared. All cells initialized as 'P' (Present). Click 'Save Changes' to commit.", "info");
+    setLoading(true);
+
+    let prevM = selectedMonth - 1;
+    let prevY = selectedYear;
+    if (prevM < 0) { prevM = 11; prevY = selectedYear - 1; }
+    const startDateStr = `${prevY}-${String(prevM + 1).padStart(2, '0')}-11`;
+    const endDateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-10`;
+
+    try {
+      // 1. Create safety backup first
+      await createBackup();
+      // 2. Perform delete range
+      await deleteAttendanceLogsRange(activeSection, startDateStr, endDateStr);
+      // 3. Reload data
+      await loadData(activeSection, selectedMonth, selectedYear);
+      showToast("Successfully deleted all attendance logs for this roster month from the database.", "success");
+    } catch (e) {
+      console.error("Delete roster month failed:", e);
+      showToast("Failed to delete roster logs from the database.", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Compile and show Roster Simulation / Preview before save
@@ -833,7 +847,7 @@ export default function AttendanceGrid() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 font-bold text-xs tracking-wider uppercase transition no-print cursor-pointer"
           >
             <Trash2 size={14} />
-            Clear Grid
+            Delete Roster Month
           </button>
 
           <button
@@ -1045,6 +1059,7 @@ export default function AttendanceGrid() {
                                 </option>
                               ))}
                               <option value="CUSTOM_CODE" className="bg-white text-blue-600 font-bold">Custom...</option>
+                              <option value="DELETE" className="bg-white text-rose-600 font-bold">Delete</option>
                             </select>
                           </td>
                         );
@@ -1134,26 +1149,26 @@ export default function AttendanceGrid() {
         </div>
       )}
 
-      {/* Clear Grid Challenge Modal */}
+      {/* Delete Month Roster Challenge Modal */}
       {isClearModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
           <div className="bg-white border border-[#E2E0D9] w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 bg-rose-50 text-rose-800">
               <AlertCircle size={18} className="text-rose-600" />
-              <h3 className="font-bold text-xs uppercase tracking-wider">Destructive Operation: Clear Grid</h3>
+              <h3 className="font-bold text-xs uppercase tracking-wider">Destructive Operation: Delete Month Roster</h3>
             </div>
             
             <div className="p-5 space-y-4">
               <p className="text-xs text-slate-650 leading-relaxed font-semibold">
-                This will reset all cell codes in the active roster cycle to default <strong>'P' (Present)</strong>.
+                This will permanently delete all attendance logs and generated night duties for this month/section from the database.
               </p>
               <p className="text-xs text-slate-500 font-medium">
-                To confirm this change, please type <code className="bg-rose-50 border border-rose-200 text-rose-700 font-mono px-1 py-0.5 rounded font-bold">CLEAR</code> in the validation input field below:
+                To confirm this change, please type <code className="bg-rose-50 border border-rose-200 text-rose-700 font-mono px-1 py-0.5 rounded font-bold">DELETE</code> in the validation input field below:
               </p>
               
               <input 
                 type="text"
-                placeholder="Type CLEAR here"
+                placeholder="Type DELETE here"
                 value={clearChallengeInput}
                 onChange={(e) => setClearChallengeInput(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold placeholder-slate-400 text-slate-800 uppercase focus:outline-none focus:border-rose-500"
@@ -1168,15 +1183,15 @@ export default function AttendanceGrid() {
                 </button>
                 <button
                   onClick={confirmClearGrid}
-                  disabled={clearChallengeInput !== 'CLEAR'}
+                  disabled={clearChallengeInput !== 'DELETE'}
                   className={`px-3.5 py-2 rounded-lg font-bold text-xs uppercase cursor-pointer flex items-center gap-1.5 ${
-                    clearChallengeInput === 'CLEAR'
+                    clearChallengeInput === 'DELETE'
                       ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md'
                       : 'bg-slate-100 text-slate-450 border border-slate-250 cursor-not-allowed'
                   }`}
                 >
                   <Trash2 size={14} />
-                  Clear Grid Cells
+                  Delete Month Roster
                 </button>
               </div>
             </div>
@@ -1554,6 +1569,56 @@ export default function AttendanceGrid() {
                     Cancel
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cell Delete Confirmation Modal */}
+      {pendingDeleteCell && (
+        <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
+          <div className="bg-white border border-[#E2E0D9] w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 bg-rose-50 text-rose-800">
+              <AlertCircle size={18} className="text-rose-600" />
+              <h3 className="font-bold text-xs uppercase tracking-wider">Confirm Delete Record</h3>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-slate-650 leading-relaxed font-semibold">
+                Are you sure you want to permanently delete the attendance entry for <strong>{pendingDeleteCell.empName}</strong> on <strong>{pendingDeleteCell.dateStr}</strong>?
+              </p>
+              <p className="text-xs text-slate-500 font-medium">
+                This will wipe the entry from the database. An automatic safety backup of the database will be created before deletion.
+              </p>
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-150">
+                <button
+                  onClick={() => setPendingDeleteCell(null)}
+                  className="px-3.5 py-2 rounded-lg border border-slate-250 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const { empId, dateStr } = pendingDeleteCell;
+                    setPendingDeleteCell(null);
+                    setLoading(true);
+                    try {
+                      await createBackup();
+                      await deleteAttendanceLog(empId, dateStr);
+                      await loadData(activeSection, selectedMonth, selectedYear);
+                      showToast("Successfully deleted attendance log from the database.", "success");
+                    } catch (e) {
+                      console.error("Delete cell failed:", e);
+                      showToast("Failed to delete log entry.", "error");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase cursor-pointer shadow-md flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} />
+                  Delete Entry
+                </button>
               </div>
             </div>
           </div>

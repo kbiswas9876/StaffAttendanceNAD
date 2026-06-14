@@ -32,7 +32,7 @@ import {
   getAttendanceCodes, createAttendanceCode, updateAttendanceCode, deleteAttendanceCode, AttendanceCode,
   getHolidays, createHoliday, updateHoliday, deleteHoliday, Holiday,
   getAuditLogs, AuditLog,
-  getBackupsList, createBackup, restoreBackup, getBackupStatus,
+  getBackupsList, createBackup, restoreBackup, getBackupStatus, deleteBackup,
   getAttendanceLogs, saveAttendanceLogsBulk, addSpecialEvent,
   getWeeklyScheduleDefault
 } from '../../lib/api';
@@ -869,6 +869,19 @@ export default function AdminPanel() {
         setTimeout(() => window.location.reload(), 1500);
       } catch (err: any) {
         showToast(err.message || "Restore failed. Snapshot file corrupt.", "error");
+      }
+    }
+  };
+
+  const handleDeleteBackup = async (filename: string) => {
+    const isConfirmed = window.confirm(`WARNING: Are you sure you want to permanently delete database backup "${filename}"?\n\nThis action cannot be undone.`);
+    if (isConfirmed) {
+      try {
+        await deleteBackup(filename);
+        showToast("Backup deleted successfully.", "success");
+        loadAdminData();
+      } catch (err: any) {
+        showToast(err.message || "Failed to delete backup.", "error");
       }
     }
   };
@@ -2146,12 +2159,20 @@ export default function AdminPanel() {
                           <span className="text-xs font-bold text-slate-700 font-mono">{file}</span>
                           <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">SQLite database copy</span>
                         </div>
-                        <button
-                          onClick={() => handleRestoreBackup(file)}
-                          className="px-3.5 py-1.5 rounded bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 text-xs font-bold transition cursor-pointer uppercase tracking-wider text-[10px]"
-                        >
-                          Restore State
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleRestoreBackup(file)}
+                            className="px-3.5 py-1.5 rounded bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 text-xs font-bold transition cursor-pointer uppercase tracking-wider text-[10px]"
+                          >
+                            Restore State
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBackup(file)}
+                            className="px-3.5 py-1.5 rounded bg-rose-50 hover:bg-rose-100 border border-rose-250 text-rose-700 text-xs font-bold transition cursor-pointer uppercase tracking-wider text-[10px]"
+                          >
+                            Delete Snapshot
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}

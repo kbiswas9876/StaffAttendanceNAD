@@ -974,6 +974,72 @@ def add_attendance_logs_bulk(logs: List[AttendanceLogSchema]):
     log_audit("Update", "Attendance", f"Bulk logged {len(logs)} attendance roster records.")
     return {"status": "success"}
 
+@app.delete("/api/attendance-log")
+def delete_attendance_log(emp_id: int = Query(...), date: str = Query(...)):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT count(*) FROM attendance_log WHERE emp_id = ? AND date = ?", (emp_id, date))
+        if cursor.fetchone()[0] == 0:
+            raise HTTPException(status_code=404, detail="Log entry not found")
+        cursor.execute("DELETE FROM attendance_log WHERE emp_id = ? AND date = ?", (emp_id, date))
+        conn.commit()
+        
+        # Recalculate leaves
+        year = int(date.split("-")[0])
+        sync_leave_and_ledger(emp_id, year)
+        log_audit("Delete", "Attendance", f"Deleted attendance log for Employee ID {emp_id} on {date}")
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/attendance-log/range")
+def delete_attendance_logs_range(
+    start_date: str = Query(...),
+    end_date: str = Query(...),
+    section_code: Optional[str] = Query(None)
+):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        if section_code and section_code != 'ALL':
+            cursor.execute("""
+                SELECT emp_id FROM employees
+                WHERE primary_section_id = (SELECT id FROM sections WHERE section_code = ?)
+            """, (section_code,))
+            affected_emps = [row['emp_id'] for row in cursor.fetchall()]
+            if not affected_emps:
+                return {"status": "success", "count": 0}
+                
+            placeholders = ",".join("?" for _ in affected_emps)
+            query = f"""
+                DELETE FROM attendance_log
+                WHERE emp_id IN ({placeholders}) AND date >= ? AND date <= ?
+            """
+            cursor.execute(query, affected_emps + [start_date, end_date])
+        else:
+            cursor.execute("SELECT DISTINCT emp_id FROM attendance_log WHERE date >= ? AND date <= ?", (start_date, end_date))
+            affected_emps = [row['emp_id'] for row in cursor.fetchall()]
+            cursor.execute("DELETE FROM attendance_log WHERE date >= ? AND date <= ?", (start_date, end_date))
+        
+        conn.commit()
+        
+        # Recalculate leaves for all affected employees
+        year = int(start_date.split("-")[0])
+        for emp_id in affected_emps:
+            sync_leave_and_ledger(emp_id, year)
+            
+        log_audit("Delete Range", "Attendance", f"Deleted attendance logs from {start_date} to {end_date} for section {section_code or 'ALL'}")
+        return {"status": "success", "count": len(affected_emps)}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 # 9. Special Events (Transfers & Training)
 @app.get("/api/special-events")
 def read_special_events(section_code: Optional[str] = None):
@@ -1121,6 +1187,19 @@ def restore_backup(payload: RestoreSchema):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
+
+@app.delete("/api/backups/{filename}")
+def delete_backup(filename: str):
+    try:
+        filename = os.path.basename(filename)
+        file_path = os.path.join(BACKUP_DIR, filename)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Backup file not found.")
+        os.remove(file_path)
+        log_audit("Delete Backup", "System", f"Permanently deleted database backup: {filename}")
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Delete backup failed: {str(e)}")
 
 @app.get("/api/backups/status")
 def get_backup_status():
