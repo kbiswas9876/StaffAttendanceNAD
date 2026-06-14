@@ -44,6 +44,57 @@ interface DayInfo {
   isSunday: boolean;
 }
 
+const getBaseRotatingShift = (sched: any, dateStr: string) => {
+  if (sched.type !== 'rotating') {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+    return sched[dayOfWeek] || null;
+  }
+
+  const anchorStr = sched.anchor_date || '2026-06-01';
+  const anchor = new Date(anchorStr);
+  const target = new Date(dateStr);
+
+  anchor.setHours(0,0,0,0);
+  target.setHours(0,0,0,0);
+
+  const diffTime = target.getTime() - anchor.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  const cycleDay = ((diffDays % 28) + 28) % 28;
+  const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 4
+
+  const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+  const wk = `week${weekNum}`;
+  return sched[wk]?.[dayOfWeek] || null;
+};
+
+const getRotatingShift = (emp: any, dateStr: string) => {
+  const sched = emp.weekly_schedule;
+  if (!sched) return null;
+
+  const overrides = (sched as any).custom_night_weeks;
+  if (Array.isArray(overrides)) {
+    const isOverride = overrides.some(w => dateStr >= w.from_date && dateStr <= w.to_date);
+    if (isOverride) {
+      const baseShift = getBaseRotatingShift(sched, dateStr);
+      if (baseShift === 'R') return 'R';
+      return 'N';
+    }
+  }
+
+  return getBaseRotatingShift(sched, dateStr);
+};
+
+const mapShiftToRosterCode = (shiftCode: string | null) => {
+  if (!shiftCode) return 'P';
+  const code = shiftCode.toUpperCase();
+  if (code === 'R') return 'R';
+  if (code === 'N' || code === 'P/N') return 'P/N';
+  if (['G', 'M', 'E', 'P'].includes(code)) return 'P';
+  return code;
+};
+
 // Compute days range for roster month (11th of prev to 10th of current)
 const getRosterPeriodDays = (month: number, year: number): DayInfo[] => {
   const dayList: DayInfo[] = [];
@@ -275,6 +326,23 @@ export default function AdminPanel() {
   useEffect(() => {
     loadAdminData();
   }, []);
+
+  const handleDesignationChange = (val: string) => {
+    setEmpDesig(val);
+    
+    // Auto-adjust pay level based on designation
+    let defaultLevel = 1;
+    if (val === 'SSE/Sig/IC') defaultLevel = 8;
+    else if (val === 'SSE/Sig') defaultLevel = 7;
+    else if (val === 'JE/Sig') defaultLevel = 6;
+    else if (val === 'Sr. Tech') defaultLevel = 6;
+    else if (val === 'Tech-I') defaultLevel = 5;
+    else if (val === 'Tech-II') defaultLevel = 4;
+    else if (val === 'Tech-III') defaultLevel = 3;
+    else if (val === 'Assistant') defaultLevel = 1;
+    
+    setEmpLevel(defaultLevel);
+  };
 
   // Form Submits & Actions
   // 1. Employees Tab Forms
@@ -690,28 +758,17 @@ export default function AdminPanel() {
     if (!emp) return;
 
     const newGrid = { ...plannerGrid };
-    const weekdayMap: { [key: string]: string } = {
-      'Mon': 'Monday', 'Tue': 'Tuesday', 'Wed': 'Wednesday', 'Thu': 'Thursday', 'Fri': 'Friday', 'Sat': 'Saturday', 'Sun': 'Sunday'
-    };
 
     plannerDays.forEach((day, index) => {
-      const restDay = emp.default_rest_day;
-      const isRest = day.weekday === restDay.slice(0, 3) || (day.isSunday && restDay === 'Sunday');
-      
-      let status = isRest ? 'R' : 'P';
       const sched = emp.weekly_schedule;
+      let status = 'P';
       if (sched) {
-        const fullDayName = weekdayMap[day.weekday];
-        if ((sched as any).type === 'rotating') {
-          let wk = 'week1';
-          if (index >= 7 && index < 14) wk = 'week2';
-          else if (index >= 14 && index < 21) wk = 'week3';
-          else if (index >= 21) wk = 'week4';
-          
-          status = (sched as any)[wk]?.[fullDayName] || status;
-        } else {
-          status = (sched as any)[fullDayName] || status;
-        }
+        const shift = getRotatingShift(emp, day.dateStr);
+        status = mapShiftToRosterCode(shift);
+      } else {
+        const restDay = emp.default_rest_day;
+        const isRest = day.weekday === restDay.slice(0, 3) || (day.isSunday && restDay === 'Sunday');
+        status = isRest ? 'R' : 'P';
       }
       newGrid[day.dateStr] = status;
     });
@@ -1000,17 +1057,17 @@ export default function AdminPanel() {
                         <label className="block mb-1 uppercase tracking-wider text-[10px]">Designation</label>
                         <select 
                           value={empDesig}
-                          onChange={(e) => setEmpDesig(e.target.value)}
+                          onChange={(e) => handleDesignationChange(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
                         >
-                          <option value="SSE/Sig/IC">SSE (In-Charge)</option>
+                          <option value="SSE/Sig/IC">SSE/Sig/IC</option>
                           <option value="SSE/Sig">SSE/Sig</option>
                           <option value="JE/Sig">JE/Sig</option>
                           <option value="Sr. Tech">Sr. Tech</option>
                           <option value="Tech-I">Tech-I</option>
                           <option value="Tech-II">Tech-II</option>
                           <option value="Tech-III">Tech-III</option>
-                          <option value="Assist/Sig">Assistant</option>
+                          <option value="Assistant">Assistant</option>
                         </select>
                       </div>
                       <div>

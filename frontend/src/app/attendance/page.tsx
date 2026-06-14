@@ -41,6 +41,57 @@ interface DayInfo {
   isSunday: boolean;
 }
 
+const getBaseRotatingShift = (sched: any, dateStr: string) => {
+  if (sched.type !== 'rotating') {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+    return sched[dayOfWeek] || null;
+  }
+
+  const anchorStr = sched.anchor_date || '2026-06-01';
+  const anchor = new Date(anchorStr);
+  const target = new Date(dateStr);
+
+  anchor.setHours(0,0,0,0);
+  target.setHours(0,0,0,0);
+
+  const diffTime = target.getTime() - anchor.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  const cycleDay = ((diffDays % 28) + 28) % 28;
+  const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 4
+
+  const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+  const wk = `week${weekNum}`;
+  return sched[wk]?.[dayOfWeek] || null;
+};
+
+const getRotatingShift = (emp: any, dateStr: string) => {
+  const sched = emp.weekly_schedule;
+  if (!sched) return null;
+
+  const overrides = (sched as any).custom_night_weeks;
+  if (Array.isArray(overrides)) {
+    const isOverride = overrides.some(w => dateStr >= w.from_date && dateStr <= w.to_date);
+    if (isOverride) {
+      const baseShift = getBaseRotatingShift(sched, dateStr);
+      if (baseShift === 'R') return 'R';
+      return 'N';
+    }
+  }
+
+  return getBaseRotatingShift(sched, dateStr);
+};
+
+const mapShiftToRosterCode = (shiftCode: string | null) => {
+  if (!shiftCode) return 'P';
+  const code = shiftCode.toUpperCase();
+  if (code === 'R') return 'R';
+  if (code === 'N' || code === 'P/N') return 'P/N';
+  if (['G', 'M', 'E', 'P'].includes(code)) return 'P';
+  return code;
+};
+
 export default function AttendanceGrid() {
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -485,9 +536,6 @@ export default function AttendanceGrid() {
 
   const executeAutoFill = () => {
     const updatedGrid = { ...gridData };
-    const weekdayMap: { [key: string]: string } = {
-      'Mon': 'Monday', 'Tue': 'Tuesday', 'Wed': 'Wednesday', 'Thu': 'Thursday', 'Fri': 'Friday', 'Sat': 'Saturday', 'Sun': 'Sunday'
-    };
 
     employees.forEach((emp) => {
       const empGrid = { ...(updatedGrid[emp.emp_id] || {}) };
@@ -495,23 +543,15 @@ export default function AttendanceGrid() {
       days.forEach((day, index) => {
         const existing = empGrid[day.dateStr];
         if (!existing || !existing.status) {
-          const restDay = emp.default_rest_day;
-          const isRest = day.weekday === restDay.slice(0, 3) || (day.isSunday && restDay === 'Sunday');
-
-          let status = isRest ? 'R' : 'P';
           const sched = emp.weekly_schedule;
+          let status = 'P';
           if (sched) {
-            const fullDayName = weekdayMap[day.weekday];
-            if ((sched as any).type === 'rotating') {
-              let wk = 'week1';
-              if (index >= 7 && index < 14) wk = 'week2';
-              else if (index >= 14 && index < 21) wk = 'week3';
-              else if (index >= 21) wk = 'week4';
-              
-              status = (sched as any)[wk]?.[fullDayName] || status;
-            } else {
-              status = (sched as any)[fullDayName] || status;
-            }
+            const shift = getRotatingShift(emp, day.dateStr);
+            status = mapShiftToRosterCode(shift);
+          } else {
+            const restDay = emp.default_rest_day;
+            const isRest = day.weekday === restDay.slice(0, 3) || (day.isSunday && restDay === 'Sunday');
+            status = isRest ? 'R' : 'P';
           }
 
           empGrid[day.dateStr] = {
@@ -538,7 +578,7 @@ export default function AttendanceGrid() {
   };
 
   const confirmClearGrid = async () => {
-    if (clearChallengeInput !== 'DELETE') {
+    if (clearChallengeInput.trim().toUpperCase() !== 'DELETE') {
       showToast("Challenge code invalid. Please type 'DELETE'.", "error");
       return;
     }
@@ -1183,9 +1223,9 @@ export default function AttendanceGrid() {
                 </button>
                 <button
                   onClick={confirmClearGrid}
-                  disabled={clearChallengeInput !== 'DELETE'}
+                  disabled={clearChallengeInput.trim().toUpperCase() !== 'DELETE'}
                   className={`px-3.5 py-2 rounded-lg font-bold text-xs uppercase cursor-pointer flex items-center gap-1.5 ${
-                    clearChallengeInput === 'DELETE'
+                    clearChallengeInput.trim().toUpperCase() === 'DELETE'
                       ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md'
                       : 'bg-slate-100 text-slate-450 border border-slate-250 cursor-not-allowed'
                   }`}
