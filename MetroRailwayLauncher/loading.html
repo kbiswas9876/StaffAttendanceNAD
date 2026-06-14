@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Metro Railway Kolkata S&T ERP</title>
+    <style>
+        body {
+            background-color: #0d0e12;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        .container {
+            background-color: #151821;
+            border: 1px solid #272c3a;
+            border-radius: 16px;
+            width: 540px;
+            padding: 40px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .logo-placeholder {
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+        .logo-ring {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #1e293b;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1.5s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h1 {
+            color: #ffffff;
+            font-size: 22px;
+            margin-top: 0;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+        }
+        h2 {
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 0;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        .status-container {
+            text-align: left;
+            margin-bottom: 25px;
+            background: #0f111a;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #1e2230;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 13.5px;
+            color: #94a3b8;
+        }
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+        .status-icon {
+            font-size: 14px;
+            width: 20px;
+            margin-right: 12px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .pending { color: #475569; }
+        .running { color: #3b82f6; animation: blink 1s infinite alternate; }
+        .completed { color: #10b981; }
+        .failed { color: #ef4444; }
+        
+        @keyframes blink {
+            from { opacity: 0.4; }
+            to { opacity: 1; }
+        }
+        
+        .progress-bar-bg {
+            background-color: #1e293b;
+            border-radius: 9999px;
+            height: 6px;
+            width: 100%;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            height: 100%;
+            width: 10%;
+            border-radius: 9999px;
+            transition: width 0.3s ease;
+        }
+        .log-box {
+            background-color: #0a0b0f;
+            border-radius: 8px;
+            height: 120px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            padding: 12px;
+            color: #10b981;
+            text-align: left;
+            white-space: pre-wrap;
+            border: 1px solid #1e2230;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-placeholder">
+            <div class="logo-ring"></div>
+        </div>
+        <h1>METRO RAILWAY KOLKATA S&T ERP</h1>
+        <h2>Staff Attendance System Roster</h2>
+        
+        <div class="status-container">
+            <div class="status-item" id="status-extract">
+                <span class="status-icon running" id="icon-extract">▶</span>
+                <span id="text-extract">Extracting embedded application resources...</span>
+            </div>
+            <div class="status-item" id="status-backend">
+                <span class="status-icon pending" id="icon-backend">○</span>
+                <span id="text-backend">Waiting for database and API microservice...</span>
+            </div>
+        </div>
+        
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        
+        <div class="log-box" id="log-box">Initializing WinForms launcher lifecycle...</div>
+    </div>
+
+    <script>
+        function updateStatus(stage, state, text) {
+            var iconEl = document.getElementById("icon-" + stage);
+            var textEl = document.getElementById("text-" + stage);
+            if (text) {
+                textEl.innerText = text;
+            }
+            
+            iconEl.className = "status-icon " + state;
+            if (state === "running") {
+                iconEl.innerText = "▶";
+            } else if (state === "completed") {
+                iconEl.innerText = "✔";
+            } else if (state === "failed") {
+                iconEl.innerText = "✘";
+            } else {
+                iconEl.innerText = "○";
+            }
+        }
+        
+        function setProgress(percentage) {
+            document.getElementById("progress-fill").style.width = percentage + "%";
+        }
+        
+        function appendLog(message) {
+            var logEl = document.getElementById("log-box");
+            logEl.innerText += "\n" + message;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+    </script>
+</body>
+</html>

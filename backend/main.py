@@ -2045,6 +2045,11 @@ async def serve_frontend(path_name: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    is_frozen = getattr(sys, 'frozen', False)
+    if is_frozen:
+        # Pass the app object directly and disable reload to avoid multiprocessing issues in PyInstaller
+        uvicorn.run(app, host="127.0.0.1", port=8000)
+    else:
+        uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
 
 
