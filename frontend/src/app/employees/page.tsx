@@ -211,19 +211,19 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   timelineJourney.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const getStatusColor = (status: string) => {
-    if (!status) return 'bg-slate-100 hover:bg-slate-200/70 border border-slate-200';
+    if (!status) return 'bg-white hover:bg-slate-50 text-slate-300 border border-slate-200/60';
     const colors: { [key: string]: string } = {
-      'P': 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-250',
-      'P/N': 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200',
-      'R': 'bg-slate-200 hover:bg-slate-300 text-slate-500 border border-slate-300',
-      'CR': 'bg-blue-100 hover:bg-blue-200 text-blue-700 border border-blue-200',
-      'CL': 'bg-amber-100 hover:bg-amber-250 text-amber-700 border border-amber-200',
-      'LAP': 'bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200',
-      'Sick': 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-200',
-      'SCL': 'bg-rose-100 hover:bg-rose-200 text-rose-700 border border-rose-200',
-      'PH': 'bg-yellow-100 hover:bg-yellow-200 text-yellow-600 border border-yellow-200'
+      'P': 'bg-emerald-100 hover:bg-emerald-250 text-emerald-800 border border-emerald-300',
+      'P/N': 'bg-violet-100 hover:bg-violet-200 text-violet-805 border border-violet-300',
+      'R': 'bg-slate-105 hover:bg-slate-200 text-slate-500 border border-slate-200',
+      'CR': 'bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300',
+      'CL': 'bg-amber-100 hover:bg-amber-200 text-amber-805 border border-amber-305',
+      'LAP': 'bg-orange-100 hover:bg-orange-200 text-orange-805 border border-orange-305',
+      'Sick': 'bg-red-500 hover:bg-red-600 text-white border border-red-600',
+      'SCL': 'bg-pink-100 hover:bg-pink-200 text-pink-800 border border-pink-305',
+      'PH': 'bg-yellow-100 hover:bg-yellow-250 text-yellow-850 border border-yellow-305'
     };
-    return colors[status] || 'bg-slate-100 hover:bg-slate-200 border border-slate-200';
+    return colors[status] || 'bg-slate-50 hover:bg-slate-100 text-slate-400 border border-slate-200';
   };
 
   const renderHeatmap = () => {
@@ -467,13 +467,13 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             {renderHeatmap()}
             <div className="pt-3 border-t border-slate-200 flex flex-wrap gap-4 text-[10px] font-bold text-slate-500 items-center">
               <span>Roster Colors:</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-white border border-slate-250"></span> Present (P)</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-purple-100 border border-purple-200"></span> Night Duty (P/N)</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-slate-200 border border-slate-300"></span> Weekly Rest (R)</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-blue-100 border border-blue-200"></span> Comp Rest (CR)</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-amber-100 border border-amber-200"></span> Casual Leave (CL)</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-orange-100 border border-orange-200"></span> LAP Leave</span>
-              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-red-100 border border-red-200"></span> Sick Leave</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-emerald-100 border border-emerald-300"></span> Present (P)</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-violet-100 border border-violet-300"></span> Night Duty (P/N)</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-slate-105 border border-slate-200"></span> Weekly Rest (R)</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-sky-100 border border-sky-300"></span> Comp Rest (CR)</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-amber-100 border border-amber-305"></span> Casual Leave (CL)</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-orange-100 border border-orange-305"></span> LAP Leave</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-red-500 border border-red-600"></span> Sick Leave</span>
             </div>
           </div>
         </div>

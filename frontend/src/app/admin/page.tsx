@@ -236,6 +236,8 @@ export default function AdminPanel() {
   const [shiftStart, setShiftStart] = useState('09:00');
   const [shiftEnd, setShiftEnd] = useState('17:30');
   const [shiftNight, setShiftNight] = useState(false);
+  const [isCustomDutyType, setIsCustomDutyType] = useState(false);
+  const [customDutyTypeText, setCustomDutyTypeText] = useState('');
 
   // 4b. Roster Codes Form
   const [codeVal, setCodeVal] = useState('');
@@ -739,6 +741,8 @@ export default function AdminPanel() {
     const sectionObj = sections.find(s => s.section_code === shiftSecCode);
     if (!sectionObj) return;
 
+    const finalDutyType = isCustomDutyType ? customDutyTypeText.trim() : (shiftNight ? 'Night Shift' : 'General / Day Shift');
+
     try {
       if (editingShiftRuleId !== null) {
         await updateShiftRule(editingShiftRuleId, {
@@ -747,7 +751,8 @@ export default function AdminPanel() {
           start_time: shiftStart.length === 5 ? `${shiftStart}:00` : shiftStart,
           end_time: shiftEnd.length === 5 ? `${shiftEnd}:00` : shiftEnd,
           working_days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
-          is_night_duty: shiftNight
+          is_night_duty: shiftNight,
+          duty_type: finalDutyType
         });
         showToast(`Successfully updated shift rule ${shiftCode} for ${shiftSecCode}.`, "success");
         setEditingShiftRuleId(null);
@@ -758,7 +763,8 @@ export default function AdminPanel() {
           start_time: `${shiftStart}:00`,
           end_time: `${shiftEnd}:00`,
           working_days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
-          is_night_duty: shiftNight
+          is_night_duty: shiftNight,
+          duty_type: finalDutyType
         });
         showToast(`Successfully created shift rule ${shiftCode} for ${shiftSecCode}.`, "success");
       }
@@ -766,6 +772,8 @@ export default function AdminPanel() {
       setShiftStart('09:00');
       setShiftEnd('17:30');
       setShiftNight(false);
+      setIsCustomDutyType(false);
+      setCustomDutyTypeText('');
       loadAdminData();
     } catch (err) {
       showToast("Failed to save shift rule. Check if the code already exists for this section.", "error");
@@ -782,6 +790,15 @@ export default function AdminPanel() {
     setShiftStart(rule.start_time.substring(0, 5));
     setShiftEnd(rule.end_time.substring(0, 5));
     setShiftNight(rule.is_night_duty);
+    
+    const dt = rule.duty_type || (rule.is_night_duty ? 'Night Shift' : 'General / Day Shift');
+    if (dt === 'Night Shift' || dt === 'General / Day Shift') {
+      setIsCustomDutyType(false);
+      setCustomDutyTypeText('');
+    } else {
+      setIsCustomDutyType(true);
+      setCustomDutyTypeText(dt);
+    }
   };
 
   const handleCancelEditShift = () => {
@@ -790,6 +807,8 @@ export default function AdminPanel() {
     setShiftStart('09:00');
     setShiftEnd('17:30');
     setShiftNight(false);
+    setIsCustomDutyType(false);
+    setCustomDutyTypeText('');
   };
 
   const handleDeleteShiftClick = async (ruleId: number) => {
@@ -1702,9 +1721,21 @@ export default function AdminPanel() {
                             <td className="py-3 px-5 text-blue-600 font-extrabold">Level {emp.level}</td>
                             <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold uppercase">{emp.section_code || "Unassigned"}</span></td>
                             <td className="py-3 px-5">{emp.default_rest_day}</td>
-                            <td className="py-3 px-5 text-center space-x-2">
-                              <button onClick={() => handleEditEmployeeClick(emp)} className="text-slate-400 hover:text-slate-855 transition cursor-pointer font-bold">Edit</button>
-                              <button onClick={() => handleDeleteEmployeeClick(emp.emp_id)} className="text-slate-400 hover:text-rose-600 transition cursor-pointer font-bold">Delete</button>
+                            <td className="py-3 px-5 text-center flex items-center justify-center gap-1.5">
+                              <button 
+                                onClick={() => handleEditEmployeeClick(emp)} 
+                                title="Edit Employee"
+                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                              >
+                                <Edit size={11} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteEmployeeClick(emp.emp_id)} 
+                                title="Delete Employee"
+                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                              >
+                                <Trash2 size={11} />
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -1989,17 +2020,55 @@ export default function AdminPanel() {
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 py-1">
-                    <input 
-                      type="checkbox"
-                      id="shiftNight"
-                      checked={shiftNight}
-                      onChange={(e) => setShiftNight(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-300 rounded cursor-pointer"
-                    />
-                    <label htmlFor="shiftNight" className="uppercase tracking-wider text-[10px] text-slate-500 cursor-pointer select-none">
-                      Is Night Duty Shift
-                    </label>
+                  <div>
+                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Duty Type</label>
+                    <select 
+                      value={isCustomDutyType ? 'Custom' : (shiftNight ? 'Night Shift' : 'General / Day Shift')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Custom') {
+                          setIsCustomDutyType(true);
+                          setShiftNight(false);
+                          setCustomDutyTypeText('');
+                        } else {
+                          setIsCustomDutyType(false);
+                          setShiftNight(val === 'Night Shift');
+                        }
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                    >
+                      <option value="General / Day Shift">General / Day Shift</option>
+                      <option value="Night Shift">Night Shift</option>
+                      <option value="Custom">Custom...</option>
+                    </select>
+
+                    {isCustomDutyType && (
+                      <div className="mt-3.5 space-y-3.5 border-t border-slate-100 pt-3 animate-fade-in">
+                        <div>
+                          <label className="block mb-1 uppercase tracking-wider text-[10px] text-blue-600">Custom Duty Type Name</label>
+                          <input 
+                            type="text" 
+                            value={customDutyTypeText}
+                            onChange={(e) => setCustomDutyTypeText(e.target.value)}
+                            placeholder="e.g. Evening Shift"
+                            className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm text-slate-805 focus:outline-none focus:border-blue-500 font-semibold"
+                            required
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="checkbox"
+                            id="customShiftNight"
+                            checked={shiftNight}
+                            onChange={(e) => setShiftNight(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded cursor-pointer"
+                          />
+                          <label htmlFor="customShiftNight" className="uppercase tracking-wider text-[10px] text-slate-500 cursor-pointer select-none">
+                            Qualifies as Night Duty? (For Allowance)
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="pt-2 flex justify-end gap-2.5">
                     {editingShiftRuleId !== null && (
@@ -2056,10 +2125,22 @@ export default function AdminPanel() {
                               <td className="py-3 px-5 font-mono">{s.start_time}</td>
                               <td className="py-3 px-5 font-mono">{s.end_time}</td>
                               <td className="py-3 px-5 text-center">
-                                {s.is_night_duty ? (
-                                  <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase">Night Shift</span>
+                                {s.duty_type ? (
+                                  s.is_night_duty ? (
+                                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase">{s.duty_type}</span>
+                                  ) : (
+                                    <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${
+                                      s.duty_type === 'General / Day Shift' 
+                                        ? 'bg-slate-100 text-slate-500' 
+                                        : 'bg-indigo-50 text-indigo-600 border border-indigo-200/50'
+                                    }`}>{s.duty_type}</span>
+                                  )
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold text-[9px] uppercase">General / Day</span>
+                                  s.is_night_duty ? (
+                                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase">Night Shift</span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold text-[9px] uppercase">General / Day</span>
+                                  )
                                 )}
                               </td>
                               <td className="py-3 px-5 text-center flex justify-center items-center gap-1.5">

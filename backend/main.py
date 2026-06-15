@@ -254,6 +254,7 @@ def init_db():
             end_time TEXT NOT NULL,
             working_days TEXT NOT NULL,
             is_night_duty INTEGER NOT NULL DEFAULT 0,
+            duty_type TEXT,
             UNIQUE (section_id, shift_code)
         );
     """)
@@ -463,6 +464,13 @@ def init_db():
             conn.commit()
         except sqlite3.OperationalError:
             pass # Column already exists
+            
+    # Ensure duty_type column exists in shift_rules table
+    try:
+        cursor.execute("ALTER TABLE shift_rules ADD COLUMN duty_type TEXT;")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Column already exists
         
     conn.close()
 
@@ -500,6 +508,7 @@ class ShiftRuleSchema(BaseModel):
     end_time: str
     working_days: List[str]
     is_night_duty: bool
+    duty_type: Optional[str] = None
 
 class AttendanceCodeSchema(BaseModel):
     code: str
@@ -848,6 +857,8 @@ def read_shift_rules(section_code: str):
     for r in rules:
         r['working_days'] = r['working_days'].split(',')
         r['is_night_duty'] = bool(r['is_night_duty'])
+        if not r.get('duty_type'):
+            r['duty_type'] = 'Night Shift' if r['is_night_duty'] else 'General / Day Shift'
     conn.close()
     return rules
 
@@ -857,10 +868,13 @@ def add_shift_rule(payload: ShiftRuleSchema):
     try:
         cursor = conn.cursor()
         days_str = ",".join(payload.working_days)
+        duty_type_val = payload.duty_type
+        if not duty_type_val:
+            duty_type_val = 'Night Shift' if payload.is_night_duty else 'General / Day Shift'
         cursor.execute("""
-            INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (payload.section_id, payload.shift_code, payload.start_time, payload.end_time, days_str, int(payload.is_night_duty)))
+            INSERT INTO shift_rules (section_id, shift_code, start_time, end_time, working_days, is_night_duty, duty_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (payload.section_id, payload.shift_code, payload.start_time, payload.end_time, days_str, int(payload.is_night_duty), duty_type_val))
         conn.commit()
         log_audit("Insert", "Shift Rules", f"Added shift rule {payload.shift_code} for Section ID {payload.section_id}")
         return {"id": cursor.lastrowid, **payload.dict()}
@@ -878,11 +892,14 @@ def update_shift_rule(rule_id: int, payload: ShiftRuleSchema):
         if not existing:
             raise HTTPException(status_code=404, detail="Shift rule not found.")
         days_str = ",".join(payload.working_days)
+        duty_type_val = payload.duty_type
+        if not duty_type_val:
+            duty_type_val = 'Night Shift' if payload.is_night_duty else 'General / Day Shift'
         cursor.execute("""
             UPDATE shift_rules 
-            SET section_id = ?, shift_code = ?, start_time = ?, end_time = ?, working_days = ?, is_night_duty = ?
+            SET section_id = ?, shift_code = ?, start_time = ?, end_time = ?, working_days = ?, is_night_duty = ?, duty_type = ?
             WHERE id = ?
-        """, (payload.section_id, payload.shift_code, payload.start_time, payload.end_time, days_str, int(payload.is_night_duty), rule_id))
+        """, (payload.section_id, payload.shift_code, payload.start_time, payload.end_time, days_str, int(payload.is_night_duty), duty_type_val, rule_id))
         conn.commit()
         log_audit("Update", "Shift Rules", f"Updated shift rule {payload.shift_code} (ID: {rule_id}) for Section ID {payload.section_id}")
         return {"id": rule_id, **payload.dict()}

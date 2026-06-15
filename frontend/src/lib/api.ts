@@ -65,6 +65,7 @@ export interface ShiftRule {
   end_time: string;
   working_days: string[];
   is_night_duty: boolean;
+  duty_type?: string;
 }
 
 export interface LeaveBank {
