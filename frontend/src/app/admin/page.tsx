@@ -35,7 +35,7 @@ import {
   getAuditLogs, AuditLog,
   getBackupsList, createBackup, restoreBackup, getBackupStatus, deleteBackup,
   getAttendanceLogs, saveAttendanceLogsBulk, addSpecialEvent,
-  getWeeklyScheduleDefault
+  getWeeklyScheduleDefault, getAppVersion
 } from '../../lib/api';
 
 interface DayInfo {
@@ -268,7 +268,7 @@ export default function AdminPanel() {
   const [isBackupRunning, setIsBackupRunning] = useState(false);
 
   // Updates check states
-  const [currentVersion] = useState('v1.2.0'); // Installed version
+  const [currentVersion, setCurrentVersion] = useState('v1.2.0'); // Installed version
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle');
   const [latestRelease, setLatestRelease] = useState<{
     tag_name: string;
@@ -366,6 +366,16 @@ export default function AdminPanel() {
       }
       if (storedLines.length > 0) {
         setSecLineId(storedLines[0].id);
+      }
+
+      // Fetch dynamic application version from API
+      try {
+        const verObj = await getAppVersion();
+        if (verObj && verObj.version) {
+          setCurrentVersion(`v${verObj.version.replace(/^v/, '')}`);
+        }
+      } catch (verErr) {
+        console.error("Failed to load application version from backend", verErr);
       }
     } catch (e) {
       console.error("Failed to load admin panel data", e);

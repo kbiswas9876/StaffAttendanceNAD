@@ -85,6 +85,9 @@ def sync_leave_and_ledger(emp_id: int, year: int):
             return
         rest_day = emp['default_rest_day']
 
+        start_date = f"{year}-01-01"
+        end_date = f"{year}-12-31"
+
         # Get all logs for employee in that year
         cursor.execute("""
             SELECT date, status, remarks FROM attendance_log 
@@ -105,6 +108,7 @@ def sync_leave_and_ledger(emp_id: int, year: int):
                     earned_dates.append(log['date'])
 
         # Gather explicitly mapped CRs and unassociated CRs
+        consumed_dates = [log['date'] for log in logs if log['status'] == 'CR']
         explicit_mappings = {} # consumed_date -> earned_date
         unassociated_consumed = []
         for log in logs:
@@ -626,6 +630,15 @@ class NumberedCanvas(canvas.Canvas):
 
 
 # --- API ENDPOINTS ---
+
+try:
+    from version import VERSION
+except ImportError:
+    VERSION = "1.2.0"
+
+@app.get("/api/version")
+def get_version():
+    return {"version": VERSION}
 
 # 1. Lines CRUD
 @app.get("/api/lines")

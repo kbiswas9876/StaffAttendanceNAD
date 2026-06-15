@@ -114,15 +114,20 @@ public class MainForm : Form
             }
 
             bool shouldWrite = true;
-            if (File.Exists(backendPath))
+            string versionFilePath = Path.Combine(appDir, "version.txt");
+            if (File.Exists(backendPath) && File.Exists(versionFilePath))
             {
                 try
                 {
-                    FileInfo fi = new FileInfo(backendPath);
-                    // Avoid re-writing if size is unchanged
-                    if (fi.Length == stream.Length)
+                    string lastExtractedVersion = File.ReadAllText(versionFilePath).Trim();
+                    if (lastExtractedVersion == APP_VERSION)
                     {
-                        shouldWrite = false;
+                        FileInfo fi = new FileInfo(backendPath);
+                        // Avoid re-writing if size is unchanged
+                        if (fi.Length == stream.Length)
+                        {
+                            shouldWrite = false;
+                        }
                     }
                 }
                 catch { }
@@ -140,6 +145,12 @@ public class MainForm : Form
                     stream.CopyTo(fs);
                 }
                 AppendLog("Extraction finished successfully.");
+
+                try
+                {
+                    File.WriteAllText(versionFilePath, APP_VERSION);
+                }
+                catch { }
             }
         }
 

@@ -30,7 +30,80 @@ def convert_png_to_ico():
         print(f"Error during image conversion: {e}")
         return False
 
+def get_version():
+    version_file = "version.txt"
+    if not os.path.exists(version_file):
+        with open(version_file, "w") as f:
+            f.write("1.2.0")
+        return "1.2.0"
+    with open(version_file, "r") as f:
+        return f.read().strip().replace("v", "")
+
+def update_project_versions(version):
+    # 1. Update version.py in backend
+    version_file = os.path.join("backend", "version.py")
+    print(f"Updating backend version file: {version_file} to '{version}'")
+    with open(version_file, "w") as f:
+        f.write(f'VERSION = "{version}"\n')
+        
+    # 2. Update MainForm.cs in C# Launcher
+    main_form_path = os.path.join("MetroRailwayLauncher", "MainForm.cs")
+    if os.path.exists(main_form_path):
+        print(f"Updating C# MainForm.cs constant to 'v{version}'")
+        with open(main_form_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        import re
+        # Match public const string APP_VERSION = "...";
+        pattern = r'(public\s+const\s+string\s+APP_VERSION\s*=\s*")[^"]*(";)'
+        new_content = re.sub(pattern, rf'\g<1>v{version}\g<2>', content)
+        
+        with open(main_form_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+            
+    # 3. Update MetroRailwayLauncher.csproj in C# Launcher
+    csproj_path = os.path.join("MetroRailwayLauncher", "MetroRailwayLauncher.csproj")
+    if os.path.exists(csproj_path):
+        print(f"Updating .NET csproj file version metadata to '{version}'")
+        with open(csproj_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        import re
+        # Check if AssemblyVersion, FileVersion, Version tags exist
+        has_assembly = "<AssemblyVersion>" in content
+        has_file = "<FileVersion>" in content
+        has_version = "<Version>" in content
+        
+        if has_assembly:
+            content = re.sub(r'<AssemblyVersion>[^<]*</AssemblyVersion>', f'<AssemblyVersion>{version}.0</AssemblyVersion>', content)
+        if has_file:
+            content = re.sub(r'<FileVersion>[^<]*</FileVersion>', f'<FileVersion>{version}.0</FileVersion>', content)
+        if has_version:
+            content = re.sub(r'<Version>[^<]*</Version>', f'<Version>{version}</Version>', content)
+            
+        # If any are missing, insert them before </PropertyGroup>
+        if not (has_assembly and has_file and has_version):
+            extra_properties = []
+            if not has_assembly:
+                extra_properties.append(f"    <AssemblyVersion>{version}.0</AssemblyVersion>")
+            if not has_file:
+                extra_properties.append(f"    <FileVersion>{version}.0</FileVersion>")
+            if not has_version:
+                extra_properties.append(f"    <Version>{version}</Version>")
+            
+            injection = "\n" + "\n".join(extra_properties) + "\n  </PropertyGroup>"
+            content = content.replace("  </PropertyGroup>", injection)
+            
+        with open(csproj_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
 def build_executable():
+    version = get_version()
+    print(f"=======================================================")
+    print(f"Building Metro Railway S&T ERP with Version: v{version}")
+    print(f"=======================================================")
+    update_project_versions(version)
+    
     # Make sure we have the icon
     if not os.path.exists("icon.ico"):
         if not convert_png_to_ico():

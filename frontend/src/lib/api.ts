@@ -428,6 +428,10 @@ export const deleteBackup = async (filename: string): Promise<{ status: string }
   });
 };
 
+export const getAppVersion = async (): Promise<{ version: string }> => {
+  return apiFetch<{ version: string }>("/version");
+};
+
 // Helper for weekly schedule defaults
 export const getWeeklyScheduleDefault = (restDay: string): { [day: string]: string } => {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

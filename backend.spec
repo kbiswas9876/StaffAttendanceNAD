@@ -2,10 +2,11 @@
 
 a = Analysis(
     ['backend/main.py'],
-    pathex=[],
+    pathex=['backend'],
     binaries=[],
     datas=[('frontend/out', 'out'), ('backend/database.db', '.')],
     hiddenimports=[
+        'version',
         'uvicorn', 
         'sqlite3', 
         'pandas', 
