@@ -254,7 +254,7 @@ export default function Dashboard() {
                   </tr>
                 ) : (
                   employees.map((emp) => (
-                    <tr key={emp.emp_id} className="hover:bg-[#F5F3EF]/40 transition-colors cursor-pointer" onClick={() => window.location.href=`/employees/${emp.emp_id}`}>
+                    <tr key={emp.emp_id} className="hover:bg-[#F5F3EF]/40 transition-colors cursor-pointer" onClick={() => window.location.href=`/employees?id=${emp.emp_id}`}>
                       <td className="py-3 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
                       <td className="py-3 px-5 font-bold text-[#191919]">{emp.name}</td>
                       <td className="py-3 px-5">

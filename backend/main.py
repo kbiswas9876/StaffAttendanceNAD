@@ -291,7 +291,11 @@ def init_db():
             from_date TEXT NOT NULL,
             to_date TEXT NOT NULL,
             order_number TEXT,
-            location TEXT
+            location TEXT,
+            from_section TEXT,
+            to_section TEXT,
+            signatory_name TEXT,
+            signatory_designation TEXT
         );
     """)
 
@@ -447,6 +451,14 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass # Column already exists
+
+    # Ensure transfer and signatory columns exist in special_events table
+    for col in ["from_section", "to_section", "signatory_name", "signatory_designation"]:
+        try:
+            cursor.execute(f"ALTER TABLE special_events ADD COLUMN {col} TEXT;")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass # Column already exists
         
     conn.close()
 
@@ -514,6 +526,10 @@ class SpecialEventSchema(BaseModel):
     to_date: str
     order_number: Optional[str] = None
     location: Optional[str] = None
+    from_section: Optional[str] = None
+    to_section: Optional[str] = None
+    signatory_name: Optional[str] = None
+    signatory_designation: Optional[str] = None
 
 class RestoreSchema(BaseModel):
     filename: str
@@ -1139,9 +1155,9 @@ def add_special_event(payload: SpecialEventSchema):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO special_events (emp_id, event_type, from_date, to_date, order_number, location)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (payload.emp_id, payload.event_type, payload.from_date, payload.to_date, payload.order_number, payload.location))
+        INSERT INTO special_events (emp_id, event_type, from_date, to_date, order_number, location, from_section, to_section, signatory_name, signatory_designation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (payload.emp_id, payload.event_type, payload.from_date, payload.to_date, payload.order_number, payload.location, payload.from_section, payload.to_section, payload.signatory_name, payload.signatory_designation))
     conn.commit()
     conn.close()
     log_audit("Insert", "Special Events", f"Logged event {payload.event_type} for Employee ID {payload.emp_id}")

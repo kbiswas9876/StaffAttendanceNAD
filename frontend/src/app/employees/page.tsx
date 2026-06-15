@@ -25,7 +25,10 @@ import {
   Sparkles,
   Inbox,
   Edit,
-  GripVertical
+  GripVertical,
+  ArrowLeftRight,
+  CalendarDays,
+  TrendingUp
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
@@ -45,7 +48,9 @@ import {
   SpecialEvent, 
   updateLeaveBank,
   getWeeklyScheduleDefault,
-  reorderEmployees
+  reorderEmployees,
+  getCRLedger,
+  CRLedgerEntry
 } from '../../lib/api';
 
 // --- EMPLOYEE PROFILE 360 COMPONENT ---
@@ -59,6 +64,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const [leaveBank, setLeaveBank] = useState<LeaveBank | null>(null);
   const [attendance, setAttendance] = useState<AttendanceLog[]>([]);
   const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>([]);
+  const [crLedger, setCrLedger] = useState<CRLedgerEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedYear, setSelectedYear] = useState(2026);
 
@@ -126,6 +132,9 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       const events = await getSpecialEvents();
       const empEvents = events.filter(e => e.emp_id === empId);
       setSpecialEvents(empEvents);
+
+      const crData = await getCRLedger(empId);
+      setCrLedger(crData);
     } catch (e) {
       console.error("Failed to load employee 360 profile", e);
     } finally {
@@ -264,6 +273,47 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     );
   };
 
+  // Presence & Duty Status Calculations
+  const DASHBOARD_TODAY = '2026-05-20'; // Mid-cycle mock date to calculate active presence
+  const todayStatus = attendanceMap[DASHBOARD_TODAY] || 'No Log';
+  
+  const completedDuties = attendance.filter(log => log.date < DASHBOARD_TODAY && ['P', 'P/N'].includes(log.status));
+  completedDuties.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const lastDuty = completedDuties[0] || null;
+
+  const transfers = specialEvents.filter(evt => evt.event_type === 'Transfer');
+  transfers.sort((a, b) => new Date(b.from_date).getTime() - new Date(a.from_date).getTime());
+
+  const leaveLogs = attendance.filter(log => ['CL', 'LAP', 'Sick', 'SCL'].includes(log.status));
+  leaveLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const getDutyBadgeDetails = (status: string) => {
+    switch (status) {
+      case 'P':
+        return { label: 'ON DUTY (General Shift)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-250 font-bold' };
+      case 'P/N':
+        return { label: 'ON DUTY (Night Shift)', bg: 'bg-purple-50 text-purple-700 border-purple-250 font-bold' };
+      case 'R':
+        return { label: 'WEEKLY REST DAY', bg: 'bg-slate-100 text-slate-700 border-slate-250 font-bold' };
+      case 'CR':
+        return { label: 'COMPENSATORY REST', bg: 'bg-blue-50 text-blue-700 border-blue-250 font-bold' };
+      case 'CL':
+        return { label: 'ON CASUAL LEAVE', bg: 'bg-amber-50 text-amber-700 border-amber-250 font-bold' };
+      case 'LAP':
+        return { label: 'ON AVERAGE PAY LEAVE (LAP)', bg: 'bg-orange-50 text-orange-700 border-orange-250 font-bold' };
+      case 'Sick':
+        return { label: 'ON MEDICAL SICK LEAVE', bg: 'bg-red-50 text-red-700 border-red-250 font-bold' };
+      case 'SCL':
+        return { label: 'ON SPECIAL CASUAL LEAVE', bg: 'bg-rose-50 text-rose-700 border-rose-250 font-bold' };
+      case 'PH':
+        return { label: 'PUBLIC MASTER HOLIDAY', bg: 'bg-yellow-50 text-yellow-750 border-yellow-250 font-bold' };
+      default:
+        return { label: 'NO ROSTER LOG FOR TODAY', bg: 'bg-slate-50 text-slate-500 border-slate-200' };
+    }
+  };
+
+  const todayBadge = getDutyBadgeDetails(todayStatus);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -297,6 +347,34 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             <option value={2026}>2026 Roster Heatmap</option>
             <option value={2025}>2025 Roster Heatmap</option>
           </select>
+        </div>
+      </div>
+
+      {/* Presence & Duty Status Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+        <div className="flex flex-col space-y-2">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Roster Status Today (20.05.2026)</span>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1.5 rounded-full text-xs font-black border ${todayBadge.bg}`}>
+              {todayBadge.label}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col space-y-2 border-l border-slate-100 pl-0 md:pl-5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Last Worked Duty Shift</span>
+          <div className="text-xs font-bold text-slate-700">
+            {lastDuty ? (
+              <span className="flex items-center gap-1.5">
+                <span className="font-extrabold text-blue-600">{new Date(lastDuty.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <span>—</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${lastDuty.status === 'P/N' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                  {lastDuty.status === 'P/N' ? 'Night Shift (P/N)' : 'General Shift (P)'}
+                </span>
+              </span>
+            ) : (
+              <span className="text-slate-400 font-semibold italic">No previous duty logs in this period.</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -429,6 +507,151 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         </div>
       </div>
+
+      {/* History, Leaves & CR Ledger Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Transfer History Card */}
+          <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
+              <ArrowLeftRight size={18} className="text-blue-600 font-bold" />
+              Transfer & Posting History
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
+                    <th className="py-2.5 px-4">Transfer Date</th>
+                    <th className="py-2.5 px-4">From Section</th>
+                    <th className="py-2.5 px-4">To Section</th>
+                    <th className="py-2.5 px-4">Order Number</th>
+                    <th className="py-2.5 px-4">Approved Signatory</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                  {transfers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 font-bold italic">
+                        No previous transfers recorded on database.
+                      </td>
+                    </tr>
+                  ) : (
+                    transfers.map(evt => (
+                      <tr key={evt.id} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-4 font-mono">{new Date(evt.from_date).toLocaleDateString('en-GB')}</td>
+                        <td className="py-2.5 px-4 uppercase text-slate-500">
+                          {evt.from_section || evt.location?.split('➡️')?.[0]?.trim() || '—'}
+                        </td>
+                        <td className="py-2.5 px-4 uppercase text-slate-850 font-bold">
+                          {evt.to_section || evt.location?.split('➡️')?.[1]?.trim() || evt.location || '—'}
+                        </td>
+                        <td className="py-2.5 px-4 font-mono bg-slate-50/50 text-slate-650">{evt.order_number}</td>
+                        <td className="py-2.5 px-4">
+                          {evt.signatory_name && evt.signatory_name !== 'N/A' ? (
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-850">{evt.signatory_name}</span>
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wide font-medium">{evt.signatory_designation}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic font-medium">Pre-migration record</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Leave Logs Card */}
+          <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
+              <CalendarDays size={18} className="text-blue-600 font-bold" />
+              Detailed Leave Logs Ledger
+            </h3>
+            <div className="overflow-x-auto max-h-[300px]">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
+                    <th className="py-2.5 px-4">Leave Date</th>
+                    <th className="py-2.5 px-4">Leave Type</th>
+                    <th className="py-2.5 px-4">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                  {leaveLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-slate-400 font-bold italic">
+                        No leaves logged for this calendar year.
+                      </td>
+                    </tr>
+                  ) : (
+                    leaveLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-4 font-mono">{new Date(log.date).toLocaleDateString('en-GB')}</td>
+                        <td className="py-2.5 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                            log.status === 'CL' 
+                              ? 'bg-amber-50 text-amber-700 border-amber-250' 
+                              : log.status === 'LAP' 
+                                ? 'bg-orange-50 text-orange-700 border-orange-250' 
+                                : 'bg-red-50 text-red-700 border-red-250'
+                          }`}>
+                            {log.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-500 font-medium">{log.remarks || "—"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* CR Ledger Card */}
+        <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
+          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
+            <TrendingUp size={18} className="text-blue-600 font-bold" />
+            CR Balance Credit/Debit Log
+          </h3>
+          <div className="overflow-y-auto max-h-[500px] space-y-3 pr-1">
+            {crLedger.length === 0 ? (
+              <p className="text-center py-10 text-xs text-slate-400 font-bold italic">No CR ledger records found.</p>
+            ) : (
+              <div className="space-y-2">
+                {crLedger.map((cr, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 border rounded-lg text-xs font-semibold space-y-1">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                      <span>CR LOG ID: {cr.id || idx+1}</span>
+                      <span className="text-blue-600 font-extrabold">CREDIT</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-550 font-bold">Rest Day Duty (Earned):</span>
+                      <span className="font-mono text-slate-800 font-bold">{new Date(cr.earned_date).toLocaleDateString('en-GB')}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-slate-200/50 pt-1 mt-1">
+                      <span className="text-slate-550 font-bold">Consumed (Debited):</span>
+                      {cr.consumed_date ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200 font-mono">
+                          {new Date(cr.consumed_date).toLocaleDateString('en-GB')}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-250">
+                          AVAILABLE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
 
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">

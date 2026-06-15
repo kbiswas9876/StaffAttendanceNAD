@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MetroRailwayERP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+80c577cf98dd7efb5fb06ac0dcad9bdd34742498")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+58504b582505d29481e84a0fdce79c10519a818e")]
 [assembly: System.Reflection.AssemblyProductAttribute("MetroRailwayERP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MetroRailwayERP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

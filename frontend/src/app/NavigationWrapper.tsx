@@ -593,7 +593,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                           <button
                             key={emp.emp_id}
                             onClick={() => {
-                              router.push(`/employees/${emp.emp_id}`);
+                              router.push(`/employees?id=${emp.emp_id}`);
                               setIsPaletteOpen(false);
                             }}
                             className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-blue-50/50 text-left transition border border-transparent hover:border-blue-100/50"

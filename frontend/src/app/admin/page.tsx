@@ -170,6 +170,8 @@ export default function AdminPanel() {
   const [empSearchQuery, setEmpSearchQuery] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
   const [auditModuleFilter, setAuditModuleFilter] = useState('ALL');
+  const [directoryLineFilter, setDirectoryLineFilter] = useState<string>('ALL');
+  const [directorySectionFilter, setDirectorySectionFilter] = useState<string>('ALL');
 
   // Edit helper states
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null);
@@ -214,6 +216,8 @@ export default function AdminPanel() {
   const [transferDate, setTransferDate] = useState<string>('2026-06-15');
   const [transferOrderNo, setTransferOrderNo] = useState<string>('');
   const [transferRemarks, setTransferRemarks] = useState<string>('');
+  const [transferSignatoryName, setTransferSignatoryName] = useState<string>('');
+  const [transferSignatoryDesig, setTransferSignatoryDesig] = useState<string>('');
 
   // 2. Line Form
   const [lineName, setLineName] = useState('');
@@ -586,7 +590,11 @@ export default function AdminPanel() {
         from_date: transferDate,
         to_date: transferDate,
         order_number: transferOrderNo || 'N/A',
-        location: sectionObj.section_name
+        location: `${emp.section_code || 'Unassigned'} ➡️ ${sectionObj.section_code}`,
+        from_section: emp.section_code || 'Unassigned',
+        to_section: sectionObj.section_code,
+        signatory_name: transferSignatoryName || 'N/A',
+        signatory_designation: transferSignatoryDesig || 'N/A'
       });
 
       showToast(`Successfully transferred ${emp.name} to ${sectionObj.section_name}.`, "success");
@@ -594,6 +602,8 @@ export default function AdminPanel() {
       setTransferSecCode('');
       setTransferOrderNo('');
       setTransferRemarks('');
+      setTransferSignatoryName('');
+      setTransferSignatoryDesig('');
       loadAdminData();
     } catch (err) {
       showToast("Failed to complete employee transfer.", "error");
@@ -1020,12 +1030,21 @@ export default function AdminPanel() {
   };
 
   // Filters
-  const filteredEmployees = employees.filter(emp => 
-    emp.name.toLowerCase().includes(empSearchQuery.toLowerCase()) ||
-    emp.pf_number.includes(empSearchQuery) ||
-    emp.designation.toLowerCase().includes(empSearchQuery.toLowerCase()) ||
-    (emp.section_code || "").toLowerCase().includes(empSearchQuery.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = emp.name.toLowerCase().includes(empSearchQuery.toLowerCase()) ||
+      emp.pf_number.includes(empSearchQuery) ||
+      emp.designation.toLowerCase().includes(empSearchQuery.toLowerCase()) ||
+      (emp.section_code || "").toLowerCase().includes(empSearchQuery.toLowerCase());
+      
+    const matchesLine = directoryLineFilter === 'ALL' || (() => {
+      const empSec = sections.find(s => s.section_code === emp.section_code);
+      return empSec ? empSec.line_id === Number(directoryLineFilter) : false;
+    })();
+    
+    const matchesSection = directorySectionFilter === 'ALL' || emp.section_code === directorySectionFilter;
+    
+    return matchesSearch && matchesLine && matchesSection;
+  });
 
   const filteredAudits = auditLogs.filter(log => {
     const matchesSearch = log.details.toLowerCase().includes(auditSearch.toLowerCase()) || 
@@ -1468,8 +1487,16 @@ export default function AdminPanel() {
                         ))}
                       </select>
                     </div>
+                    {transferEmpId && (
+                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg animate-fade-in flex justify-between items-center text-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">From Section (Current):</span>
+                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold border border-blue-200 uppercase">
+                          {employees.find(e => e.emp_id === Number(transferEmpId))?.section_code || 'Unassigned'}
+                        </span>
+                      </div>
+                    )}
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Target Section</label>
+                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Target Section (To Section)</label>
                       <select 
                         value={transferSecCode}
                         onChange={(e) => setTransferSecCode(e.target.value)}
@@ -1505,6 +1532,30 @@ export default function AdminPanel() {
                         />
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-3 border-t pt-3.5 mt-2">
+                      <div>
+                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Signatory Name</label>
+                        <input 
+                          type="text" 
+                          value={transferSignatoryName}
+                          onChange={(e) => setTransferSignatoryName(e.target.value)}
+                          placeholder="e.g. Koushik Saha"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Signatory Designation</label>
+                        <input 
+                          type="text" 
+                          value={transferSignatoryDesig}
+                          onChange={(e) => setTransferSignatoryDesig(e.target.value)}
+                          placeholder="e.g. SSE/Sig/IC"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
                     <button 
                       type="submit" 
                       className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
@@ -1517,19 +1568,48 @@ export default function AdminPanel() {
 
               {/* Staff directory directory table */}
               <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                <div className="px-5 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="px-5 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
                   <h3 className="font-bold text-slate-855">Registered Signaller Directory</h3>
                   
-                  {/* Directory Search */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full sm:w-64">
-                    <Search size={14} className="text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search directory..." 
-                      value={empSearchQuery}
-                      onChange={(e) => setEmpSearchQuery(e.target.value)}
-                      className="bg-transparent border-none text-slate-800 placeholder-slate-400 focus:outline-none w-full"
-                    />
+                  <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
+                    {/* Line Filter */}
+                    <select
+                      value={directoryLineFilter}
+                      onChange={(e) => {
+                        setDirectoryLineFilter(e.target.value);
+                        setDirectorySectionFilter('ALL');
+                      }}
+                      className="bg-slate-50 border border-slate-250 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none font-bold text-slate-650 cursor-pointer"
+                    >
+                      <option value="ALL">All Lines</option>
+                      {lines.map(line => (
+                        <option key={line.id} value={line.id}>{line.line_name}</option>
+                      ))}
+                    </select>
+
+                    {/* Section Filter */}
+                    <select
+                      value={directorySectionFilter}
+                      onChange={(e) => setDirectorySectionFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-250 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none font-bold text-slate-650 cursor-pointer"
+                    >
+                      <option value="ALL">All Sections</option>
+                      {sections.filter(s => directoryLineFilter === 'ALL' || s.line_id === Number(directoryLineFilter)).map(sec => (
+                        <option key={sec.id} value={sec.section_code}>{sec.section_code}</option>
+                      ))}
+                    </select>
+
+                    {/* Directory Search */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full sm:w-64">
+                      <Search size={14} className="text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Search directory..." 
+                        value={empSearchQuery}
+                        onChange={(e) => setEmpSearchQuery(e.target.value)}
+                        className="bg-transparent border-none text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                      />
+                    </div>
                   </div>
                 </div>
 

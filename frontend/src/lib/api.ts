@@ -95,6 +95,10 @@ export interface SpecialEvent {
   to_date: string;
   order_number: string;
   location: string;
+  from_section?: string | null;
+  to_section?: string | null;
+  signatory_name?: string | null;
+  signatory_designation?: string | null;
 }
 
 export interface Holiday {
