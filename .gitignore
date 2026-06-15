@@ -72,3 +72,9 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# --- C# Launcher Build Outputs ---
+[Bb]in/
+[Oo]bj/
+MetroRailwayLauncher/Resources/backend.exe
+
