@@ -869,6 +869,43 @@ def add_shift_rule(payload: ShiftRuleSchema):
     finally:
         conn.close()
 
+@app.put("/api/shift-rules/{rule_id}")
+def update_shift_rule(rule_id: int, payload: ShiftRuleSchema):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        existing = cursor.execute("SELECT id FROM shift_rules WHERE id = ?", (rule_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Shift rule not found.")
+        days_str = ",".join(payload.working_days)
+        cursor.execute("""
+            UPDATE shift_rules 
+            SET section_id = ?, shift_code = ?, start_time = ?, end_time = ?, working_days = ?, is_night_duty = ?
+            WHERE id = ?
+        """, (payload.section_id, payload.shift_code, payload.start_time, payload.end_time, days_str, int(payload.is_night_duty), rule_id))
+        conn.commit()
+        log_audit("Update", "Shift Rules", f"Updated shift rule {payload.shift_code} (ID: {rule_id}) for Section ID {payload.section_id}")
+        return {"id": rule_id, **payload.dict()}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Shift code already exists for this section.")
+    finally:
+        conn.close()
+
+@app.delete("/api/shift-rules/{rule_id}")
+def delete_shift_rule(rule_id: int):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        existing = cursor.execute("SELECT id, shift_code, section_id FROM shift_rules WHERE id = ?", (rule_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Shift rule not found.")
+        cursor.execute("DELETE FROM shift_rules WHERE id = ?", (rule_id,))
+        conn.commit()
+        log_audit("Delete", "Shift Rules", f"Deleted shift rule {existing['shift_code']} (ID: {rule_id})")
+        return {"status": "success"}
+    finally:
+        conn.close()
+
 # 5. Attendance Codes
 @app.get("/api/attendance-codes")
 def read_attendance_codes():

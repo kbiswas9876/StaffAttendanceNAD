@@ -240,6 +240,19 @@ export const createShiftRule = async (rule: Omit<ShiftRule, 'id'>): Promise<Shif
   });
 };
 
+export const updateShiftRule = async (ruleId: number, rule: Omit<ShiftRule, 'id'>): Promise<ShiftRule> => {
+  return apiFetch<ShiftRule>(`/shift-rules/${ruleId}`, {
+    method: "PUT",
+    body: JSON.stringify(rule)
+  });
+};
+
+export const deleteShiftRule = async (ruleId: number): Promise<{ status: string }> => {
+  return apiFetch<{ status: string }>(`/shift-rules/${ruleId}`, {
+    method: "DELETE"
+  });
+};
+
 // 5. Attendance Codes
 export const getAttendanceCodes = async (): Promise<AttendanceCode[]> => {
   return apiFetch<AttendanceCode[]>("/attendance-codes");

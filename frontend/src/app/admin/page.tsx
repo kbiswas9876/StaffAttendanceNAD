@@ -29,7 +29,7 @@ import {
   getEmployees, createEmployee, updateEmployee, deleteEmployee, Employee,
   getLines, createLine, updateLine, deleteLine, MetroLine,
   getSections, createSection, updateSection, deleteSection, Section,
-  getShiftRules, createShiftRule, ShiftRule,
+  getShiftRules, createShiftRule, updateShiftRule, deleteShiftRule, ShiftRule,
   getAttendanceCodes, createAttendanceCode, updateAttendanceCode, deleteAttendanceCode, AttendanceCode,
   getHolidays, createHoliday, updateHoliday, deleteHoliday, Holiday,
   getAuditLogs, AuditLog,
@@ -177,6 +177,7 @@ export default function AdminPanel() {
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null);
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
   const [editingSectionId, setEditingSectionId] = useState<number | null>(null);
+  const [editingShiftRuleId, setEditingShiftRuleId] = useState<number | null>(null);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [editingHolidayId, setEditingHolidayId] = useState<number | null>(null);
 
@@ -736,20 +737,69 @@ export default function AdminPanel() {
   const handleAddShift = async (e: React.FormEvent) => {
     e.preventDefault();
     const sectionObj = sections.find(s => s.section_code === shiftSecCode);
+    if (!sectionObj) return;
 
     try {
-      await createShiftRule({
-        section_id: sectionObj?.id || 1,
-        shift_code: shiftCode.toUpperCase(),
-        start_time: `${shiftStart}:00`,
-        end_time: `${shiftEnd}:00`,
-        working_days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
-        is_night_duty: shiftNight
-      });
-      showToast(`Successfully created shift ${shiftCode} for ${shiftSecCode}.`, "success");
+      if (editingShiftRuleId !== null) {
+        await updateShiftRule(editingShiftRuleId, {
+          section_id: sectionObj.id,
+          shift_code: shiftCode.toUpperCase(),
+          start_time: shiftStart.length === 5 ? `${shiftStart}:00` : shiftStart,
+          end_time: shiftEnd.length === 5 ? `${shiftEnd}:00` : shiftEnd,
+          working_days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
+          is_night_duty: shiftNight
+        });
+        showToast(`Successfully updated shift rule ${shiftCode} for ${shiftSecCode}.`, "success");
+        setEditingShiftRuleId(null);
+      } else {
+        await createShiftRule({
+          section_id: sectionObj.id,
+          shift_code: shiftCode.toUpperCase(),
+          start_time: `${shiftStart}:00`,
+          end_time: `${shiftEnd}:00`,
+          working_days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
+          is_night_duty: shiftNight
+        });
+        showToast(`Successfully created shift rule ${shiftCode} for ${shiftSecCode}.`, "success");
+      }
+      setShiftCode('G');
+      setShiftStart('09:00');
+      setShiftEnd('17:30');
+      setShiftNight(false);
       loadAdminData();
     } catch (err) {
-      showToast("Failed to create shift rule.", "error");
+      showToast("Failed to save shift rule. Check if the code already exists for this section.", "error");
+    }
+  };
+
+  const handleEditShiftClick = (rule: ShiftRule) => {
+    setEditingShiftRuleId(rule.id);
+    const sec = sections.find(s => s.id === rule.section_id);
+    if (sec) {
+      setShiftSecCode(sec.section_code);
+    }
+    setShiftCode(rule.shift_code);
+    setShiftStart(rule.start_time.substring(0, 5));
+    setShiftEnd(rule.end_time.substring(0, 5));
+    setShiftNight(rule.is_night_duty);
+  };
+
+  const handleCancelEditShift = () => {
+    setEditingShiftRuleId(null);
+    setShiftCode('G');
+    setShiftStart('09:00');
+    setShiftEnd('17:30');
+    setShiftNight(false);
+  };
+
+  const handleDeleteShiftClick = async (ruleId: number) => {
+    if (!window.confirm("Are you sure you want to delete this shift rule?")) return;
+    try {
+      await deleteShiftRule(ruleId);
+      showToast("Shift rule deleted successfully.", "success");
+      loadAdminData();
+    } catch (err) {
+      showToast("Failed to delete shift rule.", "error");
     }
   };
 
@@ -1816,17 +1866,29 @@ export default function AdminPanel() {
                         </span>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-450 font-mono uppercase">{line.color_code}</span>
-                          <button onClick={() => handleEditLineClick(line)} className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">Edit</button>
-                          <button onClick={() => handleDeleteLineClick(line.id)} className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer">Delete</button>
+                          <button 
+                            onClick={() => handleEditLineClick(line)} 
+                            title="Edit Metro Line"
+                            className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                          >
+                            <Edit size={11} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteLineClick(line.id)} 
+                            title="Delete Metro Line"
+                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                          >
+                            <Trash2 size={11} />
+                          </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-
+ 
                 {/* Sections cards list */}
                 <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-3">
-                  <h3 className="font-bold text-slate-850 text-xs uppercase tracking-wider border-b pb-2 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center justify-between">
                     Registered Roster Sections
                     <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">{sections.length} Sections</span>
                   </h3>
@@ -1845,9 +1907,21 @@ export default function AdminPanel() {
                           </div>
                           <div className="flex justify-between items-center pl-2 pt-1 border-t border-slate-55">
                             <span className="text-[10px] text-slate-450">Base: <strong>{sec.base_location}</strong></span>
-                            <div className="flex gap-2">
-                              <button onClick={() => handleEditSectionClick(sec)} className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">Edit</button>
-                              <button onClick={() => handleDeleteSectionClick(sec.id)} className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer">Delete</button>
+                            <div className="flex gap-1.5">
+                              <button 
+                                onClick={() => handleEditSectionClick(sec)} 
+                                title="Edit Section"
+                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                              >
+                                <Edit size={11} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteSectionClick(sec.id)} 
+                                title="Delete Section"
+                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                              >
+                                <Trash2 size={11} />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1866,7 +1940,7 @@ export default function AdminPanel() {
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
                   <PlusCircle size={15} className="text-blue-600" />
-                  Define Shift Timing Rule
+                  {editingShiftRuleId ? "Edit Shift Timing Rule" : "Define Shift Timing Rule"}
                 </h3>
                 <form onSubmit={handleAddShift} className="space-y-4 text-xs font-bold text-slate-600">
                   <div>
@@ -1927,12 +2001,23 @@ export default function AdminPanel() {
                       Is Night Duty Shift
                     </label>
                   </div>
-                  <button 
-                    type="submit" 
-                    className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
-                  >
-                    Create Shift Rule
-                  </button>
+                  <div className="pt-2 flex justify-end gap-2.5">
+                    {editingShiftRuleId !== null && (
+                      <button 
+                        type="button" 
+                        onClick={handleCancelEditShift}
+                        className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 uppercase text-[10px]"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button 
+                      type="submit" 
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                    >
+                      {editingShiftRuleId ? "Save Updates" : "Create Shift Rule"}
+                    </button>
+                  </div>
                 </form>
               </div>
 
@@ -1951,12 +2036,13 @@ export default function AdminPanel() {
                         <th className="py-2.5 px-5">Start Time</th>
                         <th className="py-2.5 px-5">End Time</th>
                         <th className="py-2.5 px-5 text-center">Duty Type</th>
+                        <th className="py-2.5 px-5 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {shifts.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">
+                          <td colSpan={6} className="py-8 text-center text-slate-400 font-bold">
                             No shift rules configured.
                           </td>
                         </tr>
@@ -1975,6 +2061,22 @@ export default function AdminPanel() {
                                 ) : (
                                   <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold text-[9px] uppercase">General / Day</span>
                                 )}
+                              </td>
+                              <td className="py-3 px-5 text-center flex justify-center items-center gap-1.5">
+                                <button 
+                                  onClick={() => handleEditShiftClick(s)} 
+                                  title="Edit Shift Rule"
+                                  className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                >
+                                  <Edit size={11} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteShiftClick(s.id)} 
+                                  title="Delete Shift Rule"
+                                  className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -2293,9 +2395,21 @@ export default function AdminPanel() {
                               {code.is_leave ? `Leave (${code.leave_type})` : 'Work Shift'}
                             </span>
                           </td>
-                          <td className="py-3 px-5 text-center space-x-2">
-                            <button onClick={() => handleEditCodeClick(code)} className="text-slate-400 hover:text-slate-800 transition cursor-pointer font-bold">Edit</button>
-                            <button onClick={() => handleDeleteCode(code.code)} className="text-slate-400 hover:text-rose-600 transition cursor-pointer font-bold">Delete</button>
+                          <td className="py-3 px-5 text-center flex justify-center items-center gap-1.5">
+                            <button 
+                              onClick={() => handleEditCodeClick(code)} 
+                              title="Edit Code"
+                              className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer font-bold"
+                            >
+                              <Edit size={11} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteCode(code.code)} 
+                              title="Delete Code"
+                              className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer font-bold"
+                            >
+                              <Trash2 size={11} />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -2414,9 +2528,21 @@ export default function AdminPanel() {
                             <td className="py-3 px-5 font-bold text-slate-800">{h.name}</td>
                             <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100">{h.holiday_type}</span></td>
                             <td className="py-3 px-5 font-bold text-blue-600">{h.applicability || 'ALL'}</td>
-                            <td className="py-3 px-5 text-center space-x-2">
-                              <button onClick={() => handleEditHoliday(h)} className="text-slate-400 hover:text-slate-855 transition cursor-pointer font-bold">Edit</button>
-                              <button onClick={() => handleDeleteHoliday(h.id!)} className="text-slate-400 hover:text-rose-600 transition cursor-pointer font-bold">Delete</button>
+                            <td className="py-3 px-5 text-center flex justify-center items-center gap-1.5">
+                              <button 
+                                onClick={() => handleEditHoliday(h)} 
+                                title="Edit Holiday"
+                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                              >
+                                <Edit size={11} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteHoliday(h.id!)} 
+                                title="Delete Holiday"
+                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                              >
+                                <Trash2 size={11} />
+                              </button>
                             </td>
                           </tr>
                         ))
