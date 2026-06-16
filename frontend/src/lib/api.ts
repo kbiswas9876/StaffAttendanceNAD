@@ -15,6 +15,18 @@ export interface Employee {
         custom_night_weeks?: { from_date: string; to_date: string }[];
       }
     | {
+        type: 'flexible';
+        custom_night_weeks?: { from_date: string; to_date: string }[];
+      }
+    | {
+        type: 'rotating-3week';
+        anchor_date?: string;
+        week1: { [day: string]: string };
+        week2: { [day: string]: string };
+        week3: { [day: string]: string };
+        custom_night_weeks?: { from_date: string; to_date: string }[];
+      }
+    | {
         type: 'rotating';
         anchor_date?: string;
         week1: { [day: string]: string };

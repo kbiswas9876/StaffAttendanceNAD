@@ -28,7 +28,10 @@ import {
   GripVertical,
   ArrowLeftRight,
   CalendarDays,
-  TrendingUp
+  TrendingUp,
+  Sun,
+  Moon,
+  Coffee
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
@@ -58,6 +61,24 @@ interface ProfileProps {
   empId: number;
   onClose: () => void;
 }
+
+const getWeekdaysStartingFrom = (anchorDateStr: string) => {
+  const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  if (!anchorDateStr) return defaultDays;
+  try {
+    const date = new Date(anchorDateStr);
+    if (isNaN(date.getTime())) return defaultDays;
+    const startDay = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const startIndex = defaultDays.indexOf(startDay);
+    if (startIndex === -1) return defaultDays;
+    return [
+      ...defaultDays.slice(startIndex),
+      ...defaultDays.slice(0, startIndex)
+    ];
+  } catch (e) {
+    return defaultDays;
+  }
+};
 
 function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -314,6 +335,243 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
   const todayBadge = getDutyBadgeDetails(todayStatus);
 
+  const renderScheduleCard = () => {
+    const sched = employee?.weekly_schedule as any;
+    if (!sched) return null;
+
+    const type = sched.type || 'simple';
+    const isRotating4Week = type === 'rotating';
+    const isRotating3Week = type === 'rotating-3week';
+    const isFlexible = type === 'flexible';
+    const isSimple = !isRotating4Week && !isRotating3Week && !isFlexible;
+
+    const anchorDate = sched.anchor_date || '2026-06-01';
+    const weekdays = getWeekdaysStartingFrom(anchorDate);
+
+    // Dynamic shift calculation helpers for preview
+    const getBaseRotatingShiftForDate = (s: any, dateStr: string) => {
+      if (!s) return null;
+      if (s.type === 'flexible') return null;
+
+      if (s.type !== 'rotating' && s.type !== 'rotating-3week') {
+        const date = new Date(dateStr);
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+        return s[dayOfWeek] || null;
+      }
+
+      const anchorStr = s.anchor_date || '2026-06-01';
+      const anchor = new Date(anchorStr);
+      const target = new Date(dateStr);
+
+      anchor.setHours(0,0,0,0);
+      target.setHours(0,0,0,0);
+
+      const diffTime = target.getTime() - anchor.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (s.type === 'rotating-3week') {
+        const cycleDay = ((diffDays % 21) + 21) % 21;
+        const weekNum = Math.floor(cycleDay / 7) + 1;
+        const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+        const wk = `week${weekNum}`;
+        return s[wk]?.[dayOfWeek] || null;
+      } else {
+        const cycleDay = ((diffDays % 28) + 28) % 28;
+        const weekNum = Math.floor(cycleDay / 7) + 1;
+        const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+        const wk = `week${weekNum}`;
+        return s[wk]?.[dayOfWeek] || null;
+      }
+    };
+
+    const getShiftForDate = (dateStr: string) => {
+      if (!sched) return null;
+      const overrides = sched.custom_night_weeks;
+      if (Array.isArray(overrides)) {
+        const isOverride = overrides.some(w => dateStr >= w.from_date && dateStr <= w.to_date);
+        if (isOverride) {
+          const baseShift = getBaseRotatingShiftForDate(sched, dateStr);
+          if (baseShift === 'R') return 'R';
+          return 'N';
+        }
+      }
+      return getBaseRotatingShiftForDate(sched, dateStr);
+    };
+
+    const renderDayPill = (dayName: string, shift: string) => {
+      const code = (shift || 'R').toUpperCase();
+      let bgClass = 'bg-slate-50/50 border-slate-200 text-slate-400';
+      let icon = <Coffee size={13} className="text-slate-400" />;
+      let shiftLabel = 'Rest';
+
+      if (code === 'N' || code === 'P/N') {
+        bgClass = 'bg-purple-50/60 border-purple-200 text-purple-700 shadow-xs';
+        icon = <Moon size={13} className="text-purple-600 animate-pulse" />;
+        shiftLabel = 'Night';
+      } else if (code === 'G' || code === 'P') {
+        bgClass = 'bg-emerald-50/60 border-emerald-250 text-emerald-805 shadow-xs';
+        icon = <Sun size={13} className="text-emerald-600" />;
+        shiftLabel = 'General';
+      } else if (code !== 'R') {
+        bgClass = 'bg-blue-50/60 border-blue-200 text-blue-800 shadow-xs';
+        icon = <Sparkles size={13} className="text-blue-600" />;
+        shiftLabel = code;
+      }
+
+      return (
+        <div key={dayName} className={`flex flex-col items-center justify-between p-2 rounded-2xl border text-center transition hover:scale-[1.03] select-none ${bgClass}`}>
+          <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">{dayName.substring(0, 3)}</span>
+          <div className="w-7 h-7 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-1">
+            {icon}
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-wide">{shiftLabel}</span>
+        </div>
+      );
+    };
+
+    // Calculate upcoming shifts starting from today mock date
+    const today = '2026-05-20';
+    const tomorrowObj = new Date(today);
+    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+    const tomorrow = tomorrowObj.toISOString().split('T')[0];
+
+    const dayAfterObj = new Date(today);
+    dayAfterObj.setDate(dayAfterObj.getDate() + 2);
+    const dayAfter = dayAfterObj.toISOString().split('T')[0];
+
+    const todayShift = getShiftForDate(today);
+    const tomorrowShift = getShiftForDate(tomorrow);
+    const dayAfterShift = getShiftForDate(dayAfter);
+
+    const formatNextShiftText = (label: string, dateStr: string, shift: string | null) => {
+      if (isFlexible) {
+        return (
+          <div className="px-3 py-2 border border-slate-200 rounded-xl flex items-center justify-between text-[11px] font-bold bg-slate-50 text-slate-500">
+            <span>{label} ({new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})</span>
+            <span className="font-extrabold uppercase tracking-wide">Manual / Flexible</span>
+          </div>
+        );
+      }
+      const dateLabel = new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const code = (shift || 'R').toUpperCase();
+      let shiftText = 'Weekly Rest (R)';
+      let colorClass = 'bg-slate-50 text-slate-700 border-slate-200';
+      if (code === 'N' || code === 'P/N') {
+        shiftText = 'Night Shift (P/N)';
+        colorClass = 'bg-purple-50 text-purple-800 border-purple-200';
+      } else if (code === 'G' || code === 'P') {
+        shiftText = 'General Duty (P)';
+        colorClass = 'bg-emerald-50/80 text-emerald-800 border-emerald-250';
+      } else if (code !== 'R') {
+        shiftText = `Duty Shift (${code})`;
+        colorClass = 'bg-blue-50 text-blue-800 border-blue-200';
+      }
+      return (
+        <div className={`px-3 py-2 border rounded-xl flex items-center justify-between text-[11px] font-bold ${colorClass}`}>
+          <span>{label} ({dateLabel})</span>
+          <span className="font-black uppercase tracking-wide">{shiftText}</span>
+        </div>
+      );
+    };
+
+    return (
+      <div className="glass-panel p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-5">
+        <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <CalendarDays size={18} className="text-blue-600" />
+            Roster & Shift Schedule Pattern
+          </h3>
+          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 text-[9px] font-black uppercase tracking-wider">
+            {isFlexible ? 'Flexible' : isSimple ? 'Simple Weekly' : isRotating3Week ? '3-Week Cycle' : '4-Week Cycle'}
+          </span>
+        </div>
+
+        {isFlexible && (
+          <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl flex items-start gap-3 shadow-xs">
+            <ShieldAlert className="text-amber-500 shrink-0 mt-0.5 animate-bounce" size={18} />
+            <div>
+              <h4 className="text-xs font-black text-amber-800 uppercase tracking-wide">Flexible / No Fixed Roster Active</h4>
+              <p className="text-[11px] text-amber-700 font-semibold mt-1 leading-relaxed">
+                This employee (e.g. SSE/JE) does not follow a fixed weekly roster. Shifts are entered manually in the attendance records.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isSimple && (
+          <div className="space-y-3">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Standard Weekly Roster</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                const shift = sched[day] || sched[day.toLowerCase()] || 'R';
+                return renderDayPill(day, shift);
+              })}
+            </div>
+          </div>
+        )}
+
+        {(isRotating4Week || isRotating3Week) && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs font-semibold text-slate-500">
+              <div>
+                Roster Cycle: <span className="font-extrabold text-blue-600">{isRotating3Week ? '3-Week Rotating (21-Day HOER)' : '4-Week Rotating (28-Day HOER)'}</span>
+              </div>
+              <div>
+                Anchor Date: <span className="font-mono font-extrabold text-slate-800">{new Date(anchorDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {['week1', 'week2', 'week3', ...(isRotating4Week ? ['week4'] : [])].map((wkKey, wkIdx) => {
+                const weekData = sched[wkKey] || {};
+                return (
+                  <div key={wkKey} className="border border-slate-150 rounded-2xl p-4 bg-slate-50/30 flex flex-col space-y-3 shadow-2xs hover:border-blue-200 transition">
+                    <div className="text-xs font-extrabold text-slate-800 border-b border-slate-200/50 pb-2 flex justify-between items-center">
+                      <span>Week {wkIdx + 1}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cycle Phase</span>
+                    </div>
+                    <div className="grid grid-cols-7 gap-2">
+                      {weekdays.map(day => {
+                        const shift = weekData[day] || weekData[day.toLowerCase()] || 'R';
+                        return renderDayPill(day, shift);
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Next Scheduled Shifts Preview Panel */}
+        <div className="pt-3 border-t border-slate-150 space-y-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Upcoming Shifts Preview</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {formatNextShiftText("Today", today, todayShift)}
+            {formatNextShiftText("Tomorrow", tomorrow, tomorrowShift)}
+            {formatNextShiftText("Day After", dayAfter, dayAfterShift)}
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-slate-150">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Custom Night Duty Week Overrides</span>
+          {Array.isArray(sched.custom_night_weeks) && sched.custom_night_weeks.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {sched.custom_night_weeks.map((override: any, idx: number) => (
+                <div key={idx} className="px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-[10px] font-black text-purple-700 flex items-center gap-1">
+                  <Clock size={10} />
+                  <span>{new Date(override.from_date).toLocaleDateString('en-GB')} to {new Date(override.to_date).toLocaleDateString('en-GB')}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-450 italic font-semibold">No custom night duty week overrides configured for this employee.</span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -377,6 +635,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         </div>
       </div>
+
+      {renderScheduleCard()}
 
       {leaveBank && (
         <div className="flex justify-between items-center border-b border-slate-200 pb-3">

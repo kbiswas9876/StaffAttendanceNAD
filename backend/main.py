@@ -196,7 +196,94 @@ def sync_leave_and_ledger(emp_id: int, year: int):
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
+    # Rebuild tables referencing employees_old if any are corrupted by SQLite RENAME
+    for table_name in ('compensatory_rest_ledger', 'leave_bank', 'attendance_log', 'special_events'):
+        cursor.execute(f"SELECT sql FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+        row = cursor.fetchone()
+        if row and 'employees_old' in row[0]:
+            print(f"Repairing table {table_name} to reference new employees table...")
+            try:
+                cursor.execute("PRAGMA foreign_keys = OFF;")
+                cursor.execute(f"ALTER TABLE {table_name} RENAME TO {table_name}_old;")
+                
+                if table_name == 'compensatory_rest_ledger':
+                    cursor.execute("""
+                        CREATE TABLE compensatory_rest_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            emp_id INTEGER REFERENCES employees(emp_id) ON DELETE CASCADE,
+                            earned_date TEXT NOT NULL,
+                            consumed_date TEXT,
+                            UNIQUE (emp_id, earned_date)
+                        );
+                    """)
+                    cursor.execute("""
+                        INSERT INTO compensatory_rest_ledger (id, emp_id, earned_date, consumed_date)
+                        SELECT id, emp_id, earned_date, consumed_date FROM compensatory_rest_ledger_old;
+                    """)
+                elif table_name == 'leave_bank':
+                    cursor.execute("""
+                        CREATE TABLE leave_bank (
+                            emp_id INTEGER REFERENCES employees(emp_id) ON DELETE CASCADE,
+                            year INTEGER NOT NULL,
+                            total_cl INTEGER NOT NULL DEFAULT 8,
+                            total_lap INTEGER NOT NULL DEFAULT 30,
+                            used_cl INTEGER NOT NULL DEFAULT 0,
+                            used_lap INTEGER NOT NULL DEFAULT 0,
+                            accrued_cr INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY (emp_id, year)
+                        );
+                    """)
+                    cursor.execute("""
+                        INSERT INTO leave_bank (emp_id, year, total_cl, total_lap, used_cl, used_lap, accrued_cr)
+                        SELECT emp_id, year, total_cl, total_lap, used_cl, used_lap, accrued_cr FROM leave_bank_old;
+                    """)
+                elif table_name == 'attendance_log':
+                    cursor.execute("""
+                        CREATE TABLE attendance_log (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            emp_id INTEGER REFERENCES employees(emp_id) ON DELETE CASCADE,
+                            date TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            is_night INTEGER NOT NULL DEFAULT 0,
+                            shift_id INTEGER REFERENCES shift_rules(id) ON DELETE SET NULL,
+                            remarks TEXT,
+                            UNIQUE (emp_id, date)
+                        );
+                    """)
+                    cursor.execute("""
+                        INSERT INTO attendance_log (id, emp_id, date, status, is_night, shift_id, remarks)
+                        SELECT id, emp_id, date, status, is_night, shift_id, remarks FROM attendance_log_old;
+                    """)
+                elif table_name == 'special_events':
+                    cursor.execute("""
+                        CREATE TABLE special_events (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            emp_id INTEGER REFERENCES employees(emp_id) ON DELETE CASCADE,
+                            event_type TEXT NOT NULL,
+                            from_date TEXT NOT NULL,
+                            to_date TEXT NOT NULL,
+                            order_number TEXT,
+                            location TEXT,
+                            from_section TEXT,
+                            to_section TEXT,
+                            signatory_name TEXT,
+                            signatory_designation TEXT
+                        );
+                    """)
+                    cursor.execute("""
+                        INSERT INTO special_events (id, emp_id, event_type, from_date, to_date, order_number, location, from_section, to_section, signatory_name, signatory_designation)
+                        SELECT id, emp_id, event_type, from_date, to_date, order_number, location, from_section, to_section, signatory_name, signatory_designation FROM special_events_old;
+                    """)
+                
+                cursor.execute(f"DROP TABLE {table_name}_old;")
+                cursor.execute("PRAGMA foreign_keys = ON;")
+                conn.commit()
+                print(f"Table {table_name} repaired successfully.")
+            except Exception as e:
+                conn.rollback()
+                print(f"Error repairing table {table_name}: {e}")
+
     # 1. Lines Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS lines (
@@ -218,6 +305,39 @@ def init_db():
     """)
 
     # 3. Employees Table
+    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='employees'")
+    row = cursor.fetchone()
+    if row and 'Flexible' not in row[0]:
+        print("Migrating employees table to allow 'Flexible' as default_rest_day...")
+        try:
+            cursor.execute("PRAGMA foreign_keys = OFF;")
+            cursor.execute("ALTER TABLE employees RENAME TO employees_old;")
+            cursor.execute("""
+                CREATE TABLE employees (
+                    emp_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pf_number TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    designation TEXT NOT NULL,
+                    level INTEGER NOT NULL CHECK (level >= 1 AND level <= 12),
+                    primary_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL,
+                    default_rest_day TEXT NOT NULL CHECK (default_rest_day IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible')),
+                    joining_date TEXT,
+                    weekly_schedule TEXT,
+                    display_order INTEGER DEFAULT 0
+                );
+            """)
+            cursor.execute("""
+                INSERT INTO employees (emp_id, pf_number, name, designation, level, primary_section_id, default_rest_day, joining_date, weekly_schedule, display_order)
+                SELECT emp_id, pf_number, name, designation, level, primary_section_id, default_rest_day, joining_date, weekly_schedule, display_order FROM employees_old;
+            """)
+            cursor.execute("DROP TABLE employees_old;")
+            cursor.execute("PRAGMA foreign_keys = ON;")
+            conn.commit()
+            print("Migration of employees table successful.")
+        except Exception as e:
+            conn.rollback()
+            print(f"Error migrating employees table: {e}")
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS employees (
             emp_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,7 +346,7 @@ def init_db():
             designation TEXT NOT NULL,
             level INTEGER NOT NULL CHECK (level >= 1 AND level <= 12),
             primary_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL,
-            default_rest_day TEXT NOT NULL CHECK (default_rest_day IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
+            default_rest_day TEXT NOT NULL CHECK (default_rest_day IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible')),
             joining_date TEXT,
             weekly_schedule TEXT,
             display_order INTEGER DEFAULT 0
@@ -599,7 +719,7 @@ def calculate_weightage(total_days: int):
     total_mins = total_days * 80
     hours = total_mins // 60
     minutes = total_mins % 60
-    return f"{hours:02d} HRS", f"{minutes:02d}MIN."
+    return f"{hours:02d} HRS", f"{minutes:02d} MIN."
 
 # --- Numbered Canvas for PDF page counting ---
 class NumberedCanvas(canvas.Canvas):
@@ -1478,16 +1598,16 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     })
 
     # --- Column Widths ---
-    # Cols: SL | PF | Name | Desig | Level | Dates | Total Days | Total Hours | Weightage | Remarks
-    widths = [4, 16, 28, 14, 7, 35, 10, 12, 18, 16]
+    # Cols: SL | PF | Name | Desig | Level | Dates | Total Days | Total Hours | Weightage Hrs | Weightage Mins | Remarks
+    widths = [4, 16, 28, 14, 7, 40, 10, 12, 12, 12, 16]
     for col_idx, w in enumerate(widths):
         sheet.set_column(col_idx, col_idx, w)
 
     # ====== SECTION A: LETTERHEAD ======
     sheet.set_row(0, 30)
-    sheet.merge_range(0, 0, 0, 9, "METRO RAILWAY, KOLKATA", org_title_fmt)
+    sheet.merge_range(0, 0, 0, 10, "METRO RAILWAY, KOLKATA", org_title_fmt)
     sheet.set_row(1, 18)
-    sheet.merge_range(1, 0, 1, 9, "Office of the Senior Divisional Signal & Telecommunication Engineer", org_sub_fmt)
+    sheet.merge_range(1, 0, 1, 10, "Office of the Senior Divisional Signal & Telecommunication Engineer", org_sub_fmt)
     # Separator row
     sheet.set_row(2, 6)
 
@@ -1495,22 +1615,22 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     sheet.set_row(3, 18)
     sheet.write(3, 0, "No:", letter_key_fmt)
     sheet.merge_range(3, 1, 3, 4, req.ref_no, letter_val_fmt)
-    sheet.write(3, 7, "Date:", letter_key_fmt)
-    sheet.merge_range(3, 8, 3, 9, req.date_str, letter_val_fmt)
+    sheet.write(3, 8, "Date:", letter_key_fmt)
+    sheet.merge_range(3, 9, 3, 10, req.date_str, letter_val_fmt)
 
     sheet.set_row(4, 15)
     sheet.write(4, 0, "To,", letter_val_fmt)
     sheet.set_row(5, 15)
-    sheet.merge_range(5, 0, 5, 9, f"The {req.signatory_right}, Metro Railway, Kolkata", letter_val_fmt)
+    sheet.merge_range(5, 0, 5, 10, f"The {req.signatory_right}, Metro Railway, Kolkata", letter_val_fmt)
 
     # ====== SECTION C: SUBJECT LINE ======
     sheet.set_row(6, 8)  # Small gap
     sheet.set_row(7, 30)
-    sheet.merge_range(7, 0, 7, 9,
+    sheet.merge_range(7, 0, 7, 10,
         f"Sub:  Night Duty Allowance Statement of Signal Staff (S&T Dept.) for the Month of {req.month_name}",
         sub_banner_fmt)
     sheet.set_row(8, 20)
-    sheet.merge_range(8, 0, 8, 9,
+    sheet.merge_range(8, 0, 8, 10,
         f"Ref:  Bill Unit No. {req.bill_unit}  |  Section: {req.section_name}",
         sub_banner_fmt)
 
@@ -1520,7 +1640,7 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     headers = [
         "SL\nNo.", "P.F. No.", "Name of Staff", "Designation", "Pay\nLevel",
         f"Dates of Night Duty\n({req.month_name})",
-        "Total\nDays", "Total\nHours", "Weightage\nHours", "Remarks"
+        "Total\nDays", "Total\nHours", "Weightage\nHrs", "Weightage\nMins", "Remarks"
     ]
     for col_idx, h in enumerate(headers):
         sheet.write(10, col_idx, h, header_fmt)
@@ -1549,15 +1669,17 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
             sheet.write(current_row, 5, row.dates, d_fmt)
             sheet.write(current_row, 6, row.total_days, d_fmt)
             sheet.write(current_row, 7, total_hrs, d_fmt)
-            sheet.write(current_row, 8, f"{wt_hrs} HRS {wt_mins}", wt_fmt)
+            sheet.write(current_row, 8, wt_hrs, wt_fmt)
+            sheet.write(current_row, 9, wt_mins, wt_fmt)
             nd_rows_with_data += 1
         else:
             sheet.write(current_row, 5, "Nil", nil_fmt)
             sheet.write(current_row, 6, 0, d_fmt)
             sheet.write(current_row, 7, 0, d_fmt)
             sheet.write(current_row, 8, "—", d_fmt)
+            sheet.write(current_row, 9, "—", d_fmt)
         
-        sheet.write(current_row, 9, row.remarks or "", d_fmt)
+        sheet.write(current_row, 10, row.remarks or "", d_fmt)
         current_row += 1
 
     # ====== SECTION F: TOTALS ROW ======
@@ -1568,8 +1690,9 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     sheet.write(current_row, 6, total_days_sum, total_val_fmt)
     sheet.write(current_row, 7, total_hrs_sum, total_val_fmt)
     wt_total_hrs, wt_total_mins = calculate_weightage(total_days_sum)
-    sheet.write(current_row, 8, f"{wt_total_hrs} HRS {wt_total_mins}", total_val_fmt)
-    sheet.write(current_row, 9, f"{nd_rows_with_data} staff on night duty", total_label_fmt)
+    sheet.write(current_row, 8, wt_total_hrs, total_val_fmt)
+    sheet.write(current_row, 9, wt_total_mins, total_val_fmt)
+    sheet.write(current_row, 10, f"{nd_rows_with_data} staff on night duty", total_label_fmt)
     current_row += 1
 
     # ====== SECTION G: SIGNATURES ======
@@ -1579,13 +1702,13 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     current_row += 1
     sheet.set_row(current_row, 8)
     sig_row = current_row + 3
-    sheet.set_row(sig_row, 20)
+    sheet.set_row(sig_row, 45)
     sheet.merge_range(sig_row, 0, sig_row, 3, req.signatory_left, sig_fmt)
-    sheet.merge_range(sig_row, 6, sig_row, 9, f"For {req.signatory_right}", sig_fmt)
+    sheet.merge_range(sig_row, 7, sig_row, 10, f"For {req.signatory_right}", sig_fmt)
     sheet.set_row(sig_row + 1, 16)
     sheet.merge_range(sig_row + 1, 0, sig_row + 1, 3, "S&T Dept., Metro Railway, Kolkata",
                       workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'align': 'center', 'font_color': '#64748B'}))
-    sheet.merge_range(sig_row + 1, 6, sig_row + 1, 9, "Metro Railway, Kolkata",
+    sheet.merge_range(sig_row + 1, 7, sig_row + 1, 10, "Metro Railway, Kolkata",
                       workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'align': 'center', 'font_color': '#64748B'}))
 
     workbook.close()
@@ -1683,7 +1806,8 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
         Paragraph(f"Date of Night Duty in {req.month_name}", header_style),
         Paragraph("Total Days", header_style),
         Paragraph("Total Hours", header_style),
-        Paragraph("Weightage Hours", header_style),
+        Paragraph("Weightage Hrs", header_style),
+        Paragraph("Weightage Mins", header_style),
         Paragraph("Remarks", header_style)
     ]
     
@@ -1691,6 +1815,7 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
     for row in req.rows:
         wt_hrs, wt_mins = calculate_weightage(row.total_days)
         tot_hrs = row.total_days * 8
+        has_dates = row.dates and row.dates.strip()
         table_data.append([
             Paragraph(str(row.sl), normal_style),
             Paragraph(row.pf_number, normal_style),
@@ -1700,11 +1825,12 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
             Paragraph(row.dates or "Nil", normal_style),
             Paragraph(str(row.total_days), normal_style),
             Paragraph(f"{tot_hrs} Hrs", normal_style),
-            Paragraph(f"{wt_hrs} {wt_mins}", normal_style),
+            Paragraph(str(wt_hrs) if has_dates else "—", normal_style),
+            Paragraph(str(wt_mins) if has_dates else "—", normal_style),
             Paragraph(row.remarks or "", normal_style)
         ])
 
-    grid_table = Table(table_data, colWidths=[25, 80, 120, 75, 40, 180, 45, 55, 90, 70])
+    grid_table = Table(table_data, colWidths=[25, 80, 110, 70, 40, 180, 45, 55, 55, 55, 65])
     grid_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1E3A8A")),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),

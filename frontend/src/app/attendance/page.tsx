@@ -110,7 +110,10 @@ const DeleteRosterModal: React.FC<DeleteRosterModalProps> = ({ isOpen, onClose, 
 };
 
 const getBaseRotatingShift = (sched: any, dateStr: string) => {
-  if (sched.type !== 'rotating') {
+  if (!sched) return null;
+  if (sched.type === 'flexible') return null;
+
+  if (sched.type !== 'rotating' && sched.type !== 'rotating-3week') {
     const date = new Date(dateStr);
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     return sched[dayOfWeek] || null;
@@ -126,12 +129,19 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
   const diffTime = target.getTime() - anchor.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-  const cycleDay = ((diffDays % 28) + 28) % 28;
-  const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 4
-
-  const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-  const wk = `week${weekNum}`;
-  return sched[wk]?.[dayOfWeek] || null;
+  if (sched.type === 'rotating-3week') {
+    const cycleDay = ((diffDays % 21) + 21) % 21;
+    const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 3
+    const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+    const wk = `week${weekNum}`;
+    return sched[wk]?.[dayOfWeek] || null;
+  } else {
+    const cycleDay = ((diffDays % 28) + 28) % 28;
+    const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 4
+    const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+    const wk = `week${weekNum}`;
+    return sched[wk]?.[dayOfWeek] || null;
+  }
 };
 
 const getRotatingShift = (emp: any, dateStr: string) => {
@@ -1714,9 +1724,9 @@ export default function AttendanceGrid() {
                       setCrModal(null);
                       setManualCrDate('');
                     }}
-                    className="px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-650 font-bold text-xs uppercase cursor-pointer"
+                    className="px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-655 font-bold text-xs uppercase cursor-pointer"
                   >
-                    Proceed Unassociated
+                    Proceed without Date (Just CR)
                   </button>
 
                   <button

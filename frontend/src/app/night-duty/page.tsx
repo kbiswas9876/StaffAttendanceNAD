@@ -18,22 +18,67 @@ interface NDAStaffRow {
   designation: string;
   level: number;
   dates: string;
+  rawDates?: { day: number, monthStr: string }[];
   total_days: number;
   total_hours: number;
   weightage: string;
 }
+
+const getRosterMonthRangeName = (month: number, year: number) => {
+  const monthsList = [
+    { name: 'January', val: 0 },
+    { name: 'February', val: 1 },
+    { name: 'March', val: 2 },
+    { name: 'April', val: 3 },
+    { name: 'May', val: 4 },
+    { name: 'June', val: 5 },
+    { name: 'July', val: 6 },
+    { name: 'August', val: 7 },
+    { name: 'September', val: 8 },
+    { name: 'October', val: 9 },
+    { name: 'November', val: 10 },
+    { name: 'December', val: 11 },
+  ];
+  let prevM = month - 1;
+  let prevY = year;
+  if (prevM < 0) {
+    prevM = 11;
+    prevY = year - 1;
+  }
+  const prevMonthName = monthsList[prevM].name.toUpperCase();
+  const currentMonthName = monthsList[month].name.toUpperCase();
+  if (prevY !== year) {
+    return `${prevMonthName}-${prevY} & ${currentMonthName}-${year}`;
+  }
+  return `${prevMonthName} - ${currentMonthName} ${year}`;
+};
 
 export default function NightDutyNDA() {
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [billUnit, setBillUnit] = useState<string>('');
+
+  useEffect(() => {
+    setBillUnit(activeSection === 'KMUK' ? '2201-807' : '2201-806');
+  }, [activeSection]);
   
   // Date period state
   const [selectedMonth, setSelectedMonth] = useState<number>(5); // June (0-indexed 5)
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [ndaRows, setNdaRows] = useState<NDAStaffRow[]>([]);
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline'>('offline');
+  const [datesFormat, setDatesFormat] = useState<'simple' | 'full'>('simple');
+
+  const formatDates = (row: NDAStaffRow) => {
+    if (!row.rawDates || row.rawDates.length === 0) return 'Nil';
+    if (datesFormat === 'simple') {
+      return row.rawDates.map(d => d.day).join(',');
+    } else {
+      return row.rawDates.map(d => `${d.day} ${d.monthStr}`).join(', ');
+    }
+  };
 
   // Signatory details states
   const [signatoryLeftName, setSignatoryLeftName] = useState('');
@@ -166,6 +211,13 @@ export default function NightDutyNDA() {
           return dateObj.getDate();
         });
 
+        const rawDates = empLogs.map((log) => {
+          const dateObj = new Date(log.date);
+          const day = dateObj.getDate();
+          const monthStr = dateObj.toLocaleString('en-US', { month: 'short' });
+          return { day, monthStr };
+        });
+
         const total_days = dayNumbers.length;
         const total_hours = total_days * 8;
         
@@ -173,7 +225,7 @@ export default function NightDutyNDA() {
         const totalMins = total_days * 80;
         const wtHrs = Math.floor(totalMins / 60);
         const wtMins = totalMins % 60;
-        const weightage = `${String(wtHrs).padStart(2, '0')} HRS, ${String(wtMins).padStart(2, '0')}MIN.`;
+        const weightage = `${String(wtHrs).padStart(2, '0')} HRS ${String(wtMins).padStart(2, '0')} MIN.`;
 
         rowsList.push({
           sl: slCounter++,
@@ -182,6 +234,7 @@ export default function NightDutyNDA() {
           designation: emp.designation,
           level: emp.level,
           dates: dayNumbers.length > 0 ? dayNumbers.join(',') : 'Nil',
+          rawDates,
           total_days,
           total_hours,
           weightage
@@ -231,7 +284,7 @@ export default function NightDutyNDA() {
     }
 
     setExporting(format);
-    const monthText = monthsList[selectedMonth].name.toUpperCase() + `-${selectedYear}`;
+    const monthText = getRosterMonthRangeName(selectedMonth, selectedYear);
     const sectionName = activeSection === 'ALL' 
       ? 'KKVS & KMUK Sections' 
       : activeSection === 'KKVS' 
@@ -243,7 +296,7 @@ export default function NightDutyNDA() {
       section_code: activeSection,
       section_name: sectionName,
       ref_no: `SSE/Sig/${activeSection}/${new Date().getFullYear()}/ND`,
-      bill_unit: activeSection === 'KKVS' ? '2201-806' : '2201-807',
+      bill_unit: billUnit.trim() || '(Enter Bill Unit No.)',
       date_str: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
       signatory_left: signatoryLeftName ? `${signatoryLeftName}\n${signatoryLeftTitle}` : signatoryLeftTitle,
       signatory_right: signatoryRight,
@@ -253,7 +306,7 @@ export default function NightDutyNDA() {
         name: r.name,
         designation: r.designation,
         level: r.level,
-        dates: r.dates === 'Nil' ? '' : r.dates,
+        dates: r.dates === 'Nil' ? '' : (formatDates(r) === 'Nil' ? '' : formatDates(r)),
         total_days: r.total_days,
         remarks: ''
       }))
@@ -359,34 +412,32 @@ export default function NightDutyNDA() {
 
       {/* Signatory Config Panel */}
       {showSigConfig && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-slate-750">
-          <div>
-            <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Left Signatory (SSE In-Charge)</label>
-            <div className="flex gap-2">
-              <select
-                value={signatoryLeftName}
-                onChange={(e) => {
-                  setSignatoryLeftName(e.target.value);
-                  const matched = employees.find(emp => emp.name === e.target.value);
-                  if (matched) {
-                    setSignatoryLeftTitle(matched.designation);
-                  }
-                }}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="">-- Custom/Manual --</option>
-                {employees.map(e => (
-                  <option key={e.emp_id} value={e.name}>{e.name} ({e.designation})</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={signatoryLeftName}
-                onChange={(e) => setSignatoryLeftName(e.target.value)}
-                placeholder="Type Name..."
-                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
-              />
-            </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-750 select-none">
+          <div className="flex flex-col gap-1.5">
+            <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Left Signatory (SSE In-Charge)</label>
+            <select
+              value={signatoryLeftName}
+              onChange={(e) => {
+                setSignatoryLeftName(e.target.value);
+                const matched = employees.find(emp => emp.name === e.target.value);
+                if (matched) {
+                  setSignatoryLeftTitle(matched.designation);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="">-- Custom/Manual --</option>
+              {employees.map(e => (
+                <option key={e.emp_id} value={e.name}>{e.name} ({e.designation})</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={signatoryLeftName}
+              onChange={(e) => setSignatoryLeftName(e.target.value)}
+              placeholder="Type Manual Name..."
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+            />
           </div>
           <div>
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Left Signatory Designation</label>
@@ -407,6 +458,39 @@ export default function NightDutyNDA() {
               placeholder="e.g. Dy. CPO"
               className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
             />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Bill Unit No.</label>
+            <input
+              type="text"
+              value={billUnit}
+              onChange={(e) => setBillUnit(e.target.value)}
+              placeholder="e.g. 2201-806"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500 font-semibold"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Dates Format</label>
+            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-slate-700">
+              <button
+                type="button"
+                onClick={() => setDatesFormat('simple')}
+                className={`flex-1 text-center py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
+                  datesFormat === 'simple' ? 'bg-white shadow-xs text-blue-600' : 'hover:bg-slate-50'
+                }`}
+              >
+                Simple
+              </button>
+              <button
+                type="button"
+                onClick={() => setDatesFormat('full')}
+                className={`flex-1 text-center py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
+                  datesFormat === 'full' ? 'bg-white shadow-xs text-blue-600' : 'hover:bg-slate-50'
+                }`}
+              >
+                Full
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -494,8 +578,8 @@ export default function NightDutyNDA() {
                     <td className="py-3 px-5 text-center">
                       <span className="text-xs font-extrabold text-blue-600">Lvl {row.level}</span>
                     </td>
-                    <td className="py-3 px-5 text-xs text-slate-650 max-w-[200px] truncate" title={row.dates}>
-                      {row.dates}
+                    <td className="py-3 px-5 text-xs text-slate-650 max-w-[200px] truncate" title={formatDates(row)}>
+                      {formatDates(row)}
                     </td>
                     <td className="py-3 px-5 text-center font-bold text-slate-700">{row.total_days}</td>
                     <td className="py-3 px-5 text-center font-mono text-slate-500 text-xs">{row.total_hours} Hrs</td>
