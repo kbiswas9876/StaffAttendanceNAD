@@ -220,6 +220,8 @@ export default function AttendanceGrid() {
   const [customCodeInput, setCustomCodeInput] = useState('');
   const [crModal, setCrModal] = useState<{ isOpen: boolean; empId: number; dateStr: string; availableEntries: CRLedgerEntry[] } | null>(null);
   const [manualCrDate, setManualCrDate] = useState<string>('');
+  const [activeDropdownCell, setActiveDropdownCell] = useState<{ empId: number; dateStr: string } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   
   // Roster Simulation/Preview Modal state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -914,14 +916,14 @@ export default function AttendanceGrid() {
       {/* Title & Toolbar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-            Smart Attendance Grid
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-bold uppercase tracking-wider">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-850 flex items-center gap-2">
+            Smart Attendance Roster
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00c2b2]/10 text-[#00c2b2] border border-[#00c2b2]/20 font-black uppercase tracking-wider">
               {activeSection === 'ALL' ? 'Joint View' : `${activeSection} Section`}
             </span>
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage daily presence codes from the 11th of the starting month to the 10th of the next month.
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            Official Signalling & Telecommunication Department monthly staff roster.
           </p>
         </div>
 
@@ -933,13 +935,19 @@ export default function AttendanceGrid() {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer"
+              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer text-xs"
             >
-              {monthsList.map((m) => (
-                <option key={m.val} value={m.val} className="bg-white text-slate-800">
-                  {getRosterPeriodLabel(m.val)} (11th to 10th)
-                </option>
-              ))}
+              {monthsList.map((m) => {
+                let prevM = m.val - 1;
+                if (prevM < 0) prevM = 11;
+                const prevName = monthsList[prevM].name.substring(0, 3);
+                const currName = m.name.substring(0, 3);
+                return (
+                  <option key={m.val} value={m.val} className="bg-white text-slate-800">
+                    {prevName} - {currName}
+                  </option>
+                );
+              })}
             </select>
 
             <select
@@ -1203,24 +1211,32 @@ export default function AttendanceGrid() {
                             className="p-1 border-r border-slate-200 relative animate-fade-in"
                             style={getCellStyle(status, day.isSunday)}
                           >
-                            <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px]">
-                              <select
-                                value={status}
-                                onChange={(e) => handleCellChange(emp.emp_id, day.dateStr, e.target.value)}
-                                className="w-full text-center bg-transparent border-none appearance-none font-bold text-[10px] focus:outline-none cursor-pointer pb-0.5"
+                            <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px] relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (activeDropdownCell?.empId === emp.emp_id && activeDropdownCell?.dateStr === day.dateStr) {
+                                    setActiveDropdownCell(null);
+                                    setDropdownPos(null);
+                                  } else {
+                                    setActiveDropdownCell({ empId: emp.emp_id, dateStr: day.dateStr });
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setDropdownPos({
+                                      top: rect.bottom,
+                                      left: rect.left + rect.width / 2,
+                                      width: rect.width
+                                    });
+                                  }
+                                }}
+                                className="w-full h-full text-center bg-transparent border-none font-black text-[10.5px] focus:outline-none cursor-pointer flex items-center justify-center min-h-[30px] transition-transform active:scale-95 duration-100 hover:bg-slate-200/20 rounded-md"
                                 style={{ color: getCellStyle(status, day.isSunday).color }}
                               >
-                                <option value="" className="bg-white text-slate-450">—</option>
-                                {allCodes.map((c) => (
-                                  <option key={c.code} value={c.code} className="bg-white text-slate-800" style={{ color: c.text_color }}>
-                                    {c.code}
-                                  </option>
-                                ))}
-                                <option value="CUSTOM_CODE" className="bg-white text-blue-600 font-bold">Custom...</option>
-                                <option value="DELETE" className="bg-white text-rose-600 font-bold">Delete</option>
-                              </select>
+                                {status || '—'}
+                              </button>
+
                               {status === 'CR' && earnedDateShort && (
-                                <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px]">
+                                <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px] z-10">
                                   {earnedDateShort}
                                 </span>
                               )}
@@ -1809,6 +1825,81 @@ export default function AttendanceGrid() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Global Attendance Cell Dropdown Menu */}
+      {activeDropdownCell && dropdownPos && (
+        <>
+          {/* Click outside to close */}
+          <div 
+            className="fixed inset-0 z-40 cursor-default" 
+            onClick={() => {
+              setActiveDropdownCell(null);
+              setDropdownPos(null);
+            }}
+          />
+          
+          {/* Dropdown Menu */}
+          <div 
+            className="fixed bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 flex flex-col text-left overflow-hidden select-none"
+            style={{ 
+              top: `${dropdownPos.top + 4}px`, 
+              left: `${dropdownPos.left}px`,
+              transform: 'translateX(-50%)',
+              minWidth: '110px'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "");
+                setActiveDropdownCell(null);
+                setDropdownPos(null);
+              }}
+              className="w-full px-3 py-1.5 hover:bg-slate-100 text-[10px] font-extrabold text-slate-400 text-center transition cursor-pointer"
+            >
+              —
+            </button>
+            {allCodes.map((c) => (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => {
+                  handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, c.code);
+                  setActiveDropdownCell(null);
+                  setDropdownPos(null);
+                }}
+                className="w-full px-3 py-1.5 hover:bg-slate-100 text-[10px] font-black transition text-center cursor-pointer"
+                style={{ color: c.text_color }}
+              >
+                {c.code}
+              </button>
+            ))}
+            <div className="border-t border-slate-100 my-1"></div>
+            <button
+              type="button"
+              onClick={() => {
+                handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "CUSTOM_CODE");
+                setActiveDropdownCell(null);
+                setDropdownPos(null);
+              }}
+              className="w-full px-3 py-1.5 hover:bg-blue-50 text-[10px] font-black text-blue-600 text-center transition cursor-pointer"
+            >
+              Custom...
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "DELETE");
+                setActiveDropdownCell(null);
+                setDropdownPos(null);
+              }}
+              className="w-full px-3 py-1.5 hover:bg-rose-50 text-[10px] font-black text-rose-600 text-center transition cursor-pointer"
+            >
+              Delete
+            </button>
+          </div>
+        </>
       )}
 
     </div>

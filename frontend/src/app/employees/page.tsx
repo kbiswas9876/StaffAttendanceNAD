@@ -526,30 +526,42 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     const renderDayPill = (dayName: string, shift: string) => {
       const code = (shift || 'R').toUpperCase();
       let bgClass = 'bg-slate-50/50 border-slate-200 text-slate-400';
-      let icon = <Coffee size={13} className="text-slate-400" />;
-      let shiftLabel = 'Rest';
+      let icon = <Coffee size={12} className="text-slate-400" />;
+      let shiftLabel = 'R (Rest)';
 
       if (code === 'N' || code === 'P/N') {
         bgClass = 'bg-purple-50/60 border-purple-200 text-purple-700 shadow-xs';
-        icon = <Moon size={13} className="text-purple-600 animate-pulse" />;
-        shiftLabel = 'Night';
+        icon = <Moon size={12} className="text-purple-600 animate-pulse" />;
+        shiftLabel = 'N (Night)';
       } else if (code === 'G' || code === 'P') {
         bgClass = 'bg-emerald-50/60 border-emerald-250 text-emerald-805 shadow-xs';
-        icon = <Sun size={13} className="text-emerald-600" />;
-        shiftLabel = 'General';
-      } else if (code !== 'R') {
+        icon = <Sun size={12} className="text-emerald-600" />;
+        shiftLabel = 'G (General)';
+      } else if (code === 'M') {
         bgClass = 'bg-blue-50/60 border-blue-200 text-blue-800 shadow-xs';
-        icon = <Sparkles size={13} className="text-blue-600" />;
-        shiftLabel = code;
+        icon = <Sparkles size={12} className="text-blue-600" />;
+        shiftLabel = 'M (Morning)';
+      } else if (code === 'E') {
+        bgClass = 'bg-amber-50/60 border-amber-250 text-amber-700 shadow-xs';
+        icon = <Sparkles size={12} className="text-amber-600" />;
+        shiftLabel = 'E (Evening)';
+      } else if (code === 'R') {
+        bgClass = 'bg-slate-50/60 border-slate-200 text-slate-550';
+        icon = <Coffee size={12} className="text-slate-400" />;
+        shiftLabel = 'R (Rest)';
+      } else {
+        bgClass = 'bg-blue-50/60 border-blue-200 text-blue-800 shadow-xs';
+        icon = <Sparkles size={12} className="text-blue-600" />;
+        shiftLabel = `${code} (Duty)`;
       }
 
       return (
-        <div key={dayName} className={`flex flex-col items-center justify-between p-2 rounded-2xl border text-center transition hover:scale-[1.03] select-none ${bgClass}`}>
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">{dayName.substring(0, 3)}</span>
-          <div className="w-7 h-7 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-1">
+        <div key={dayName} className={`flex flex-col items-center justify-between py-1.5 px-1 rounded-xl border text-center transition hover:scale-[1.05] hover:shadow-xs select-none ${bgClass}`}>
+          <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 mb-1">{dayName.substring(0, 3)}</span>
+          <div className="w-6.5 h-6.5 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-1 shrink-0">
             {icon}
           </div>
-          <span className="text-[9px] font-black uppercase tracking-wide">{shiftLabel}</span>
+          <span className="text-[8px] font-black tracking-tight leading-none truncate w-full" title={shiftLabel}>{shiftLabel}</span>
         </div>
       );
     };
@@ -570,32 +582,71 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     const dayAfterShift = getShiftForDate(dayAfter);
 
     const formatNextShiftText = (label: string, dateStr: string, shift: string | null) => {
+      const dateLabel = new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
       if (isFlexible) {
         return (
-          <div className="px-3 py-2 border border-slate-200 rounded-xl flex items-center justify-between text-[11px] font-bold bg-slate-50 text-slate-500">
-            <span>{label} ({new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})</span>
-            <span className="font-extrabold uppercase tracking-wide">Manual / Flexible</span>
+          <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 shadow-2xs">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+              <Clock size={15} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] font-extrabold text-slate-400 block tracking-wide uppercase leading-none">{label} ({dateLabel})</span>
+              <span className="text-[11px] font-black text-slate-550 mt-1 block leading-none">Manual / Flexible</span>
+            </div>
           </div>
         );
       }
-      const dateLabel = new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
       const code = (shift || 'R').toUpperCase();
-      let shiftText = 'Weekly Rest (R)';
-      let colorClass = 'bg-slate-50 text-slate-700 border-slate-200';
+      let shiftText = 'Rest Shift';
+      let icon = <Coffee size={15} className="text-slate-400" />;
+      let bgIconClass = 'bg-slate-50 border-slate-100 text-slate-400';
+      let textColor = 'text-slate-550';
+      let badgeLabel = 'R (Rest)';
+
       if (code === 'N' || code === 'P/N') {
-        shiftText = 'Night Shift (P/N)';
-        colorClass = 'bg-purple-50 text-purple-800 border-purple-200';
+        shiftText = 'Night Shift';
+        icon = <Moon size={15} className="text-purple-600 animate-pulse" />;
+        bgIconClass = 'bg-purple-50 border-purple-100 text-purple-600';
+        textColor = 'text-purple-700';
+        badgeLabel = 'N (Night)';
       } else if (code === 'G' || code === 'P') {
-        shiftText = 'General Duty (P)';
-        colorClass = 'bg-emerald-50/80 text-emerald-800 border-emerald-250';
+        shiftText = 'General Shift';
+        icon = <Sun size={15} className="text-emerald-600" />;
+        bgIconClass = 'bg-emerald-50 border-emerald-100 text-emerald-600';
+        textColor = 'text-emerald-805';
+        badgeLabel = 'G (General)';
+      } else if (code === 'M') {
+        shiftText = 'Morning Shift';
+        icon = <Sparkles size={15} className="text-blue-605" />;
+        bgIconClass = 'bg-blue-50 border-blue-100 text-blue-600';
+        textColor = 'text-blue-700';
+        badgeLabel = 'M (Morning)';
+      } else if (code === 'E') {
+        shiftText = 'Evening Shift';
+        icon = <Sparkles size={15} className="text-amber-600" />;
+        bgIconClass = 'bg-amber-50 border-amber-100 text-amber-600';
+        textColor = 'text-amber-700';
+        badgeLabel = 'E (Evening)';
       } else if (code !== 'R') {
         shiftText = `Duty Shift (${code})`;
-        colorClass = 'bg-blue-50 text-blue-800 border-blue-200';
+        icon = <Sparkles size={15} className="text-blue-605" />;
+        bgIconClass = 'bg-blue-50 border-blue-100 text-blue-605';
+        textColor = 'text-blue-700';
+        badgeLabel = `${code} (Duty)`;
       }
+
       return (
-        <div className={`px-3 py-2 border rounded-xl flex items-center justify-between text-[11px] font-bold ${colorClass}`}>
-          <span>{label} ({dateLabel})</span>
-          <span className="font-black uppercase tracking-wide">{shiftText}</span>
+        <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 shadow-2xs hover:border-slate-300 transition duration-200">
+          <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${bgIconClass}`}>
+            {icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] font-extrabold text-slate-400 block tracking-wide uppercase leading-none">{label} ({dateLabel})</span>
+            <span className={`text-[11px] font-black mt-1 block leading-none ${textColor}`}>{shiftText}</span>
+          </div>
+          <span className="text-[9px] font-black text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded uppercase shrink-0">
+            {badgeLabel}
+          </span>
         </div>
       );
     };
@@ -660,12 +711,18 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               {['week1', 'week2', 'week3', ...(isRotating4Week ? ['week4'] : [])].map((wkKey, wkIdx) => {
                 const weekData = sched[wkKey] || {};
                 return (
-                  <div key={wkKey} className="border border-slate-150 rounded-2xl p-4 bg-slate-50/30 flex flex-col space-y-3 shadow-2xs hover:border-blue-200 transition">
-                    <div className="text-xs font-extrabold text-slate-800 border-b border-slate-200/50 pb-2 flex justify-between items-center">
-                      <span>Week {wkIdx + 1}</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cycle Phase</span>
+                  <div key={wkKey} className="border border-slate-200 rounded-2xl p-4.5 bg-white flex flex-col space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group hover:border-[#00c2b2]/40">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#00c2b2] to-blue-500 opacity-80"></div>
+                    <div className="text-xs font-black text-slate-800 border-b border-slate-100 pb-2.5 flex justify-between items-center pl-1.5">
+                      <span className="flex items-center gap-1.5 text-[13px] font-black text-slate-850">
+                        <CalendarDays size={14} className="text-[#00c2b2]" />
+                        Week {wkIdx + 1}
+                      </span>
+                      <span className="text-[8px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Roster Phase {wkIdx + 1}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-1.5">
                       {weekdays.map(day => {
                         const shift = weekData[day] || weekData[day.toLowerCase()] || 'R';
                         return renderDayPill(day, shift);

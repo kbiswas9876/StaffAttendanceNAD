@@ -252,30 +252,35 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         } transition-all duration-300 ease-in-out bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9]">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9] overflow-hidden">
           {isSidebarOpen ? (
-            <div className="flex items-center gap-2.5">
-              <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
-              </svg>
-              <div className="flex flex-col">
-                <span className="text-xs font-black tracking-widest text-slate-850 font-sans">SIGNAL DEPARTMENT</span>
-                <span className="text-[8px] font-extrabold text-blue-600 tracking-widest uppercase font-mono mt-0.5">
-                  {activeSection === 'ALL' ? 'JOINT VIEW' : `${activeSection} SECTION`}
-                </span>
+            <>
+              <div className="flex items-center gap-2.5 min-w-0 animate-in fade-in duration-300">
+                <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
+                </svg>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-black tracking-widest text-slate-850 font-sans truncate">SIGNAL DEPT.</span>
+                  <span className="text-[8px] font-extrabold text-blue-600 tracking-widest uppercase font-mono mt-0.5 truncate">
+                    {activeSection === 'ALL' ? 'JOINT VIEW' : `${activeSection} SEC.`}
+                  </span>
+                </div>
               </div>
-            </div>
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-850 transition cursor-pointer shrink-0 ml-1"
+              >
+                <Menu size={18} />
+              </button>
+            </>
           ) : (
-            <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 select-none ring-2 ring-blue-100 mx-auto" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
-            </svg>
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-850 transition cursor-pointer mx-auto animate-in fade-in duration-300"
+            >
+              <Menu size={18} />
+            </button>
           )}
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 rounded bg-[#E5E3DC] hover:bg-[#D9D7CE] text-slate-600 hover:text-slate-850 transition cursor-pointer"
-          >
-            {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-          </button>
         </div>
 
         {/* Navigation list */}
@@ -286,16 +291,28 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
               <Link
                 key={item.path}
                 href={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-200 group cursor-pointer select-none relative border ${
+                className={`flex items-center p-2 rounded-xl text-sm font-extrabold transition-all duration-200 group cursor-pointer select-none relative ${
                   isActive 
-                    ? 'bg-blue-50/70 border-blue-100/50 text-blue-700 shadow-xs' 
-                    : 'border-transparent text-slate-600 hover:bg-[#EFEDE6] hover:text-slate-850'
+                    ? 'bg-blue-50/40 text-blue-750 shadow-2xs' 
+                    : 'text-slate-650 hover:bg-[#EFEDE6]/70 hover:text-slate-900'
                 }`}
               >
-                <item.icon size={20} className={isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-850 transition-colors'} />
-                {isSidebarOpen && <span>{item.name}</span>}
-                {isActive && isSidebarOpen && (
-                  <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-250 ${
+                  isActive 
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20' 
+                    : 'bg-slate-200/50 text-slate-500 group-hover:bg-slate-300/60 group-hover:text-slate-800'
+                }`}>
+                  <item.icon size={16} className="transition-transform duration-250 group-hover:scale-105" />
+                </div>
+                <span className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${
+                  isSidebarOpen ? 'opacity-100 max-w-[155px] ml-3.5' : 'opacity-0 max-w-0 ml-0'
+                }`}>
+                  {item.name}
+                </span>
+                {isActive && (
+                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse transition-opacity duration-300 ${
+                    isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}></span>
                 )}
               </Link>
             );
@@ -624,8 +641,10 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         )}
 
         {/* Child Router Content */}
-        <main className="flex-1 overflow-auto bg-[#F8FAFC] relative page-transition">
-          {children}
+        <main className="flex-1 overflow-auto bg-[#F8FAFC] relative">
+          <div key={pathname} className="page-transition min-h-full">
+            {children}
+          </div>
         </main>
       </div>
 

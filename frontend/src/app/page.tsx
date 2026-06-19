@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Users, 
   Moon, 
@@ -16,6 +17,7 @@ import {
 import { getEmployees, getAttendanceLogs, getSpecialEvents, getSections, Employee, AttendanceLog, SpecialEvent } from '../lib/api';
 
 export default function Dashboard() {
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<AttendanceLog[]>([]);
@@ -165,7 +167,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         
         {/* Card 1: Total Staff */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/10 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/10 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-5 pl-6 flex items-center gap-4 hover-lift cursor-pointer group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-blue-500 to-indigo-500 opacity-85"></div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <Users size={22} className="stroke-[2.5]" />
           </div>
@@ -183,7 +186,8 @@ export default function Dashboard() {
         </div>
 
         {/* Card 2: Compensatory Rest (CR) */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/10 border border-slate-200/80 hover:border-emerald-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/10 border border-slate-200/80 hover:border-emerald-300 rounded-2xl p-5 pl-6 flex items-center gap-4 hover-lift cursor-pointer group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-emerald-500 to-teal-500 opacity-85"></div>
           <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <CalendarDays size={22} className="stroke-[2.5]" />
           </div>
@@ -201,7 +205,8 @@ export default function Dashboard() {
         </div>
 
         {/* Card 3: Night Duty shifts */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-purple-50/10 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-purple-50/10 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-5 pl-6 flex items-center gap-4 hover-lift cursor-pointer group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-purple-500 to-pink-500 opacity-85"></div>
           <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <Moon size={22} className="stroke-[2.5]" />
           </div>
@@ -219,7 +224,8 @@ export default function Dashboard() {
         </div>
 
         {/* Card 4: Leaves Logged */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-amber-50/10 border border-slate-200/80 hover:border-amber-300 rounded-2xl p-5 flex items-center gap-4 hover-lift cursor-pointer group">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-amber-50/10 border border-slate-200/80 hover:border-amber-300 rounded-2xl p-5 pl-6 flex items-center gap-4 hover-lift cursor-pointer group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-500 to-orange-500 opacity-85"></div>
           <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
             <CalendarCheck size={22} className="stroke-[2.5]" />
           </div>
@@ -282,7 +288,7 @@ export default function Dashboard() {
                   </tr>
                 ) : (
                   employees.map((emp) => (
-                    <tr key={emp.emp_id} className="hover:bg-[#F5F3EF]/40 transition-colors cursor-pointer" onClick={() => window.location.href=`/employees?id=${emp.emp_id}`}>
+                    <tr key={emp.emp_id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/employees?id=${emp.emp_id}`)}>
                       <td className="py-3 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
                       <td className="py-3 px-5 font-bold text-[#191919]">{emp.name}</td>
                       <td className="py-3 px-5">

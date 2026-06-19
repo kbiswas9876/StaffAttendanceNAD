@@ -12,9 +12,9 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
 
-    <AssemblyVersion>1.2.1.0</AssemblyVersion>
-    <FileVersion>1.2.1.0</FileVersion>
-    <Version>1.2.1</Version>
+    <AssemblyVersion>1.2.1.1</AssemblyVersion>
+    <FileVersion>1.2.1.1</FileVersion>
+    <Version>1.2.1.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

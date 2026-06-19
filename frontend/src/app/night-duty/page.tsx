@@ -370,11 +370,17 @@ export default function NightDutyNDA() {
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
               className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer"
             >
-              {monthsList.map((m) => (
-                <option key={m.val} value={m.val} className="bg-white text-slate-800">
-                  {m.name} Roster
-                </option>
-              ))}
+              {monthsList.map((m) => {
+                let prevM = m.val - 1;
+                if (prevM < 0) prevM = 11;
+                const prevName = monthsList[prevM].name.substring(0, 3);
+                const currName = m.name.substring(0, 3);
+                return (
+                  <option key={m.val} value={m.val} className="bg-white text-slate-800">
+                    {prevName} - {currName}
+                  </option>
+                );
+              })}
             </select>
             
             <select
@@ -511,15 +517,33 @@ export default function NightDutyNDA() {
         </div>
       )}
 
-      {/* NDA Weightage Guide */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-xs text-slate-650 space-y-1">
-          <p className="font-bold text-slate-800">NDA weightage algorithm calculation details:</p>
-          <p>
-            The system filters roster sheets for the code <strong className="text-blue-600">P/N</strong> (Present with Night Duty). 
-            Total hours is computed as <strong className="text-blue-600">Total Shifts * 8 Hours</strong>. 
-            Weightage is computed as <strong className="text-blue-600">Total Shifts * 80 Minutes</strong> (1 Hour 20 Minutes per shift), structured hierarchically by Employee Pay Level.
+      {/* NDA Weightage Guide Card */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-50/70 to-indigo-50/30 border border-blue-200/60 rounded-2xl p-5 flex items-start gap-4 shadow-xs select-none">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600 opacity-80"></div>
+        <div className="w-9 h-9 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+          <Info size={18} className="stroke-[2.5]" />
+        </div>
+        <div className="text-xs text-slate-700 space-y-2 flex-1">
+          <h4 className="font-black text-slate-850 text-xs uppercase tracking-wider">NDA Weightage Algorithm Calculation</h4>
+          <p className="leading-relaxed font-semibold">
+            The system extracts shift data matching the code <strong className="text-blue-600 bg-blue-100/50 px-1.5 py-0.5 rounded font-mono">P/N</strong> (Present with Night Duty) and applies the following computations:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div className="bg-white/80 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Working Hours</span>
+              <span className="text-xs font-black text-slate-800">
+                Total Shifts <span className="text-blue-600 font-extrabold">×</span> 8 Hours
+              </span>
+            </div>
+            <div className="bg-white/80 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Weightage Allowance</span>
+              <span className="text-xs font-black text-slate-800">
+                Total Shifts <span className="text-blue-600 font-extrabold">×</span> 80 Minutes <span className="text-slate-400 font-bold">(1h 20m per shift)</span>
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 font-bold mt-1">
+            * Shift results are grouped and sorted hierarchically by Employee Pay Level according to official establishment rules.
           </p>
         </div>
       </div>

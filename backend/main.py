@@ -1605,7 +1605,7 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
 
     # --- Column Widths ---
     # Cols: SL | PF | Name | Desig | Level | Dates | Total Days | Total Hours | Weightage Hrs | Weightage Mins | Remarks
-    widths = [4, 16, 28, 14, 7, 40, 10, 12, 12, 12, 16]
+    widths = [4, 16, 28, 14, 7, 60, 10, 12, 12, 12, 16]
     for col_idx, w in enumerate(widths):
         sheet.set_column(col_idx, col_idx, w)
 
@@ -1673,7 +1673,14 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
         total_hrs = row.total_days * 8
         has_dates = row.dates and row.dates.strip()
         
-        sheet.set_row(current_row, 20)
+        # Estimate number of lines needed for the Dates string
+        dates_str = row.dates or ""
+        # Width of col 5 is 60. Segoe UI 9pt can fit about 1.4 characters per unit of width.
+        # So width 60 fits about 84 characters in one line. Let's use ~80 characters per line safety limit.
+        lines_needed = max(1, (len(dates_str) + 75) // 80)
+        row_height = max(22, lines_needed * 14 + 6)
+        
+        sheet.set_row(current_row, row_height)
         sheet.write(current_row, 0, row.sl, d_fmt)
         sheet.write(current_row, 1, row.pf_number, d_fmt)
         sheet.write(current_row, 2, row.name, n_fmt)
@@ -1846,7 +1853,7 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
             Paragraph(row.remarks or "", normal_style)
         ])
 
-    grid_table = Table(table_data, colWidths=[25, 80, 110, 70, 40, 180, 45, 55, 55, 55, 65])
+    grid_table = Table(table_data, colWidths=[20, 75, 105, 60, 35, 210, 40, 45, 45, 45, 90])
     grid_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1E3A8A")),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),

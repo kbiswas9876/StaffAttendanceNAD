@@ -69,15 +69,22 @@ def update_project_versions(version):
             content = f.read()
             
         import re
+        
+        # Format a 4-part version for AssemblyVersion/FileVersion (e.g., 1.2.1.1 or 1.2.1.0)
+        parts = version.split('.')
+        while len(parts) < 4:
+            parts.append('0')
+        four_part_version = '.'.join(parts[:4])
+        
         # Check if AssemblyVersion, FileVersion, Version tags exist
         has_assembly = "<AssemblyVersion>" in content
         has_file = "<FileVersion>" in content
         has_version = "<Version>" in content
         
         if has_assembly:
-            content = re.sub(r'<AssemblyVersion>[^<]*</AssemblyVersion>', f'<AssemblyVersion>{version}.0</AssemblyVersion>', content)
+            content = re.sub(r'<AssemblyVersion>[^<]*</AssemblyVersion>', f'<AssemblyVersion>{four_part_version}</AssemblyVersion>', content)
         if has_file:
-            content = re.sub(r'<FileVersion>[^<]*</FileVersion>', f'<FileVersion>{version}.0</FileVersion>', content)
+            content = re.sub(r'<FileVersion>[^<]*</FileVersion>', f'<FileVersion>{four_part_version}</FileVersion>', content)
         if has_version:
             content = re.sub(r'<Version>[^<]*</Version>', f'<Version>{version}</Version>', content)
             
@@ -85,9 +92,9 @@ def update_project_versions(version):
         if not (has_assembly and has_file and has_version):
             extra_properties = []
             if not has_assembly:
-                extra_properties.append(f"    <AssemblyVersion>{version}.0</AssemblyVersion>")
+                extra_properties.append(f"    <AssemblyVersion>{four_part_version}</AssemblyVersion>")
             if not has_file:
-                extra_properties.append(f"    <FileVersion>{version}.0</FileVersion>")
+                extra_properties.append(f"    <FileVersion>{four_part_version}</FileVersion>")
             if not has_version:
                 extra_properties.append(f"    <Version>{version}</Version>")
             
@@ -190,10 +197,13 @@ def build_executable():
     final_output = os.path.join("dist", "MetroRailwayERP.exe")
     
     if os.path.exists(final_output):
+        dest_filename = f"MetroRailwayERP_v{version}.exe"
+        dest_path = os.path.join("dist", dest_filename)
+        shutil.copy2(final_output, dest_path)
         print(f"\n=======================================================")
         print("Metro Railway Kolkata S&T ERP Standalone Launcher Built!")
-        print(f"Your standalone executable is ready at: {final_output}")
-        print(f"File size: {os.path.getsize(final_output) / (1024 * 1024):.2f} MB")
+        print(f"Your standalone executable is ready at: {dest_path}")
+        print(f"File size: {os.path.getsize(dest_path) / (1024 * 1024):.2f} MB")
         print("=======================================================")
     else:
         print(f"Error: Launcher output not found at {final_output}!")
