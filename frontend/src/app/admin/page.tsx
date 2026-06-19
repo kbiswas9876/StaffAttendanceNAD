@@ -86,11 +86,11 @@ const getRotatingShift = (emp: any, dateStr: string) => {
 
   const overrides = (sched as any).custom_night_weeks;
   if (Array.isArray(overrides)) {
-    const isOverride = overrides.some(w => dateStr >= w.from_date && dateStr <= w.to_date);
-    if (isOverride) {
+    const override = overrides.find(w => dateStr >= w.from_date && dateStr <= w.to_date);
+    if (override) {
       const baseShift = getBaseRotatingShift(sched, dateStr);
       if (baseShift === 'R') return 'R';
-      return 'N';
+      return override.shift || 'N';
     }
   }
 
@@ -236,9 +236,10 @@ export default function AdminPanel() {
   const [activeRotatingWeek, setActiveRotatingWeek] = useState<'week1' | 'week2' | 'week3' | 'week4'>('week1');
   const [empJoiningDate, setEmpJoiningDate] = useState('');
   const [empAnchorDate, setEmpAnchorDate] = useState('2026-06-01');
-  const [customNightWeeks, setCustomNightWeeks] = useState<{ from_date: string; to_date: string; }[]>([]);
+  const [customNightWeeks, setCustomNightWeeks] = useState<{ from_date: string; to_date: string; shift?: string }[]>([]);
   const [overrideFrom, setOverrideFrom] = useState('');
   const [overrideTo, setOverrideTo] = useState('');
+  const [overrideShift, setOverrideShift] = useState('N');
 
   // 1b. Employee Transfer Form
   const [transferEmpId, setTransferEmpId] = useState<string>('');
@@ -277,9 +278,20 @@ export default function AdminPanel() {
   const [codeLeaveType, setCodeLeaveType] = useState<'CL' | 'LAP' | 'CR' | 'Sick' | 'None'>('None');
 
   // 5. Roster Planner Form
+  const defaultPeriod = (() => {
+    const now = new Date();
+    const day = now.getDate();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    if (day >= 11) {
+      return { month: (month + 1) % 12, year: month === 11 ? year + 1 : year };
+    }
+    return { month, year };
+  })();
+
   const [plannerEmpId, setPlannerEmpId] = useState<string>('');
-  const [plannerMonth, setPlannerMonth] = useState<number>(5); // June
-  const [plannerYear, setPlannerYear] = useState<number>(2026);
+  const [plannerMonth, setPlannerMonth] = useState<number>(defaultPeriod.month);
+  const [plannerYear, setPlannerYear] = useState<number>(defaultPeriod.year);
   const [plannerDays, setPlannerDays] = useState<DayInfo[]>([]);
   const [plannerGrid, setPlannerGrid] = useState<{ [dateStr: string]: string }>({});
   const [plannerRemarks, setPlannerRemarks] = useState<string>('');
@@ -529,6 +541,7 @@ export default function AdminPanel() {
       setCustomNightWeeks([]);
       setOverrideFrom('');
       setOverrideTo('');
+      setOverrideShift('N');
       setEmpWeeklySchedule(getWeeklyScheduleDefault('Wednesday'));
       setRotatingSchedule({
         week1: getWeeklyScheduleDefault('Wednesday'),
@@ -618,6 +631,7 @@ export default function AdminPanel() {
     setCustomNightWeeks([]);
     setOverrideFrom('');
     setOverrideTo('');
+    setOverrideShift('N');
     setEmpWeeklySchedule(getWeeklyScheduleDefault('Wednesday'));
     setRotatingSchedule({
       week1: getWeeklyScheduleDefault('Wednesday'),
@@ -1439,7 +1453,7 @@ export default function AdminPanel() {
                       </div>
                       {customNightWeeks.length > 0 && (
                         <div className="text-[9px] text-slate-500 italic">
-                          ({customNightWeeks.length} night override weeks configured)
+                          ({customNightWeeks.length} custom overrides configured)
                         </div>
                       )}
                     </div>
@@ -1585,8 +1599,8 @@ export default function AdminPanel() {
 
                             {/* Custom Night Weeks (Override) */}
                             <div className="border-t border-slate-100 pt-3 space-y-2">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Custom Night Week Overrides</span>
-                              <div className="grid grid-cols-3 gap-1.5 items-end">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Custom Schedule Overrides</span>
+                              <div className="grid grid-cols-4 gap-1.5 items-end">
                                 <div>
                                   <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">From Date</label>
                                   <input 
@@ -1605,6 +1619,19 @@ export default function AdminPanel() {
                                     className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
                                   />
                                 </div>
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">Override Shift</label>
+                                  <select
+                                    value={overrideShift}
+                                    onChange={(e) => setOverrideShift(e.target.value)}
+                                    className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
+                                  >
+                                    <option value="N">N (Night)</option>
+                                    <option value="E">E (Eve)</option>
+                                    <option value="G">G (Gen)</option>
+                                    <option value="M">M (Morn)</option>
+                                  </select>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1616,9 +1643,10 @@ export default function AdminPanel() {
                                       alert("Start date cannot be after end date.");
                                       return;
                                     }
-                                    setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo }]);
+                                    setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo, shift: overrideShift }]);
                                     setOverrideFrom('');
                                     setOverrideTo('');
+                                    setOverrideShift('N');
                                   }}
                                   className="bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer"
                                 >
@@ -1630,7 +1658,7 @@ export default function AdminPanel() {
                                 <div className="max-h-24 overflow-y-auto bg-slate-100 border border-slate-200 rounded-lg p-2 space-y-1">
                                   {customNightWeeks.map((w, index) => (
                                     <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-200/50 pb-0.5">
-                                      <span>{w.from_date} to {w.to_date}</span>
+                                      <span>{w.from_date} to {w.to_date} ({w.shift || 'N'})</span>
                                       <button
                                         type="button"
                                         onClick={() => setCustomNightWeeks(prev => prev.filter((_, idx) => idx !== index))}

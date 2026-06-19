@@ -22,10 +22,38 @@ export default function Dashboard() {
   const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Hardcode current visual cycle range for dashboard KPI counts
-  const DASHBOARD_START = '2026-05-11';
-  const DASHBOARD_END = '2026-06-10';
-  const DASHBOARD_TODAY = '2026-05-20'; // Mid-cycle mock date to calculate active presence
+  // Dynamically calculate current visual cycle range for dashboard KPI counts
+  const { DASHBOARD_START, DASHBOARD_END, DASHBOARD_TODAY } = (() => {
+    const today = new Date();
+    const day = today.getDate();
+    const month = today.getMonth();
+    const year = today.getFullYear();
+
+    let startYear = year;
+    let startMonth = month;
+    let endYear = year;
+    let endMonth = month;
+
+    if (day >= 11) {
+      startMonth = month;
+      endMonth = (month + 1) % 12;
+      if (month === 11) {
+        endYear = year + 1;
+      }
+    } else {
+      startMonth = month - 1;
+      if (startMonth < 0) {
+        startMonth = 11;
+        startYear = year - 1;
+      }
+      endMonth = month;
+    }
+
+    const startStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-11`;
+    const endStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-10`;
+    const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return { DASHBOARD_START: startStr, DASHBOARD_END: endStr, DASHBOARD_TODAY: todayStr };
+  })();
 
   const fetchDashboardData = async (section: string) => {
     setLoading(true);
@@ -129,7 +157,7 @@ export default function Dashboard() {
         </div>
         
         <div className="text-xs text-slate-600 font-bold bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
-          Current Roster Period: <span className="text-blue-600 font-extrabold">11.05.2026 to 10.06.2026</span>
+          Current Roster Period: <span className="text-blue-600 font-extrabold">{new Date(DASHBOARD_START).toLocaleDateString('en-GB').replace(/\//g, '.')} to {new Date(DASHBOARD_END).toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
         </div>
       </div>
 

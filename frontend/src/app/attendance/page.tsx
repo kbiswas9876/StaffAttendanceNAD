@@ -150,11 +150,11 @@ const getRotatingShift = (emp: any, dateStr: string) => {
 
   const overrides = (sched as any).custom_night_weeks;
   if (Array.isArray(overrides)) {
-    const isOverride = overrides.some(w => dateStr >= w.from_date && dateStr <= w.to_date);
-    if (isOverride) {
+    const override = overrides.find(w => dateStr >= w.from_date && dateStr <= w.to_date);
+    if (override) {
       const baseShift = getBaseRotatingShift(sched, dateStr);
       if (baseShift === 'R') return 'R';
-      return 'N';
+      return override.shift || 'N';
     }
   }
 
@@ -170,14 +170,32 @@ const mapShiftToRosterCode = (shiftCode: string | null) => {
   return code;
 };
 
+const getRosterPeriodLabel = (monthVal: number) => {
+  const fullMonths = ["December", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const prevName = fullMonths[monthVal];
+  const currName = fullMonths[monthVal + 1];
+  return `${prevName}-${currName}`;
+};
+
 export default function AttendanceGrid() {
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Date period state
-  const [selectedMonth, setSelectedMonth] = useState<number>(5); // June (0-indexed 5)
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const defaultPeriod = (() => {
+    const now = new Date();
+    const day = now.getDate();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    if (day >= 11) {
+      return { month: (month + 1) % 12, year: month === 11 ? year + 1 : year };
+    }
+    return { month, year };
+  })();
+
+  const [selectedMonth, setSelectedMonth] = useState<number>(defaultPeriod.month);
+  const [selectedYear, setSelectedYear] = useState<number>(defaultPeriod.year);
   const [days, setDays] = useState<DayInfo[]>([]);
 
   // Attendance grid states
@@ -919,7 +937,7 @@ export default function AttendanceGrid() {
             >
               {monthsList.map((m) => (
                 <option key={m.val} value={m.val} className="bg-white text-slate-800">
-                  {m.name} Roster
+                  {getRosterPeriodLabel(m.val)} (11th to 10th)
                 </option>
               ))}
             </select>

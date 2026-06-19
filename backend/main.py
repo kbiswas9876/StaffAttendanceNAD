@@ -721,6 +721,12 @@ def calculate_weightage(total_days: int):
     minutes = total_mins % 60
     return f"{hours:02d} HRS", f"{minutes:02d} MIN."
 
+def calculate_weightage_numeric(total_days: int):
+    total_mins = total_days * 80
+    hours = total_mins // 60
+    minutes = total_mins % 60
+    return hours, minutes
+
 # --- Numbered Canvas for PDF page counting ---
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -1636,24 +1642,34 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
 
     # ====== SECTION D: TABLE HEADERS ======
     sheet.set_row(9, 8)  # Gap row
-    sheet.set_row(10, 30)
-    headers = [
-        "SL\nNo.", "P.F. No.", "Name of Staff", "Designation", "Pay\nLevel",
-        f"Dates of Night Duty\n({req.month_name})",
-        "Total\nDays", "Total\nHours", "Weightage\nHrs", "Weightage\nMins", "Remarks"
-    ]
-    for col_idx, h in enumerate(headers):
-        sheet.write(10, col_idx, h, header_fmt)
+    sheet.set_row(10, 20)
+    sheet.set_row(11, 20)
+    
+    sheet.merge_range(10, 0, 11, 0, "SL\nNo.", header_fmt)
+    sheet.merge_range(10, 1, 11, 1, "P.F. No.", header_fmt)
+    sheet.merge_range(10, 2, 11, 2, "Name of Staff", header_fmt)
+    sheet.merge_range(10, 3, 11, 3, "Designation", header_fmt)
+    sheet.merge_range(10, 4, 11, 4, "Pay\nLevel", header_fmt)
+    sheet.merge_range(10, 5, 11, 5, f"Dates of Night Duty\n({req.month_name})", header_fmt)
+    sheet.merge_range(10, 6, 11, 6, "Total\nDays", header_fmt)
+    sheet.merge_range(10, 7, 11, 7, "Total\nHours", header_fmt)
+    
+    # Horizontally merged header for Weightage
+    sheet.merge_range(10, 8, 10, 9, "Weightage Time", header_fmt)
+    sheet.write(11, 8, "Hrs", header_fmt)
+    sheet.write(11, 9, "Mins", header_fmt)
+    
+    sheet.merge_range(10, 10, 11, 10, "Remarks", header_fmt)
 
     # ====== SECTION E: TABLE DATA ======
     nd_rows_with_data = 0
-    current_row = 11
+    current_row = 12
     for idx, row in enumerate(req.rows):
         is_alt = idx % 2 == 1
         d_fmt = data_alt_fmt if is_alt else data_center_fmt
         n_fmt = name_alt_fmt if is_alt else name_fmt
         
-        wt_hrs, wt_mins = calculate_weightage(row.total_days)
+        wt_hrs_val, wt_mins_val = calculate_weightage_numeric(row.total_days)
         total_hrs = row.total_days * 8
         has_dates = row.dates and row.dates.strip()
         
@@ -1669,8 +1685,8 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
             sheet.write(current_row, 5, row.dates, d_fmt)
             sheet.write(current_row, 6, row.total_days, d_fmt)
             sheet.write(current_row, 7, total_hrs, d_fmt)
-            sheet.write(current_row, 8, wt_hrs, wt_fmt)
-            sheet.write(current_row, 9, wt_mins, wt_fmt)
+            sheet.write(current_row, 8, wt_hrs_val, wt_fmt)
+            sheet.write(current_row, 9, wt_mins_val, wt_fmt)
             nd_rows_with_data += 1
         else:
             sheet.write(current_row, 5, "Nil", nil_fmt)
@@ -1689,9 +1705,9 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     sheet.merge_range(current_row, 0, current_row, 5, "TOTAL", total_label_fmt)
     sheet.write(current_row, 6, total_days_sum, total_val_fmt)
     sheet.write(current_row, 7, total_hrs_sum, total_val_fmt)
-    wt_total_hrs, wt_total_mins = calculate_weightage(total_days_sum)
-    sheet.write(current_row, 8, wt_total_hrs, total_val_fmt)
-    sheet.write(current_row, 9, wt_total_mins, total_val_fmt)
+    wt_total_hrs_val, wt_total_mins_val = calculate_weightage_numeric(total_days_sum)
+    sheet.write(current_row, 8, wt_total_hrs_val, total_val_fmt)
+    sheet.write(current_row, 9, wt_total_mins_val, total_val_fmt)
     sheet.write(current_row, 10, f"{nd_rows_with_data} staff on night duty", total_label_fmt)
     current_row += 1
 
@@ -1939,7 +1955,7 @@ async def export_attendance_excel(req: AttendanceExportRequest):
 
     # Set cell sizes for dates (31 columns: index 3 to 33)
     for c in range(3, 34):
-        sheet.set_column(c, c, 4.5)
+        sheet.set_column(c, c, 6.0)
     sheet.set_column(34, 34, 28) # Remarks (index 34)
 
     # Days arrays

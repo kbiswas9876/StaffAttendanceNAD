@@ -12,11 +12,11 @@ export interface Employee {
     | {
         type: 'simple';
         [day: string]: any;
-        custom_night_weeks?: { from_date: string; to_date: string }[];
+        custom_night_weeks?: { from_date: string; to_date: string; shift?: string }[];
       }
     | {
         type: 'flexible';
-        custom_night_weeks?: { from_date: string; to_date: string }[];
+        custom_night_weeks?: { from_date: string; to_date: string; shift?: string }[];
       }
     | {
         type: 'rotating-3week';
@@ -24,7 +24,7 @@ export interface Employee {
         week1: { [day: string]: string };
         week2: { [day: string]: string };
         week3: { [day: string]: string };
-        custom_night_weeks?: { from_date: string; to_date: string }[];
+        custom_night_weeks?: { from_date: string; to_date: string; shift?: string }[];
       }
     | {
         type: 'rotating';
@@ -33,7 +33,7 @@ export interface Employee {
         week2: { [day: string]: string };
         week3: { [day: string]: string };
         week4: { [day: string]: string };
-        custom_night_weeks?: { from_date: string; to_date: string }[];
+        custom_night_weeks?: { from_date: string; to_date: string; shift?: string }[];
       }
     | { [day: string]: string };
   display_order?: number;
