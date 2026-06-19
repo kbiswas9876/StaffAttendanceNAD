@@ -467,3 +467,22 @@ export const getWeeklyScheduleDefault = (restDay: string): { [day: string]: stri
   });
   return sched;
 };
+
+export interface UpdaterStatus {
+  status: 'idle' | 'downloading' | 'completed' | 'error';
+  progress: number;
+  filename: string;
+  path: string;
+  error_message: string;
+}
+
+export const triggerUpdateDownload = async (): Promise<{ status: string; filename: string; path: string }> => {
+  return apiFetch<{ status: string; filename: string; path: string }>("/updater/download", {
+    method: "POST"
+  });
+};
+
+export const getUpdateDownloadStatus = async (): Promise<UpdaterStatus> => {
+  return apiFetch<UpdaterStatus>("/updater/status");
+};
+

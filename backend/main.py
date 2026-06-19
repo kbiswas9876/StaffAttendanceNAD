@@ -775,6 +775,110 @@ except ImportError:
 def get_version():
     return {"version": VERSION}
 
+# --- Background Updater State & Endpoints ---
+import threading
+import urllib.request
+import json
+import os
+
+download_state = {
+    "status": "idle", # "idle", "downloading", "completed", "error"
+    "progress": 0,
+    "filename": "",
+    "path": "",
+    "error_message": ""
+}
+
+def download_file_worker(download_url, dest_path):
+    global download_state
+    try:
+        req = urllib.request.Request(
+            download_url, 
+            headers={"User-Agent": "StaffAttendanceERPUpdater"}
+        )
+        with urllib.request.urlopen(req) as response:
+            total_size = int(response.headers.get('content-length', 0))
+            block_size = 1024 * 16
+            downloaded = 0
+            
+            with open(dest_path, "wb") as f:
+                while True:
+                    chunk = response.read(block_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        download_state["progress"] = int((downloaded / total_size) * 100)
+                    else:
+                        download_state["progress"] = 50
+            
+            download_state["status"] = "completed"
+            download_state["progress"] = 100
+    except Exception as e:
+        download_state["status"] = "error"
+        download_state["error_message"] = str(e)
+        print(f"Update download failed: {e}")
+
+@app.post("/api/updater/download")
+def trigger_update_download():
+    global download_state
+    if download_state["status"] == "downloading":
+        return {"status": "already_downloading"}
+        
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/kbiswas9876/StaffAttendanceNAD/releases/latest",
+            headers={"User-Agent": "StaffAttendanceERPUpdater"}
+        )
+        with urllib.request.urlopen(req) as response:
+            release_data = json.loads(response.read().decode())
+            
+        assets = release_data.get("assets", [])
+        exe_asset = None
+        for asset in assets:
+            if asset.get("name", "").endswith(".exe"):
+                exe_asset = asset
+                break
+                
+        if not exe_asset:
+            if assets:
+                exe_asset = assets[0]
+            else:
+                raise HTTPException(status_code=404, detail="No assets found in the latest release.")
+                
+        download_url = exe_asset["browser_download_url"]
+        filename = exe_asset["name"]
+        
+        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+        os.makedirs(downloads_dir, exist_ok=True)
+        dest_path = os.path.join(downloads_dir, filename)
+        
+        download_state["status"] = "downloading"
+        download_state["progress"] = 0
+        download_state["filename"] = filename
+        download_state["path"] = dest_path
+        download_state["error_message"] = ""
+        
+        t = threading.Thread(target=download_file_worker, args=(download_url, dest_path), daemon=True)
+        t.start()
+        
+        return {
+            "status": "started",
+            "filename": filename,
+            "path": dest_path
+        }
+    except Exception as e:
+        download_state["status"] = "error"
+        download_state["error_message"] = str(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/updater/status")
+def get_updater_status():
+    global download_state
+    return download_state
+
+
 # 1. Lines CRUD
 @app.get("/api/lines")
 def read_lines():

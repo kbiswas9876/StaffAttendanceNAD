@@ -35,7 +35,8 @@ import {
   getAuditLogs, AuditLog,
   getBackupsList, createBackup, restoreBackup, getBackupStatus, deleteBackup,
   getAttendanceLogs, saveAttendanceLogsBulk, addSpecialEvent,
-  getWeeklyScheduleDefault, getAppVersion
+  getWeeklyScheduleDefault, getAppVersion,
+  triggerUpdateDownload, getUpdateDownloadStatus
 } from '../../lib/api';
 
 interface DayInfo {
@@ -322,6 +323,47 @@ export default function AdminPanel() {
     html_url: string;
   } | null>(null);
 
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStateText, setDownloadStateText] = useState<'idle' | 'downloading' | 'completed' | 'error'>('idle');
+  const [downloadPath, setDownloadPath] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+
+  const startUpdateDownload = async () => {
+    setDownloadStateText('downloading');
+    setDownloadProgress(0);
+    setDownloadError('');
+    try {
+      await triggerUpdateDownload();
+      
+      const interval = setInterval(async () => {
+        try {
+          const status = await getUpdateDownloadStatus();
+          setDownloadProgress(status.progress);
+          setDownloadStateText(status.status);
+          if (status.status === 'completed') {
+            setDownloadPath(status.path);
+            clearInterval(interval);
+            showToast("Update downloaded successfully!", "success");
+          } else if (status.status === 'error') {
+            setDownloadError(status.error_message);
+            clearInterval(interval);
+            showToast("Failed to download update", "error");
+          }
+        } catch (pollErr) {
+          console.error("Error polling update status", pollErr);
+          clearInterval(interval);
+          setDownloadStateText('error');
+          setDownloadError("Connection to backend lost.");
+        }
+      }, 500);
+    } catch (err: any) {
+      console.error("Failed to trigger update download", err);
+      setDownloadStateText('error');
+      setDownloadError(err.message || "Failed to start download");
+      showToast("Download failed", "error");
+    }
+  };
+
   const checkSystemUpdates = async () => {
     setUpdateStatus('checking');
     try {
@@ -343,8 +385,25 @@ export default function AdminPanel() {
         html_url: data.html_url
       });
       
-      // Compare versions
-      if (data.tag_name !== currentVersion) {
+      // Compare versions numerically to check if tag_name is newer than currentVersion
+      const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
+      const a = parse(data.tag_name);
+      const b = parse(currentVersion);
+      const maxLength = Math.max(a.length, b.length);
+      let isNewer = false;
+      for (let i = 0; i < maxLength; i++) {
+        const numA = a[i] || 0;
+        const numB = b[i] || 0;
+        if (numA > numB) {
+          isNewer = true;
+          break;
+        }
+        if (numA < numB) {
+          break;
+        }
+      }
+      
+      if (isNewer) {
         setUpdateStatus('available');
       } else {
         setUpdateStatus('latest');
@@ -3012,15 +3071,75 @@ export default function AdminPanel() {
                         <span className="text-xs font-extrabold text-blue-700 uppercase tracking-wide">New Update Available!</span>
                         <span className="text-[10px] text-slate-500 font-bold">{latestRelease.name} ({latestRelease.tag_name})</span>
                       </div>
-                      <a 
-                        href={latestRelease.html_url} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition shadow-md shadow-blue-500/10 text-center"
-                      >
-                        Download Update
-                      </a>
+                      
+                      {downloadStateText === 'idle' && (
+                        <div className="flex gap-2">
+                          <a 
+                            href={latestRelease.html_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[10px] uppercase tracking-wider transition text-center"
+                          >
+                            GitHub Page
+                          </a>
+                          <button 
+                            onClick={startUpdateDownload}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition shadow-md shadow-blue-500/10 text-center cursor-pointer"
+                          >
+                            Download Update
+                          </button>
+                        </div>
+                      )}
                     </div>
+
+                    {downloadStateText === 'downloading' && (
+                      <div className="flex flex-col gap-2.5 p-4 bg-blue-50/30 rounded-xl border border-blue-100 animate-fade-in">
+                        <div className="flex justify-between items-center text-xs font-bold text-blue-700">
+                          <span className="flex items-center gap-1.5">
+                            <RefreshCw size={14} className="animate-spin" />
+                            Downloading standalone update bundle...
+                          </span>
+                          <span>{downloadProgress}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-600 transition-all duration-300 rounded-full"
+                            style={{ width: `${downloadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {downloadStateText === 'completed' && (
+                      <div className="flex flex-col gap-2.5 p-4 bg-emerald-50/50 rounded-xl border border-emerald-250 text-emerald-800 animate-fade-in">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle size={18} className="text-emerald-600" />
+                          <span className="text-xs font-bold">Successfully Downloaded Update!</span>
+                        </div>
+                        <p className="text-[10px] text-slate-650 font-semibold leading-relaxed">
+                          The updated standalone executable <strong>{latestRelease.tag_name}</strong> was saved to your Downloads folder:
+                          <code className="bg-white border border-slate-200 text-slate-800 font-mono px-2 py-1 rounded text-[9.5px] mt-1.5 block select-all">
+                            {downloadPath}
+                          </code>
+                        </p>
+                        <p className="text-[10px] text-amber-700 font-bold mt-1 bg-amber-50 border border-amber-200 p-2 rounded-lg">
+                          ⚠️ Action Required: Please exit this application, delete or rename the old executable, copy the new file from your Downloads folder, and run the new executable to launch.
+                        </p>
+                      </div>
+                    )}
+
+                    {downloadStateText === 'error' && (
+                      <div className="flex flex-col gap-2 p-4 bg-rose-50/50 rounded-xl border border-rose-250 text-rose-850 animate-fade-in">
+                        <span className="text-xs font-bold">Download Failed</span>
+                        <p className="text-[10px] text-slate-505 font-semibold">{downloadError || "An error occurred while downloading update files."}</p>
+                        <button 
+                          onClick={startUpdateDownload}
+                          className="mt-1 self-start px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold uppercase transition cursor-pointer shadow-md"
+                        >
+                          Retry Download
+                        </button>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
