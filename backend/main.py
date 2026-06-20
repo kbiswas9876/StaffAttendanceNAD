@@ -43,6 +43,18 @@ if not os.path.exists(DB_PATH):
         except Exception as e:
             print(f"Failed to copy default database: {e}")
 
+TA_TEMPLATE_PATH = os.path.join(doc_dir, "TA bill.xlsx")
+if not os.path.exists(TA_TEMPLATE_PATH):
+    if getattr(sys, 'frozen', False):
+        default_ta = os.path.join(sys._MEIPASS, "TA bill.xlsx")
+    else:
+        default_ta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "TA bill.xlsx")
+    if os.path.exists(default_ta):
+        try:
+            shutil.copy(default_ta, TA_TEMPLATE_PATH)
+        except Exception as e:
+            print(f"Failed to copy default TA template: {e}")
+
 app = FastAPI(title="Metro Railway Kolkata S&T Staff Management System Backend")
 
 app.add_middleware(
@@ -591,6 +603,56 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass # Column already exists
+
+    # Ensure basic_pay column exists in employees table (migration for existing DBs)
+    try:
+        cursor.execute("ALTER TABLE employees ADD COLUMN basic_pay INTEGER DEFAULT 0;")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Column already exists
+
+    # Create ta_bills and ta_entries tables
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ta_bills (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            emp_id INTEGER NOT NULL REFERENCES employees(emp_id) ON DELETE CASCADE,
+            month_year TEXT NOT NULL,
+            journey_type TEXT NOT NULL,
+            book_no TEXT DEFAULT '',
+            page_no TEXT DEFAULT '',
+            serial_no_from TEXT DEFAULT '',
+            serial_no_to TEXT DEFAULT '',
+            bill_unit TEXT DEFAULT '',
+            basic_pay INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+    """)
+    try:
+        cursor.execute("ALTER TABLE ta_bills ADD COLUMN bill_unit TEXT DEFAULT '';")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Column already exists
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ta_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bill_id INTEGER NOT NULL REFERENCES ta_bills(id) ON DELETE CASCADE,
+            entry_date TEXT NOT NULL,
+            train_no TEXT DEFAULT '',
+            time_left TEXT DEFAULT '',
+            time_arrived TEXT DEFAULT '',
+            station_from TEXT DEFAULT '',
+            station_to TEXT DEFAULT '',
+            is_stay INTEGER DEFAULT 0,
+            stay_details TEXT DEFAULT '',
+            days_nights TEXT DEFAULT '',
+            object_journey TEXT DEFAULT '',
+            rate INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            display_order INTEGER DEFAULT 0
+        );
+    """)
+    conn.commit()
         
     conn.close()
 
@@ -617,6 +679,7 @@ class EmployeeSchema(BaseModel):
     joining_date: Optional[str] = None
     weekly_schedule: Optional[dict] = None
     display_order: Optional[int] = 0
+    basic_pay: Optional[int] = 0
 
 class ReorderPayload(BaseModel):
     emp_ids: List[int]
@@ -1014,9 +1077,9 @@ def add_employee(payload: EmployeeSchema):
         cursor = conn.cursor()
         sched_str = json.dumps(payload.weekly_schedule) if payload.weekly_schedule else "{}"
         cursor.execute("""
-            INSERT INTO employees (pf_number, name, designation, level, primary_section_id, default_rest_day, joining_date, weekly_schedule, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, payload.display_order or 0))
+            INSERT INTO employees (pf_number, name, designation, level, primary_section_id, default_rest_day, joining_date, weekly_schedule, display_order, basic_pay)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, payload.display_order or 0, payload.basic_pay or 0))
         emp_id = cursor.lastrowid
         
         # Create initial leave bank record
@@ -1039,9 +1102,9 @@ def edit_employee(emp_id: int, payload: EmployeeSchema):
     sched_str = json.dumps(payload.weekly_schedule) if payload.weekly_schedule else "{}"
     cursor.execute("""
         UPDATE employees SET pf_number = ?, name = ?, designation = ?, level = ?, 
-            primary_section_id = ?, default_rest_day = ?, joining_date = ?, weekly_schedule = ?, display_order = ?
+            primary_section_id = ?, default_rest_day = ?, joining_date = ?, weekly_schedule = ?, display_order = ?, basic_pay = ?
         WHERE emp_id = ?
-    """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, payload.display_order or 0, emp_id))
+    """, (payload.pf_number, payload.name, payload.designation, payload.level, payload.primary_section_id, payload.default_rest_day, payload.joining_date, sched_str, payload.display_order or 0, payload.basic_pay or 0, emp_id))
     conn.commit()
     conn.close()
     
@@ -1870,7 +1933,7 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
         fontSize=12,
         leading=14,
         alignment=1, # Center
-        textColor=colors.HexColor("#1E3A8A")
+        textColor=colors.HexColor("#1B365D")
     )
     normal_style = ParagraphStyle(
         'DocNormal',
@@ -1958,15 +2021,20 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
         ])
 
     grid_table = Table(table_data, colWidths=[20, 75, 105, 60, 35, 210, 40, 45, 45, 45, 90])
-    grid_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1E3A8A")),
+    t_style = [
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1B365D")),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('ALIGN', (2,1), (2,-1), 'LEFT'), # Left align names
         ('BOTTOMPADDING', (0,0), (-1,0), 6),
         ('TOPPADDING', (0,0), (-1,0), 6),
-    ]))
+    ]
+    for r_idx in range(1, len(table_data)):
+        row_bg = colors.HexColor("#F8FAFC") if r_idx % 2 == 1 else colors.white
+        t_style.append(('BACKGROUND', (0, r_idx), (-1, r_idx), row_bg))
+        
+    grid_table.setStyle(TableStyle(t_style))
     story.append(grid_table)
     story.append(Spacer(1, 30))
 
@@ -2040,15 +2108,15 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     })
 
     # Soft dynamic styles for roster codes
-    pn_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#F3E8FF', 'font_color': '#7E22CE', 'bold': True})
-    r_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#F1F5F9', 'font_color': '#64748B'})
-    cr_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#EFF6FF', 'font_color': '#1D4ED8', 'bold': True})
-    cl_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFFBEB', 'font_color': '#B45309', 'bold': True})
-    lap_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFF7ED', 'font_color': '#C2410C', 'bold': True})
-    sick_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF2F2', 'font_color': '#B91C1C', 'bold': True})
-    scl_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFF1F2', 'font_color': '#BE123C', 'bold': True})
-    ph_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF9C3', 'font_color': '#A16207', 'bold': True})
-    custom_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#E6FFFA', 'font_color': '#047487', 'bold': True})
+    pn_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#F3E8FF', 'font_color': '#7E22CE', 'bold': True, 'text_wrap': True})
+    r_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#F1F5F9', 'font_color': '#64748B', 'text_wrap': True})
+    cr_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#EFF6FF', 'font_color': '#1D4ED8', 'bold': True, 'text_wrap': True})
+    cl_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFFBEB', 'font_color': '#B45309', 'bold': True, 'text_wrap': True})
+    lap_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFF7ED', 'font_color': '#C2410C', 'bold': True, 'text_wrap': True})
+    sick_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF2F2', 'font_color': '#B91C1C', 'bold': True, 'text_wrap': True})
+    scl_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFF1F2', 'font_color': '#BE123C', 'bold': True, 'text_wrap': True})
+    ph_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF9C3', 'font_color': '#A16207', 'bold': True, 'text_wrap': True})
+    custom_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#E6FFFA', 'font_color': '#047487', 'bold': True, 'text_wrap': True})
 
     # 1. Header Information (spans A to AI, since we combine Name & PF into 1 col)
     sheet.merge_range("A1:AI1", "METRO RAILWAY, KOLKATA", title_format)
@@ -2085,7 +2153,7 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     # 3. Write Data
     curr_row = 4
     for emp_idx, emp in enumerate(req.rows):
-        sheet.set_row(curr_row, 26) # Slightly taller row to fit 2-line name & PF
+        sheet.set_row(curr_row, 35) # Row height set to 35 to cleanly fit name/PF and custom code/order details
         sheet.write(curr_row, 0, emp.sl, data_format)
         
         # Combined Name & PF
@@ -2167,10 +2235,16 @@ async def export_attendance_excel(req: AttendanceExportRequest):
                         sheet.write(curr_row, col_idx, val, day_format)
             else:
                 # Merge consecutive identical status cells (e.g. Sick, CL, R)
+                order_text = emp.days[start_idx].remarks
+                display_val = val
+                # Format custom codes as Code\n(Order) if order/remarks exist
+                if val not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order_text:
+                    display_val = f"{val}\n({order_text})"
+                
                 if start_col == end_col:
-                    sheet.write(curr_row, start_col, val, cell_format)
+                    sheet.write(curr_row, start_col, display_val, cell_format)
                 else:
-                    sheet.merge_range(curr_row, start_col, curr_row, end_col, val, cell_format)
+                    sheet.merge_range(curr_row, start_col, curr_row, end_col, display_val, cell_format)
             
         sheet.write(curr_row, 34, emp.remarks, data_format)
         curr_row += 1
@@ -2220,7 +2294,7 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         fontName='Helvetica-Bold',
         fontSize=12,
         alignment=1,
-        textColor=colors.HexColor("#1E3A8A")
+        textColor=colors.HexColor("#1B365D")
     )
     
     meta_style = ParagraphStyle(
@@ -2257,6 +2331,18 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         leading=6
     )
 
+    att_header_text_style = ParagraphStyle(
+        'AttTableHeaderText',
+        parent=cell_bold_style,
+        textColor=colors.white
+    )
+
+    att_day_header_text_style = ParagraphStyle(
+        'AttTableDayHeaderText',
+        parent=day_header_style,
+        textColor=colors.white
+    )
+
     name_style = ParagraphStyle(
         'AttName',
         parent=styles['Normal'],
@@ -2282,23 +2368,23 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
 
     # Table headers (Name and PF combined in column 2)
     header_row_1 = [
-        Paragraph("<b>SL</b>", cell_bold_style),
-        Paragraph("<b>Name of Staff / P.F. No.</b>", cell_bold_style),
-        Paragraph("<b>Designation</b>", cell_bold_style)
+        Paragraph("<b>SL</b>", att_header_text_style),
+        Paragraph("<b>Name of Staff / P.F. No.</b>", att_header_text_style),
+        Paragraph("<b>Designation</b>", att_header_text_style)
     ]
     
     days_in_grid = req.rows[0].days if req.rows else []
     for day in days_in_grid:
-        header_row_1.append(Paragraph(f"<b>{day.day}</b><br/>{day.weekday[0]}", day_header_style))
+        header_row_1.append(Paragraph(f"<b>{day.day}</b><br/>{day.weekday[0]}", att_day_header_text_style))
         
-    header_row_1.append(Paragraph("<b>Remarks</b>", cell_bold_style))
+    header_row_1.append(Paragraph("<b>Remarks</b>", att_header_text_style))
 
     table_data = [header_row_1]
 
     # Construct grid styles, highlight sundays in table style backgrounds
     t_style = [
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F1F5F9")),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1B365D")),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('ALIGN', (1,1), (1,-1), 'CENTER'), # Center Name/PF
@@ -2308,14 +2394,20 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         ('RIGHTPADDING', (0,0), (-1,-1), 1),
     ]
 
-    # Color Sundays columns dynamically (starting at index 3 instead of 4)
+    # Apply alternating background color for rows (excluding Sunday/Holiday day cols)
+    for r_idx in range(1, len(req.rows) + 1):
+        row_bg = colors.HexColor("#F8FAFC") if r_idx % 2 == 1 else colors.white
+        t_style.append(('BACKGROUND', (0, r_idx), (2, r_idx), row_bg))
+        t_style.append(('BACKGROUND', (-1, r_idx), (-1, r_idx), row_bg))
+
+    # Color Sundays columns dynamically (starting at index 3 and row 1 to preserve header background)
     for d_idx, day in enumerate(days_in_grid):
         if day.weekday == "Sun":
             col_c = 3 + d_idx
-            t_style.append(('BACKGROUND', (col_c, 0), (col_c, -1), colors.HexColor("#FEE2E2")))
+            t_style.append(('BACKGROUND', (col_c, 1), (col_c, -1), colors.HexColor("#FEE2E2")))
         elif day.is_holiday:
             col_c = 3 + d_idx
-            t_style.append(('BACKGROUND', (col_c, 0), (col_c, -1), colors.HexColor("#FEF3C7")))
+            t_style.append(('BACKGROUND', (col_c, 1), (col_c, -1), colors.HexColor("#FEF3C7")))
 
     # Fill data & build SPAN merges for consecutive leave/rest days
     for r_idx, row in enumerate(req.rows):
@@ -2347,7 +2439,11 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
             should_merge = status not in ('P', 'CR', '', None) and start_idx < end_idx
             
             if should_merge:
-                status_html = f"<b>{status}</b>"
+                order = row.days[start_idx].remarks
+                if status not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order:
+                    status_html = f"<b>{status}</b><br/><font size=4>{order}</font>"
+                else:
+                    status_html = f"<b>{status}</b>"
                 day_cells[start_idx] = Paragraph(status_html, cell_bold_style)
                 for idx in range(start_idx + 1, end_idx + 1):
                     day_cells[idx] = ""
@@ -2371,8 +2467,13 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
                             display_html = f"<b>{val}</b>"
                     elif val in ('R', 'Sick', 'CL', 'LAP', 'SCL', 'PH', 'P/N'):
                         display_html = f"<b>{val}</b>"
+                    elif val not in ('P', '', None):
+                        if day_obj.remarks:
+                            display_html = f"<b>{val}</b><br/><font size=4>{day_obj.remarks}</font>"
+                        else:
+                            display_html = f"<b>{val}</b>"
                         
-                    day_cells[idx] = Paragraph(display_html, cell_bold_style if val in ('CR', 'P/N', 'R', 'Sick', 'CL', 'LAP', 'SCL', 'PH') else cell_style)
+                    day_cells[idx] = Paragraph(display_html, cell_bold_style if val not in ('P', '', None) else cell_style)
                     
         for val in day_cells:
             data_line.append(val)
@@ -2439,6 +2540,760 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         pdf_buffer,
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+
+# --- Traveling Allowance Pydantic Schemas & Endpoints ---
+class TAEntrySchema(BaseModel):
+    id: Optional[int] = None
+    entry_date: str
+    train_no: Optional[str] = ""
+    time_left: Optional[str] = ""
+    time_arrived: Optional[str] = ""
+    station_from: Optional[str] = ""
+    station_to: Optional[str] = ""
+    is_stay: Optional[int] = 0
+    stay_details: Optional[str] = ""
+    days_nights: Optional[str] = ""
+    object_journey: Optional[str] = ""
+    rate: int
+    amount: int
+
+class TABillSchema(BaseModel):
+    id: Optional[int] = None
+    emp_id: int
+    month_year: str
+    journey_type: str
+    book_no: Optional[str] = ""
+    page_no: Optional[str] = ""
+    serial_no_from: Optional[str] = ""
+    serial_no_to: Optional[str] = ""
+    bill_unit: Optional[str] = ""
+    basic_pay: Optional[int] = 0
+    entries: List[TAEntrySchema]
+
+@app.get("/api/ta-bills")
+def get_ta_bills(section_code: Optional[str] = None):
+    conn = get_db()
+    query = """
+        SELECT b.*, e.name as emp_name, e.pf_number, e.designation, e.level
+        FROM ta_bills b
+        JOIN employees e ON b.emp_id = e.emp_id
+        LEFT JOIN sections s ON e.primary_section_id = s.id
+    """
+    params = []
+    if section_code and section_code != 'ALL':
+        query += " WHERE s.section_code = ?"
+        params.append(section_code)
+    
+    query += " ORDER BY b.month_year DESC, b.id DESC"
+    rows = conn.execute(query, params).fetchall()
+    
+    bills = []
+    for row in rows:
+        b = dict(row)
+        total_amount = conn.execute("SELECT SUM(amount) FROM ta_entries WHERE bill_id = ?", (b['id'],)).fetchone()[0] or 0
+        b['total_amount'] = total_amount
+        bills.append(b)
+        
+    conn.close()
+    return bills
+
+@app.get("/api/ta-bills/{id}")
+def get_ta_bill(id: int):
+    conn = get_db()
+    row = conn.execute("""
+        SELECT b.*, e.name as emp_name, e.pf_number, e.designation, e.level
+        FROM ta_bills b
+        JOIN employees e ON b.emp_id = e.emp_id
+        WHERE b.id = ?
+    """, (id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="TA Bill not found")
+    
+    bill = dict(row)
+    entries = [dict(r) for r in conn.execute("SELECT * FROM ta_entries WHERE bill_id = ? ORDER BY id ASC", (id,)).fetchall()]
+    bill['entries'] = entries
+    conn.close()
+    return bill
+
+@app.post("/api/ta-bills")
+def create_ta_bill(payload: TABillSchema):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO ta_bills (emp_id, month_year, journey_type, book_no, page_no, serial_no_from, serial_no_to, bill_unit, basic_pay, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (payload.emp_id, payload.month_year, payload.journey_type, payload.book_no, payload.page_no, payload.serial_no_from, payload.serial_no_to, payload.bill_unit or "", payload.basic_pay or 0, now_str))
+        bill_id = cursor.lastrowid
+        
+        for entry in payload.entries:
+            cursor.execute("""
+                INSERT INTO ta_entries (bill_id, entry_date, train_no, time_left, time_arrived, station_from, station_to, is_stay, stay_details, days_nights, object_journey, rate, amount)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (bill_id, entry.entry_date, entry.train_no, entry.time_left, entry.time_arrived, entry.station_from, entry.station_to, entry.is_stay, entry.stay_details, entry.days_nights, entry.object_journey, entry.rate, entry.amount))
+            
+        conn.commit()
+        log_audit("Insert", "TA Bills", f"Created TA Bill ID {bill_id} for Employee ID {payload.emp_id}")
+        return {"id": bill_id, "status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+ 
+@app.put("/api/ta-bills/{id}")
+def update_ta_bill(id: int, payload: TABillSchema):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE ta_bills 
+            SET emp_id = ?, month_year = ?, journey_type = ?, book_no = ?, page_no = ?, serial_no_from = ?, serial_no_to = ?, bill_unit = ?, basic_pay = ?
+            WHERE id = ?
+        """, (payload.emp_id, payload.month_year, payload.journey_type, payload.book_no, payload.page_no, payload.serial_no_from, payload.serial_no_to, payload.bill_unit or "", payload.basic_pay or 0, id))
+        
+        cursor.execute("DELETE FROM ta_entries WHERE bill_id = ?", (id,))
+        for entry in payload.entries:
+            cursor.execute("""
+                INSERT INTO ta_entries (bill_id, entry_date, train_no, time_left, time_arrived, station_from, station_to, is_stay, stay_details, days_nights, object_journey, rate, amount)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (id, entry.entry_date, entry.train_no, entry.time_left, entry.time_arrived, entry.station_from, entry.station_to, entry.is_stay, entry.stay_details, entry.days_nights, entry.object_journey, entry.rate, entry.amount))
+            
+        conn.commit()
+        log_audit("Update", "TA Bills", f"Updated TA Bill ID {id} for Employee ID {payload.emp_id}")
+        return {"id": id, "status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/ta-bills/{id}")
+def delete_ta_bill(id: int):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ta_bills WHERE id = ?", (id,))
+        conn.commit()
+        log_audit("Delete", "TA Bills", f"Deleted TA Bill ID {id}")
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+def num_to_words(n):
+    if n == 0:
+        return "Zero"
+    
+    units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", 
+             "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+    tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+    
+    def helper(num):
+        if num < 20:
+            return units[num]
+        elif num < 100:
+            return tens[num // 10] + (" " + units[num % 10] if num % 10 != 0 else "")
+        elif num < 1000:
+            return units[num // 100] + " Hundred" + (" and " + helper(num % 100) if num % 100 != 0 else "")
+        elif num < 100000:
+            return helper(num // 1000) + " Thousand" + (" " + helper(num % 1000) if num % 1000 != 0 else "")
+        else:
+            return helper(num // 100000) + " Lakh" + (" " + helper(num % 100000) if num % 100000 != 0 else "")
+            
+    res = helper(n)
+    return res
+
+def delete_rows_clean(ws, start_row, amount):
+    import openpyxl
+    new_ranges = []
+    for r in list(ws.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = r.bounds
+        if min_row >= start_row and max_row < start_row + amount:
+            continue
+        if min_row >= start_row + amount:
+            r.shift(row_shift=-amount)
+            new_ranges.append(r)
+        elif max_row < start_row:
+            new_ranges.append(r)
+        else:
+            new_max_row = max_row
+            if max_row >= start_row:
+                if max_row < start_row + amount:
+                    new_max_row = start_row - 1
+                else:
+                    new_max_row = max_row - amount
+            if new_max_row >= min_row:
+                r.max_row = new_max_row
+                new_ranges.append(r)
+    ws.merged_cells.ranges.clear()
+    for r in new_ranges:
+        ws.merged_cells.ranges.add(r)
+    ws.delete_rows(start_row, amount)
+
+def insert_rows_clean(ws, start_row, amount):
+    import openpyxl
+    new_ranges = []
+    for r in list(ws.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = r.bounds
+        if min_row >= start_row:
+            r.shift(row_shift=amount)
+            new_ranges.append(r)
+        elif max_row < start_row:
+            new_ranges.append(r)
+        else:
+            r.max_row = max_row + amount
+            new_ranges.append(r)
+    ws.merged_cells.ranges.clear()
+    for r in new_ranges:
+        ws.merged_cells.ranges.add(r)
+    ws.insert_rows(start_row, amount)
+
+def copy_row_style(ws, src_row, dst_row):
+    import openpyxl
+    for col in range(1, ws.max_column + 1):
+        src_cell = ws.cell(row=src_row, column=col)
+        dst_cell = ws.cell(row=dst_row, column=col)
+        if src_cell.has_style:
+            dst_cell.font = openpyxl.styles.Font(
+                name=src_cell.font.name,
+                size=src_cell.font.size,
+                bold=src_cell.font.bold,
+                italic=src_cell.font.italic,
+                charset=src_cell.font.charset,
+                color=src_cell.font.color,
+                underline=src_cell.font.underline,
+                strike=src_cell.font.strike,
+                vertAlign=src_cell.font.vertAlign,
+                scheme=src_cell.font.scheme
+            )
+            dst_cell.border = openpyxl.styles.Border(
+                left=src_cell.border.left,
+                right=src_cell.border.right,
+                top=src_cell.border.top,
+                bottom=src_cell.border.bottom
+            )
+            dst_cell.fill = openpyxl.styles.PatternFill(
+                fill_type=src_cell.fill.fill_type,
+                start_color=src_cell.fill.start_color,
+                end_color=src_cell.fill.end_color
+            )
+            dst_cell.alignment = openpyxl.styles.Alignment(
+                horizontal=src_cell.alignment.horizontal,
+                vertical=src_cell.alignment.vertical,
+                text_rotation=src_cell.alignment.text_rotation,
+                wrap_text=src_cell.alignment.wrap_text,
+                shrink_to_fit=src_cell.alignment.shrink_to_fit,
+                indent=src_cell.alignment.indent
+            )
+            dst_cell.number_format = src_cell.number_format
+
+@app.get("/api/ta-bills/{id}/export-excel")
+def export_ta_bill_excel(id: int):
+    import openpyxl
+    import re
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    
+    def apply_premium_styling(ws, journey_type, required_rows):
+        # Fonts
+        title_font = Font(name="Segoe UI", size=14, bold=True, color="1B365D")
+        meta_font = Font(name="Segoe UI", size=9.5, bold=False, color="333333")
+        header_font = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
+        data_font = Font(name="Segoe UI", size=9.5, color="222222")
+        data_bold_font = Font(name="Segoe UI", size=9.5, bold=True, color="222222")
+        total_font = Font(name="Segoe UI", size=10.5, bold=True, color="1B365D")
+        
+        # Fills
+        header_fill = PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid")
+        alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+        white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+        total_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+        
+        # Borders
+        thin_border_side = Side(border_style="thin", color="CBD5E1")
+        thick_border_side = Side(border_style="medium", color="1B365D")
+        double_border_side = Side(border_style="double", color="1B365D")
+        
+        data_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+        header_border = Border(left=thin_border_side, right=thin_border_side, top=thick_border_side, bottom=thick_border_side)
+        total_border = Border(top=thin_border_side, bottom=double_border_side, left=thin_border_side, right=thin_border_side)
+
+        # Column count
+        max_col = 10 if journey_type == "NORMAL" else 11
+        
+        # Row Heights
+        ws.row_dimensions[1].height = 24
+        ws.row_dimensions[2].height = 24
+        ws.row_dimensions[4].height = 24
+        ws.row_dimensions[5].height = 24
+        ws.row_dimensions[7].height = 28
+        ws.row_dimensions[8].height = 20
+
+        # 2. Format Headers (Rows 7 and 8)
+        for r in [7, 8]:
+            for c in range(1, max_col + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = header_border
+
+        # 3. Format Data Rows (Row 9 to 8+required_rows)
+        data_start = 9
+        data_end = 8 + required_rows
+        
+        for r in range(data_start, data_end + 1):
+            ws.row_dimensions[r].height = 22
+            if journey_type == "NORMAL":
+                pair_idx = (r - data_start) // 2
+                fill_to_use = alt_fill if pair_idx % 2 == 1 else white_fill
+            else:
+                fill_to_use = alt_fill if (r % 2 == 1) else white_fill
+                
+            for c in range(1, max_col + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.font = data_font
+                cell.fill = fill_to_use
+                cell.border = data_border
+                
+                # Alignments & formatting based on columns
+                if c == 1:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif c == 2:
+                    val_str = str(cell.value or "")
+                    if "STAYED AT" in val_str:
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        cell.font = data_bold_font
+                    else:
+                        cell.alignment = Alignment(horizontal="left", vertical="center")
+                elif c in [3, 4, 5, 6]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif c == 7:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif c == 8:
+                    if journey_type == "NORMAL":
+                        cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                    else:
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif c == 9:
+                    if journey_type == "NORMAL":
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                        cell.number_format = '#,##0'
+                    else:
+                        cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                elif c == 10:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    cell.number_format = '#,##0'
+                elif c == 11:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    cell.number_format = '#,##0'
+
+        # 4. Format Total Row
+        total_row = 9 + required_rows
+        ws.row_dimensions[total_row].height = 26
+        
+        for c in range(1, max_col + 1):
+            cell = ws.cell(row=total_row, column=c)
+            cell.fill = total_fill
+            cell.border = total_border
+            if cell.value:
+                cell.font = total_font
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                
+        # 5. Format Bottom Certification and Signature block
+        cert_start = total_row + 1
+        for r in range(cert_start, ws.max_row + 1):
+            # Check if row has text to shrink empty spacing rows
+            row_has_text = any(ws.cell(row=r, column=c).value is not None for c in range(1, max_col + 1))
+            if row_has_text:
+                ws.row_dimensions[r].height = 18
+            else:
+                ws.row_dimensions[r].height = 10
+            for c in range(1, max_col + 1):
+                cell = ws.cell(row=r, column=c)
+                if cell.value and isinstance(cell.value, str):
+                    if "I hereby certify that" in cell.value:
+                        cell.font = Font(name="Segoe UI", size=9, italic=True, color="475569")
+                        cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+                    elif any(k in cell.value for k in ["Countersigned", "Signature of Officer", "Controlling Officer", "Head of Office"]):
+                        cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
+                    elif "Note:" in cell.value:
+                        cell.font = Font(name="Segoe UI", size=8, italic=True, color="64748B")
+                        cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+        
+        # Ensure grid lines are shown
+        ws.views.sheetView[0].showGridLines = True
+
+    conn = get_db()
+    bill_row = conn.execute("""
+        SELECT b.*, e.name as emp_name, e.pf_number, e.designation, e.level, e.joining_date, s.section_code
+        FROM ta_bills b
+        JOIN employees e ON b.emp_id = e.emp_id
+        LEFT JOIN sections s ON e.primary_section_id = s.id
+        WHERE b.id = ?
+    """, (id,)).fetchone()
+    
+    if not bill_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="TA Bill not found")
+        
+    bill = dict(bill_row)
+    entries_rows = conn.execute("SELECT * FROM ta_entries WHERE bill_id = ? ORDER BY id ASC", (id,)).fetchall()
+    entries = [dict(r) for r in entries_rows]
+    conn.close()
+    
+    if not os.path.exists(TA_TEMPLATE_PATH):
+        raise HTTPException(status_code=500, detail="TA template Excel file not found on server.")
+        
+    try:
+        wb = openpyxl.load_workbook(TA_TEMPLATE_PATH)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load TA template: {e}")
+        
+    journey_type = bill.get("journey_type", "NORMAL")
+    sheet_to_keep = "format" if journey_type == "NORMAL" else "SUBRATA"
+    
+    if sheet_to_keep not in wb.sheetnames:
+        raise HTTPException(status_code=500, detail=f"Template sheet '{sheet_to_keep}' not found in workbook.")
+        
+    ws = wb[sheet_to_keep]
+    
+    emp_name = bill.get("emp_name", "") or ""
+    pf_number = bill.get("pf_number", "") or ""
+    designation = bill.get("designation", "") or ""
+    level = bill.get("level", 1) or 1
+    basic_pay = bill.get("basic_pay", 0) or 0
+    joining_date = bill.get("joining_date", "") or ""
+    month_year = bill.get("month_year", "") or ""
+    book_no = bill.get("book_no", "") or ""
+    page_no = bill.get("page_no", "") or ""
+    serial_no_from = bill.get("serial_no_from", "") or ""
+    serial_no_to = bill.get("serial_no_to", "") or ""
+    bill_unit = bill.get("bill_unit", "") or ""
+    section_code = bill.get("section_code", "") or "KKVS"
+
+    # Helpers to dynamically unmerge and format premium header blocks
+    def write_meta_box(ws, start_row, start_col, end_row, end_col, label, value, bold_val=False, alignment="center"):
+        for r_range in list(ws.merged_cells.ranges):
+            min_col, min_row, max_col, max_row = r_range.bounds
+            if (start_row <= max_row and end_row >= min_row) and (start_col <= max_col and end_col >= min_col):
+                try:
+                    ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+                except Exception:
+                    pass
+        thin_border = Border(
+            left=Side(border_style="thin", color="CBD5E1"),
+            right=Side(border_style="thin", color="CBD5E1"),
+            top=Side(border_style="thin", color="CBD5E1"),
+            bottom=Side(border_style="thin", color="CBD5E1")
+        )
+        bg_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+        font_color = "1B365D" if bold_val else "333333"
+        cell_font = Font(name="Segoe UI", size=9.5, bold=bold_val, color=font_color)
+        for r in range(start_row, end_row + 1):
+            for c in range(start_col, end_col + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.value = None
+                cell.fill = bg_fill
+                cell.border = thin_border
+                cell.font = cell_font
+                cell.alignment = Alignment(horizontal=alignment, vertical="center", wrap_text=True)
+        top_left_cell = ws.cell(row=start_row, column=start_col)
+        top_left_cell.value = f"{label}: {value}" if label else value
+        if start_row != end_row or start_col != end_col:
+            ws.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+
+    def write_title_box(ws, start_row, start_col, end_row, end_col, title):
+        for r_range in list(ws.merged_cells.ranges):
+            min_col, min_row, max_col, max_row = r_range.bounds
+            if (start_row <= max_row and end_row >= min_row) and (start_col <= max_col and end_col >= min_col):
+                try:
+                    ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+                except Exception:
+                    pass
+        title_font = Font(name="Segoe UI", size=11, bold=True, color="1B365D")
+        for r in range(start_row, end_row + 1):
+            for c in range(start_col, end_col + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.value = None
+                cell.font = title_font
+                cell.fill = PatternFill(fill_type=None)
+                cell.border = Border()
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.cell(row=start_row, column=start_col).value = title
+        if start_row != end_row or start_col != end_col:
+            ws.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+
+    try:
+        dt = datetime.strptime(month_year, "%Y-%m")
+        month_year_display = dt.strftime("%B  %Y").upper()
+    except Exception:
+        month_year_display = month_year.upper()
+
+    joining_date_display = joining_date or ""
+    if joining_date:
+        try:
+            dt_ap = datetime.strptime(joining_date, "%Y-%m-%d")
+            joining_date_display = dt_ap.strftime("%d.%m.%Y")
+        except Exception:
+            pass
+
+    # Build the header grid fields cleanly
+    if journey_type == "NORMAL":
+        # Row 1
+        write_meta_box(ws, 1, 1, 1, 3, "Book No", book_no, bold_val=True, alignment="left")
+        write_meta_box(ws, 1, 4, 1, 7, "Section/Station", section_code, bold_val=True, alignment="center")
+        write_meta_box(ws, 1, 8, 1, 10, "P.F. No", pf_number, bold_val=True, alignment="right")
+        # Row 2
+        write_meta_box(ws, 2, 1, 2, 2, "Page No", page_no, alignment="left")
+        write_meta_box(ws, 2, 3, 2, 5, "Serial No", f"{serial_no_from} to {serial_no_to}", alignment="center")
+        write_meta_box(ws, 2, 6, 2, 7, "B.U. No", bill_unit, alignment="center")
+        write_title_box(ws, 2, 8, 2, 10, "TRAVELLING ALLOWANCE JOURNAL")
+        # Row 4
+        write_meta_box(ws, 4, 1, 4, 2, "Department", "S&T", alignment="left")
+        write_meta_box(ws, 4, 3, 4, 4, "Division HQs", section_code, alignment="center")
+        write_meta_box(ws, 4, 5, 4, 8, "Journal Performed by", f"Sri {emp_name}", bold_val=True, alignment="left")
+        write_meta_box(ws, 4, 9, 4, 10, "Allowance for", month_year_display, alignment="right")
+        # Row 5
+        write_meta_box(ws, 5, 1, 5, 2, "Designation", designation, alignment="left")
+        write_meta_box(ws, 5, 3, 5, 4, "Pay", f"Rs. {basic_pay}", alignment="center")
+        write_meta_box(ws, 5, 5, 5, 6, "Level", level, alignment="center")
+        write_meta_box(ws, 5, 7, 5, 8, "DOA", joining_date_display, alignment="center")
+        write_meta_box(ws, 5, 9, 5, 10, "Rule", "SRTA", alignment="right")
+    else:
+        # Row 1
+        write_meta_box(ws, 1, 1, 1, 3, "Book No", book_no, bold_val=True, alignment="left")
+        write_meta_box(ws, 1, 4, 1, 7, "Section/Station", section_code, bold_val=True, alignment="center")
+        write_meta_box(ws, 1, 8, 1, 11, "P.F. No", pf_number, bold_val=True, alignment="right")
+        # Row 2
+        write_meta_box(ws, 2, 1, 2, 2, "Page No", page_no, alignment="left")
+        write_meta_box(ws, 2, 3, 2, 5, "Serial No", f"{serial_no_from} to {serial_no_to}", alignment="center")
+        write_meta_box(ws, 2, 6, 2, 7, "B.U. No", bill_unit, alignment="center")
+        write_title_box(ws, 2, 8, 2, 11, "TRAVELLING ALLOWANCE JOURNAL")
+        # Row 4
+        write_meta_box(ws, 4, 1, 4, 2, "Department", "S&T", alignment="left")
+        write_meta_box(ws, 4, 3, 4, 4, "Division HQs", section_code, alignment="center")
+        write_meta_box(ws, 4, 5, 4, 9, "Journal Performed by", f"Sri {emp_name}", bold_val=True, alignment="left")
+        write_meta_box(ws, 4, 10, 4, 11, "Allowance for", month_year_display, alignment="right")
+        # Row 5
+        write_meta_box(ws, 5, 1, 5, 2, "Designation", designation, alignment="left")
+        write_meta_box(ws, 5, 3, 5, 4, "Pay", f"Rs. {basic_pay}", alignment="center")
+        write_meta_box(ws, 5, 5, 5, 6, "Level", level, alignment="center")
+        write_meta_box(ws, 5, 7, 5, 9, "DOA", joining_date_display, alignment="center")
+        write_meta_box(ws, 5, 10, 5, 11, "Rule", "SRTA", alignment="right")
+
+    # Write data
+    total_amount = 0
+    if journey_type == "NORMAL":
+        num_pairs = (len(entries) + 1) // 2
+        required_rows = num_pairs * 2
+        
+        if required_rows > 18:
+            insert_rows_clean(ws, 27, required_rows - 18)
+            for r in range(27, 27 + required_rows - 18):
+                if r % 2 == 1:
+                    copy_row_style(ws, 9, r)
+                else:
+                    copy_row_style(ws, 10, r)
+        elif required_rows < 18:
+            delete_rows_clean(ws, 9 + required_rows, 18 - required_rows)
+            
+        entry_start = 9
+        entry_end = 8 + required_rows
+        for r in list(ws.merged_cells.ranges):
+            min_col, min_row, max_col, max_row = r.bounds
+            if min_row >= entry_start and max_row <= entry_end:
+                ws.merged_cells.ranges.remove(r)
+                
+        for i in range(num_pairs):
+            r1_idx = 9 + 2 * i
+            r2_idx = 10 + 2 * i
+            
+            leg_out = entries[2 * i]
+            leg_in = entries[2 * i + 1] if (2 * i + 1) < len(entries) else None
+            
+            date_val = leg_out.get("entry_date", "")
+            try:
+                dt_d = datetime.strptime(date_val, "%Y-%m-%d")
+                date_display = dt_d.strftime("%d.%m.%y")
+            except Exception:
+                date_display = date_val
+                
+            ws.cell(row=r1_idx, column=1).value = date_display
+            ws.cell(row=r1_idx, column=2).value = leg_out.get("train_no", "")
+            
+            t_left = leg_out.get("time_left", "")
+            if t_left and not any(h in t_left.lower() for h in ("hrs", "hr")):
+                t_left = f"{t_left} hrs"
+            ws.cell(row=r1_idx, column=3).value = t_left
+            
+            t_arr = leg_out.get("time_arrived", "")
+            if t_arr and not any(h in t_arr.lower() for h in ("hrs", "hr")):
+                t_arr = f"{t_arr} hrs"
+            ws.cell(row=r1_idx, column=4).value = t_arr
+            
+            ws.cell(row=r1_idx, column=5).value = leg_out.get("station_from", "")
+            ws.cell(row=r1_idx, column=6).value = leg_out.get("station_to", "")
+            
+            days_nights_val = leg_out.get("days_nights", "")
+            try:
+                days_nights_display = float(days_nights_val) if days_nights_val else None
+            except Exception:
+                days_nights_display = days_nights_val
+            ws.cell(row=r1_idx, column=7).value = days_nights_display
+            
+            ws.cell(row=r1_idx, column=8).value = leg_out.get("object_journey", "")
+            ws.cell(row=r1_idx, column=9).value = leg_out.get("rate", 0)
+            ws.cell(row=r1_idx, column=10).value = leg_out.get("amount", 0)
+            total_amount += leg_out.get("amount", 0)
+            
+            if leg_in:
+                ws.cell(row=r2_idx, column=2).value = leg_in.get("train_no", "")
+                
+                t_left_in = leg_in.get("time_left", "")
+                if t_left_in and not any(h in t_left_in.lower() for h in ("hrs", "hr")):
+                    t_left_in = f"{t_left_in} hrs"
+                ws.cell(row=r2_idx, column=3).value = t_left_in
+                
+                t_arr_in = leg_in.get("time_arrived", "")
+                if t_arr_in and not any(h in t_arr_in.lower() for h in ("hrs", "hr")):
+                    t_arr_in = f"{t_arr_in} hrs"
+                ws.cell(row=r2_idx, column=4).value = t_arr_in
+                
+                ws.cell(row=r2_idx, column=5).value = leg_in.get("station_from", "")
+                ws.cell(row=r2_idx, column=6).value = leg_in.get("station_to", "")
+            else:
+                for c in range(2, 7):
+                    ws.cell(row=r2_idx, column=c).value = ""
+                    
+            ws.merge_cells(start_row=r1_idx, start_column=1, end_row=r2_idx, end_column=1)
+            ws.merge_cells(start_row=r1_idx, start_column=7, end_row=r2_idx, end_column=7)
+            ws.merge_cells(start_row=r1_idx, start_column=8, end_row=r2_idx, end_column=8)
+            ws.merge_cells(start_row=r1_idx, start_column=9, end_row=r2_idx, end_column=9)
+            ws.merge_cells(start_row=r1_idx, start_column=10, end_row=r2_idx, end_column=10)
+            
+        total_row_idx = 9 + required_rows
+        ws.cell(row=total_row_idx, column=8).value = f"Total :Rupees {num_to_words(total_amount)} only                     Rs.              {total_amount}"
+        ws.merge_cells(start_row=total_row_idx, start_column=8, end_row=total_row_idx, end_column=10)
+
+    else:
+        N = len(entries)
+        required_rows = N * 2
+        
+        if required_rows > 10:
+            insert_rows_clean(ws, 19, required_rows - 10)
+            for r in range(19, 19 + required_rows - 10):
+                if r % 2 == 1:
+                    copy_row_style(ws, 9, r)
+                else:
+                    copy_row_style(ws, 10, r)
+        elif required_rows < 10:
+            delete_rows_clean(ws, 9 + required_rows, 10 - required_rows)
+            
+        entry_start = 9
+        entry_end = 8 + required_rows
+        for r in list(ws.merged_cells.ranges):
+            min_col, min_row, max_col, max_row = r.bounds
+            if min_row >= entry_start and max_row <= entry_end:
+                ws.merged_cells.ranges.remove(r)
+                
+        for i in range(N):
+            r1_idx = 9 + 2 * i
+            r2_idx = 10 + 2 * i
+            entry = entries[i]
+            is_stay = entry.get("is_stay", 0)
+            
+            date_val = entry.get("entry_date", "")
+            try:
+                dt_d = datetime.strptime(date_val, "%Y-%m-%d")
+                date_display = dt_d.strftime("%d.%m.%y")
+            except Exception:
+                date_display = date_val
+                
+            ws.cell(row=r1_idx, column=1).value = date_display
+            ws.merge_cells(start_row=r1_idx, start_column=1, end_row=r2_idx, end_column=1)
+            
+            days_nights_val = entry.get("days_nights", "")
+            ws.cell(row=r1_idx, column=8).value = days_nights_val
+            ws.merge_cells(start_row=r1_idx, start_column=8, end_row=r2_idx, end_column=8)
+            
+            ws.cell(row=r1_idx, column=9).value = entry.get("object_journey", "")
+            ws.merge_cells(start_row=r1_idx, start_column=9, end_row=r2_idx, end_column=9)
+            
+            ws.cell(row=r1_idx, column=10).value = entry.get("rate", 0)
+            ws.merge_cells(start_row=r1_idx, start_column=10, end_row=r2_idx, end_column=10)
+            
+            ws.cell(row=r1_idx, column=11).value = entry.get("amount", 0)
+            ws.merge_cells(start_row=r1_idx, start_column=11, end_row=r2_idx, end_column=11)
+            total_amount += entry.get("amount", 0)
+            
+            ws.cell(row=r1_idx, column=7).value = None
+            ws.merge_cells(start_row=r1_idx, start_column=7, end_row=r2_idx, end_column=7)
+            
+            if is_stay:
+                stay_text = entry.get("stay_details") or entry.get("train_no") or ""
+                ws.cell(row=r1_idx, column=2).value = stay_text
+                ws.merge_cells(start_row=r1_idx, start_column=2, end_row=r2_idx, end_column=6)
+            else:
+                ws.cell(row=r1_idx, column=2).value = entry.get("train_no", "")
+                
+                t_left = entry.get("time_left", "")
+                if t_left and not any(h in t_left.lower() for h in ("hrs", "hr")):
+                    t_left = f"{t_left} hrs"
+                ws.cell(row=r1_idx, column=3).value = t_left
+                
+                t_arr = entry.get("time_arrived", "")
+                if t_arr and not any(h in t_arr.lower() for h in ("hrs", "hr")):
+                    t_arr = f"{t_arr} hrs"
+                ws.cell(row=r1_idx, column=4).value = t_arr
+                
+                ws.cell(row=r1_idx, column=5).value = entry.get("station_from", "")
+                ws.cell(row=r1_idx, column=6).value = entry.get("station_to", "")
+                
+                ws.merge_cells(start_row=r1_idx, start_column=2, end_row=r2_idx, end_column=2)
+                ws.merge_cells(start_row=r1_idx, start_column=3, end_row=r2_idx, end_column=3)
+                ws.merge_cells(start_row=r1_idx, start_column=4, end_row=r2_idx, end_column=4)
+                ws.merge_cells(start_row=r1_idx, start_column=5, end_row=r2_idx, end_column=5)
+                ws.merge_cells(start_row=r1_idx, start_column=6, end_row=r2_idx, end_column=6)
+                
+        total_row_idx = 9 + required_rows
+        ws.cell(row=total_row_idx, column=9).value = f"Total :Rupees {num_to_words(total_amount)} only                     Rs.              {total_amount}"
+        ws.merge_cells(start_row=total_row_idx, start_column=9, end_row=total_row_idx, end_column=11)
+
+    for r in range(1, ws.max_row + 1):
+        for c in range(1, ws.max_column + 1):
+            cell_val = ws.cell(row=r, column=c).value
+            if cell_val and isinstance(cell_val, str) and "I hereby certify that above mentioned" in cell_val:
+                new_text = re.sub(
+                    r"(above mentioned\s+)(.*?)(absent on duty)", 
+                    r"\g<1>  Sri " + emp_name + r"  \g<3>", 
+                    cell_val
+                )
+                ws.cell(row=r, column=c).value = new_text
+
+    # Apply dynamic premium layout styling
+    apply_premium_styling(ws, journey_type, required_rows)
+
+    sheet_name_clean = emp_name[:30].strip()
+    ws.title = sheet_name_clean
+    for s in list(wb.sheetnames):
+        if s != sheet_name_clean:
+            wb.remove(wb[s])
+            
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+    
+    filename = f"TA_Bill_{emp_name.replace(' ', '_')}_{month_year}.xlsx"
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 # Resolve frontend/out directory

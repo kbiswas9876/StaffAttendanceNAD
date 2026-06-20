@@ -37,6 +37,7 @@ export interface Employee {
       }
     | { [day: string]: string };
   display_order?: number;
+  basic_pay?: number;
 }
 
 export interface AttendanceCode {
@@ -484,5 +485,71 @@ export const triggerUpdateDownload = async (): Promise<{ status: string; filenam
 
 export const getUpdateDownloadStatus = async (): Promise<UpdaterStatus> => {
   return apiFetch<UpdaterStatus>("/updater/status");
+};
+
+// 13. Traveling Allowance (TA) Calculations & Export APIs
+export interface TAEntry {
+  id?: number;
+  entry_date: string;
+  train_no?: string;
+  time_left?: string;
+  time_arrived?: string;
+  station_from?: string;
+  station_to?: string;
+  is_stay?: number;
+  stay_details?: string;
+  days_nights?: string;
+  object_journey?: string;
+  rate: number;
+  amount: number;
+}
+
+export interface TABill {
+  id?: number;
+  emp_id: number;
+  emp_name?: string;
+  pf_number?: string;
+  designation?: string;
+  level?: number;
+  month_year: string;
+  journey_type: 'NORMAL' | 'TRAINING';
+  book_no?: string;
+  page_no?: string;
+  serial_no_from?: string;
+  serial_no_to?: string;
+  bill_unit?: string;
+  basic_pay?: number;
+  total_amount?: number;
+  created_at?: string;
+  entries: TAEntry[];
+}
+
+export const getTABills = async (sectionCode?: string): Promise<TABill[]> => {
+  const path = sectionCode ? `/ta-bills?section_code=${sectionCode}` : "/ta-bills";
+  return apiFetch<TABill[]>(path);
+};
+
+export const getTABillById = async (id: number): Promise<TABill> => {
+  return apiFetch<TABill>(`/ta-bills/${id}`);
+};
+
+export const saveTABill = async (bill: TABill): Promise<{ id: number; status: string }> => {
+  if (bill.id) {
+    return apiFetch<{ id: number; status: string }>(`/ta-bills/${bill.id}`, {
+      method: "PUT",
+      body: JSON.stringify(bill)
+    });
+  } else {
+    return apiFetch<{ id: number; status: string }>("/ta-bills", {
+      method: "POST",
+      body: JSON.stringify(bill)
+    });
+  }
+};
+
+export const deleteTABill = async (id: number): Promise<void> => {
+  await apiFetch<any>(`/ta-bills/${id}`, {
+    method: "DELETE"
+  });
 };
 

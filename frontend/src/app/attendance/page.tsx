@@ -218,6 +218,8 @@ export default function AttendanceGrid() {
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
   const [customModal, setCustomModal] = useState<{ isOpen: boolean; empId: number; dateStr: string } | null>(null);
   const [customCodeInput, setCustomCodeInput] = useState('');
+  const [customOrderInput, setCustomOrderInput] = useState('');
+  const [customRemarksInput, setCustomRemarksInput] = useState('');
   const [crModal, setCrModal] = useState<{ isOpen: boolean; empId: number; dateStr: string; availableEntries: CRLedgerEntry[] } | null>(null);
   const [manualCrDate, setManualCrDate] = useState<string>('');
   const [activeDropdownCell, setActiveDropdownCell] = useState<{ empId: number; dateStr: string } | null>(null);
@@ -566,10 +568,23 @@ export default function AttendanceGrid() {
   }, [selectedMonth, selectedYear]);
 
   // Handle cell edit in grid
-  const handleCellChange = async (empId: number, dateStr: string, value: string) => {
+  const handleCellChange = async (empId: number, dateStr: string, value: string, remarks?: string) => {
     if (value === 'CUSTOM_CODE') {
+      const existing = gridData[empId]?.[dateStr];
+      const existingStatus = existing?.status || '';
+      const isPredefined = ['P', 'R', 'CR', 'CL', 'LAP', 'Sick', 'SCL', 'PH', 'P/N'].includes(existingStatus);
       setCustomModal({ isOpen: true, empId, dateStr });
-      setCustomCodeInput('');
+      setCustomCodeInput(isPredefined ? '' : existingStatus);
+      
+      const rem = existing?.remarks || '';
+      if (rem.startsWith('Order: ')) {
+        const parts = rem.split(' | ');
+        setCustomOrderInput(parts[0].substring(7));
+        setCustomRemarksInput(parts[1] || '');
+      } else {
+        setCustomOrderInput('');
+        setCustomRemarksInput(rem);
+      }
       return;
     }
 
@@ -589,12 +604,23 @@ export default function AttendanceGrid() {
     setGridData((prev) => {
       const empGrid = { ...(prev[empId] || {}) };
       const oldLog = empGrid[dateStr];
+      
+      let finalRemarks = remarks;
+      if (remarks === undefined) {
+        if (['P', 'R', 'CL', 'LAP', 'Sick', 'SCL', 'PH', 'P/N'].includes(value)) {
+          finalRemarks = '';
+        } else {
+          finalRemarks = oldLog ? oldLog.remarks : '';
+        }
+      }
+      
       empGrid[dateStr] = {
         ...oldLog,
         emp_id: empId,
         date: dateStr,
         status: value as any,
-        is_night: value === 'P/N'
+        is_night: value === 'P/N',
+        remarks: finalRemarks
       };
       return {
         ...prev,
@@ -1240,6 +1266,12 @@ export default function AttendanceGrid() {
                                   {earnedDateShort}
                                 </span>
                               )}
+
+                              {status !== 'CR' && status !== 'P' && status !== '' && log?.remarks && (
+                                <span className="text-[7.2px] font-bold text-slate-500 block leading-none select-none pointer-events-none mt-[-2px] z-10 truncate max-w-[42px]" title={log.remarks}>
+                                  {log.remarks.replace('Order: ', '')}
+                                </span>
+                              )}
                             </div>
                           </td>
                         );
@@ -1586,9 +1618,28 @@ export default function AttendanceGrid() {
                   placeholder="e.g. TRG"
                   value={customCodeInput}
                   onChange={(e) => setCustomCodeInput(e.target.value)}
-                  maxLength={10}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 uppercase focus:outline-none focus:border-blue-500"
                   autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Reference/Order Number (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. MRTS/SG-510/27(711) or Medical Memo"
+                  value={customOrderInput}
+                  onChange={(e) => setCustomOrderInput(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Details / Location Remarks (Optional)</label>
+                <textarea
+                  placeholder="Additional remarks, training program details"
+                  value={customRemarksInput}
+                  onChange={(e) => setCustomRemarksInput(e.target.value)}
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
@@ -1607,7 +1658,16 @@ export default function AttendanceGrid() {
                       showToast("Please enter a valid code.", "error");
                       return;
                     }
-                    handleCellChange(customModal.empId, customModal.dateStr, code);
+                    const order = customOrderInput.trim();
+                    const remarks = customRemarksInput.trim();
+                    let finalRemarks = '';
+                    if (order) {
+                      finalRemarks = `Order: ${order}`;
+                      if (remarks) finalRemarks += ` | ${remarks}`;
+                    } else {
+                      finalRemarks = remarks;
+                    }
+                    handleCellChange(customModal.empId, customModal.dateStr, code, finalRemarks);
                     setCustomModal(null);
                   }}
                   className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase cursor-pointer"

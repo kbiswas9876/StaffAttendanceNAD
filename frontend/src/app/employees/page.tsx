@@ -31,7 +31,9 @@ import {
   TrendingUp,
   Sun,
   Moon,
-  Coffee
+  Coffee,
+  Sunrise,
+  Sunset
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
@@ -522,46 +524,48 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       }
       return getBaseRotatingShiftForDate(sched, dateStr);
     };
-
-    const renderDayPill = (dayName: string, shift: string) => {
+    const renderDayPill = (dayName: string, shift: string) => {
       const code = (shift || 'R').toUpperCase();
-      let bgClass = 'bg-slate-50/50 border-slate-200 text-slate-400';
-      let icon = <Coffee size={12} className="text-slate-400" />;
-      let shiftLabel = 'R (Rest)';
+      let bgClass = '';
+      let icon = null;
+      let shiftLabel = '';
+      let textClass = 'text-white font-extrabold';
+      let weekdayClass = 'text-white/90 font-black';
+      let iconColor = 'text-white';
 
       if (code === 'N' || code === 'P/N') {
-        bgClass = 'bg-purple-50/60 border-purple-200 text-purple-700 shadow-xs';
-        icon = <Moon size={12} className="text-purple-600 animate-pulse" />;
-        shiftLabel = 'N (Night)';
+        bgClass = 'bg-indigo-600 border-transparent shadow-sm';
+        icon = <Moon size={12} className={`${iconColor} animate-pulse fill-white/20`} />;
+        shiftLabel = 'Night';
       } else if (code === 'G' || code === 'P') {
-        bgClass = 'bg-emerald-50/60 border-emerald-250 text-emerald-805 shadow-xs';
-        icon = <Sun size={12} className="text-emerald-600" />;
-        shiftLabel = 'G (General)';
+        bgClass = 'bg-emerald-600 border-transparent shadow-sm';
+        icon = <Sun size={12} className={`${iconColor} fill-white/20`} />;
+        shiftLabel = 'General';
       } else if (code === 'M') {
-        bgClass = 'bg-blue-50/60 border-blue-200 text-blue-800 shadow-xs';
-        icon = <Sparkles size={12} className="text-blue-600" />;
-        shiftLabel = 'M (Morning)';
+        bgClass = 'bg-sky-600 border-transparent shadow-sm';
+        icon = <Sunrise size={12} className={iconColor} />;
+        shiftLabel = 'Morning';
       } else if (code === 'E') {
-        bgClass = 'bg-amber-50/60 border-amber-250 text-amber-700 shadow-xs';
-        icon = <Sparkles size={12} className="text-amber-600" />;
-        shiftLabel = 'E (Evening)';
+        bgClass = 'bg-orange-600 border-transparent shadow-sm';
+        icon = <Sunset size={12} className={iconColor} />;
+        shiftLabel = 'Evening';
       } else if (code === 'R') {
-        bgClass = 'bg-slate-50/60 border-slate-200 text-slate-550';
-        icon = <Coffee size={12} className="text-slate-400" />;
-        shiftLabel = 'R (Rest)';
+        bgClass = 'bg-slate-500 border-transparent shadow-sm';
+        icon = <Coffee size={12} className={iconColor} />;
+        shiftLabel = 'Rest';
       } else {
-        bgClass = 'bg-blue-50/60 border-blue-200 text-blue-800 shadow-xs';
-        icon = <Sparkles size={12} className="text-blue-600" />;
-        shiftLabel = `${code} (Duty)`;
+        bgClass = 'bg-blue-600 border-transparent shadow-sm';
+        icon = <Sunrise size={12} className={iconColor} />;
+        shiftLabel = code;
       }
 
       return (
-        <div key={dayName} className={`flex flex-col items-center justify-between py-1.5 px-1 rounded-xl border text-center transition hover:scale-[1.05] hover:shadow-xs select-none ${bgClass}`}>
-          <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 mb-1">{dayName.substring(0, 3)}</span>
-          <div className="w-6.5 h-6.5 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-1 shrink-0">
+        <div key={dayName} className={`flex flex-col items-center justify-between py-2 px-1 rounded-xl border border-transparent text-center transition hover:scale-[1.06] hover:shadow-md select-none ${bgClass}`}>
+          <span className={`text-[8.5px] uppercase tracking-wider mb-1.5 ${weekdayClass}`}>{dayName.substring(0, 3)}</span>
+          <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center mb-1.5 shrink-0">
             {icon}
           </div>
-          <span className="text-[8px] font-black tracking-tight leading-none truncate w-full" title={shiftLabel}>{shiftLabel}</span>
+          <span className={`text-[9px] tracking-tight leading-none truncate w-full ${textClass}`} title={shiftLabel}>{shiftLabel}</span>
         </div>
       );
     };
@@ -617,21 +621,21 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         badgeLabel = 'G (General)';
       } else if (code === 'M') {
         shiftText = 'Morning Shift';
-        icon = <Sparkles size={15} className="text-blue-605" />;
-        bgIconClass = 'bg-blue-50 border-blue-100 text-blue-600';
-        textColor = 'text-blue-700';
+        icon = <Sunrise size={15} className="text-sky-605" />;
+        bgIconClass = 'bg-sky-50 border-sky-100 text-sky-600';
+        textColor = 'text-sky-700';
         badgeLabel = 'M (Morning)';
       } else if (code === 'E') {
         shiftText = 'Evening Shift';
-        icon = <Sparkles size={15} className="text-amber-600" />;
-        bgIconClass = 'bg-amber-50 border-amber-100 text-amber-600';
-        textColor = 'text-amber-700';
+        icon = <Sunset size={15} className="text-orange-600" />;
+        bgIconClass = 'bg-orange-50 border-orange-100 text-orange-605';
+        textColor = 'text-orange-700';
         badgeLabel = 'E (Evening)';
       } else if (code !== 'R') {
         shiftText = `Duty Shift (${code})`;
-        icon = <Sparkles size={15} className="text-blue-605" />;
-        bgIconClass = 'bg-blue-50 border-blue-100 text-blue-605';
-        textColor = 'text-blue-700';
+        icon = <Sunrise size={15} className="text-sky-605" />;
+        bgIconClass = 'bg-sky-50 border-sky-100 text-sky-605';
+        textColor = 'text-sky-700';
         badgeLabel = `${code} (Duty)`;
       }
 

@@ -18,7 +18,8 @@ import {
   Search,
   BookOpen,
   Keyboard,
-  Bell
+  Bell,
+  Milestone
 } from 'lucide-react';
 import { getLines, getSections, getEmployees, createBackup, getAuditLogs, MetroLine, Section, Employee, AuditLog } from '../lib/api';
 
@@ -231,6 +232,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     { name: 'Smart Attendance', path: '/attendance', icon: CalendarDays },
     { name: 'Staff Directory', path: '/employees', icon: Users },
     { name: 'Night Duty NDA', path: '/night-duty', icon: Moon },
+    { name: 'Travelling Allowance', path: '/travelling-allowance', icon: Milestone },
     { name: 'Admin Panel', path: '/admin', icon: ShieldCheck },
     { name: 'Help Center', path: '/help', icon: BookOpen },
   ];
