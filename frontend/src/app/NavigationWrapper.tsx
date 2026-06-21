@@ -304,7 +304,6 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     { name: 'Night Duty NDA', path: '/night-duty', icon: Moon },
     { name: 'Travelling Allowance', path: '/travelling-allowance', icon: Milestone },
     { name: 'Admin Panel', path: '/admin', icon: ShieldCheck },
-    { name: 'Help Center', path: '/help', icon: BookOpen },
   ];
 
   // Filtering for command palette search
@@ -493,6 +492,15 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 Ctrl+K
               </kbd>
             </button>
+
+            {/* Help Button */}
+            <Link 
+              href="/help"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200/65 rounded-lg border border-slate-200 transition cursor-pointer"
+            >
+              <BookOpen size={13} className="text-slate-400" />
+              <span>{getTranslation(lang, 'Help')}</span>
+            </Link>
 
             {/* Language Flag Dropdown */}
             <div className="relative flex items-center border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors select-none">

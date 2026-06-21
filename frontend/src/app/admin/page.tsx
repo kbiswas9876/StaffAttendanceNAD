@@ -1337,7 +1337,7 @@ export default function AdminPanel() {
             }`}
           >
             <tab.icon size={18} className="mb-1 shrink-0" />
-            <span className="text-[10px] font-bold tracking-tight block">{tab.label}</span>
+            <span className="text-[10px] font-bold tracking-tight block">{getTranslation(lang, tab.label)}</span>
           </button>
         ))}
       </div>

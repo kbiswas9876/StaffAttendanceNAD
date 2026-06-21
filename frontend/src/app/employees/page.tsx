@@ -57,6 +57,7 @@ import {
   getCRLedger,
   CRLedgerEntry
 } from '../../lib/api';
+import { getTranslation } from '../../lib/translations';
 
 // --- EMPLOYEE PROFILE 360 COMPONENT ---
 interface ProfileProps {
@@ -90,6 +91,22 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const [crLedger, setCrLedger] = useState<CRLedgerEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedYear, setSelectedYear] = useState(2026);
+  const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLang = (localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi';
+      setLang(savedLang);
+    }
+    const handleLangChange = () => {
+      if (typeof window !== 'undefined') {
+        const savedLang = (localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi';
+        setLang(savedLang);
+      }
+    };
+    window.addEventListener('erp_lang_changed', handleLangChange);
+    return () => window.removeEventListener('erp_lang_changed', handleLangChange);
+  }, []);
 
   // Edit leave balances states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1459,6 +1476,22 @@ function StaffDirectory() {
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
+  const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLang = (localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi';
+      setLang(savedLang);
+    }
+    const handleLangChange = () => {
+      if (typeof window !== 'undefined') {
+        const savedLang = (localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi';
+        setLang(savedLang);
+      }
+    };
+    window.addEventListener('erp_lang_changed', handleLangChange);
+    return () => window.removeEventListener('erp_lang_changed', handleLangChange);
+  }, []);
 
   // Drag and drop sorting states
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -1643,13 +1676,13 @@ function StaffDirectory() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-            Staff Directory
+            {getTranslation(lang, 'Staff Directory')}
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-bold uppercase tracking-wider">
-              {activeSection === 'ALL' ? 'Joint View' : `${activeSection} Section`}
+              {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Maintain employee personal details, pay scale levels, and assign base stations / rest days.
+            {getTranslation(lang, 'Maintain employee personal details, pay scale levels, and assign base stations / rest days.')}
           </p>
         </div>
 
@@ -1658,7 +1691,7 @@ function StaffDirectory() {
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-md shadow-blue-500/10 cursor-pointer"
         >
           <UserPlus size={14} />
-          Enroll Employee
+          {getTranslation(lang, 'Enroll Employee')}
         </button>
       </div>
 
@@ -1668,13 +1701,13 @@ function StaffDirectory() {
             <thead>
               <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50">
                 <th className="py-3 px-3 w-10 text-center no-print"></th>
-                <th className="py-3 px-5">PF Number</th>
-                <th className="py-3 px-5">Name</th>
-                <th className="py-3 px-5">Designation</th>
-                <th className="py-3 px-5">Pay Level</th>
-                <th className="py-3 px-5">Rest Day</th>
-                <th className="py-3 px-5">Joining Date</th>
-                <th className="py-3 px-5 text-center no-print">Actions</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'PF Number')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Name')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Designation')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Pay Level')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Rest Day')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Joining Date')}</th>
+                <th className="py-3 px-5 text-center no-print">{getTranslation(lang, 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -1693,8 +1726,8 @@ function StaffDirectory() {
                 ))
               ) : employees.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
-                    No employees enrolled in this section.
+                  <td colSpan={8} className="py-8 text-center text-slate-400 font-bold">
+                    {getTranslation(lang, 'No employees enrolled in this section.')}
                   </td>
                 </tr>
               ) : (
@@ -1763,13 +1796,13 @@ function StaffDirectory() {
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                 <User size={16} className="text-blue-600" />
-                {editingEmp ? "Edit Employee Profile" : "Enroll New Employee"}
+                {editingEmp ? getTranslation(lang, 'Edit Employee') : getTranslation(lang, 'Add New Employee')}
               </h3>
               <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs font-bold text-slate-700">
               <div>
-                <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">P.F. Number</label>
+                <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'PF Number')}</label>
                 <input
                   type="text"
                   value={pfNumber}
@@ -1780,7 +1813,7 @@ function StaffDirectory() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Employee Name</label>
+                <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Full Name')}</label>
                 <input
                   type="text"
                   value={name}
@@ -1791,7 +1824,7 @@ function StaffDirectory() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Designation</label>
+                <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Designation')}</label>
                 <input
                   type="text"
                   value={designation}
@@ -1803,25 +1836,25 @@ function StaffDirectory() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Pay Level</label>
+                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Pay Level')}</label>
                   <select
                     value={level}
                     onChange={(e) => setLevel(Number(e.target.value))}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(l => (
-                      <option key={l} value={l}>Level {l}</option>
+                      <option key={l} value={l}>{getTranslation(lang, 'Level')} {l}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Section Code</label>
+                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Primary Section')}</label>
                   <select
                     value={sectionId || ""}
                     onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : null)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
                   >
-                    <option value="">-- No Section --</option>
+                    <option value="">-- {getTranslation(lang, 'No Section')} --</option>
                     {sections.map(s => (
                       <option key={s.id} value={s.id}>{s.section_code} - {s.section_name}</option>
                     ))}
@@ -1830,19 +1863,19 @@ function StaffDirectory() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Weekly Rest Day</label>
+                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Weekly Rest Day')}</label>
                   <select
                     value={restDay}
                     onChange={(e) => setRestDay(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
                   >
                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
-                      <option key={d} value={d}>{d}</option>
+                      <option key={d} value={d}>{getTranslation(lang, d)}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Joining Date</label>
+                  <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Joining Date')}</label>
                   <input
                     type="date"
                     value={joiningDate}
@@ -1852,8 +1885,8 @@ function StaffDirectory() {
                 </div>
               </div>
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase cursor-pointer">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase cursor-pointer">{editingEmp ? "Save Updates" : "Enroll Member"}</button>
+                <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase cursor-pointer">{getTranslation(lang, 'Cancel')}</button>
+                <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase cursor-pointer">{editingEmp ? getTranslation(lang, 'Update Employee') : getTranslation(lang, 'Save Employee')}</button>
               </div>
             </form>
           </div>

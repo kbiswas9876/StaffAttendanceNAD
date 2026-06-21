@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Save,
   Sparkles,
@@ -179,6 +179,152 @@ const getRosterPeriodLabel = (monthVal: number) => {
   const currName = fullMonths[monthVal + 1];
   return `${prevName}-${currName}`;
 };
+
+interface RosterRowProps {
+  emp: Employee;
+  slToShow: number;
+  empGrid: { [dateStr: string]: AttendanceLog };
+  days: DayInfo[];
+  getCellStyle: (status: string, isSunday: boolean) => any;
+  handleCellChange: (empId: number, dateStr: string, value: string, remarks?: string) => Promise<void>;
+  handleRemarksChange: (empId: number, dateStr: string, status: string, text: string) => void;
+  activeDropdownCell: { empId: number; dateStr: string } | null;
+  setActiveDropdownCell: (cell: { empId: number; dateStr: string } | null) => void;
+  setDropdownPos: (pos: { top: number; left: number; width: number } | null) => void;
+  setHoveredCell: (cell: any) => void;
+  setMousePos: (pos: { x: number; y: number }) => void;
+}
+
+const RosterRow: React.FC<RosterRowProps> = React.memo(({
+  emp,
+  slToShow,
+  empGrid,
+  days,
+  getCellStyle,
+  handleCellChange,
+  handleRemarksChange,
+  activeDropdownCell,
+  setActiveDropdownCell,
+  setDropdownPos,
+  setHoveredCell,
+  setMousePos
+}) => {
+  return (
+    <tr className="hover:bg-slate-50/50 transition-colors">
+      {/* Fixed Staff info cell */}
+      <td className="py-2 px-3 text-left bg-slate-50 sticky left-0 z-10 border-r border-slate-200 flex flex-col justify-center h-[60px] w-[180px]">
+        <span className="font-bold text-slate-800 text-[11px] truncate max-w-[160px]" title={emp.name}>
+          {slToShow}. {emp.name}
+        </span>
+        <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-slate-550 mt-0.5 font-semibold">
+          <span className="text-slate-400">PF:</span>
+          <span className="text-blue-700 font-bold">{emp.pf_number}</span>
+        </div>
+        <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5 font-semibold">
+          {emp.designation}
+          <span className="text-[9px] text-blue-600 font-bold">L{emp.level}</span>
+        </span>
+      </td>
+
+      {/* Date cells */}
+      {days.map((day) => {
+        const log = empGrid[day.dateStr];
+        const status = log ? log.status : '';
+        const earnedDateShort = log?.remarks && log.remarks.startsWith('CR_EARNED_DATE:')
+          ? (() => {
+              const parts = log.remarks.split('CR_EARNED_DATE:');
+              if (parts[1]) {
+                const dParts = parts[1].split('-');
+                if (dParts[1] && dParts[2]) {
+                  return `${dParts[2]}.${dParts[1]}`;
+                }
+              }
+              return '';
+            })()
+          : '';
+
+        return (
+          <td
+            key={day.dateStr}
+            className="p-1 border-r border-slate-200 relative animate-fade-in cursor-pointer roster-cell"
+            style={getCellStyle(status, day.isSunday)}
+            onMouseEnter={() => {
+              if (activeDropdownCell) return;
+              setHoveredCell({
+                empName: emp.name,
+                designation: emp.designation,
+                dateStr: day.dateStr,
+                weekday: day.weekday,
+                status: status || '—'
+              });
+            }}
+            onMouseLeave={() => {
+              setHoveredCell(null);
+            }}
+            onMouseMove={(e) => {
+              setMousePos({ x: e.clientX, y: e.clientY });
+            }}
+          >
+            <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px] relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (activeDropdownCell?.empId === emp.emp_id && activeDropdownCell?.dateStr === day.dateStr) {
+                    setActiveDropdownCell(null);
+                    setDropdownPos(null);
+                  } else {
+                    setActiveDropdownCell({ empId: emp.emp_id, dateStr: day.dateStr });
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setDropdownPos({
+                      top: rect.bottom,
+                      left: rect.left + rect.width / 2,
+                      width: rect.width
+                    });
+                    setHoveredCell(null);
+                  }
+                }}
+                className="w-full h-full text-center bg-transparent border-none font-black text-[10.5px] focus:outline-none cursor-pointer flex items-center justify-center min-h-[30px] transition-transform active:scale-95 duration-100 hover:bg-slate-200/20 rounded-md"
+                style={{ color: getCellStyle(status, day.isSunday).color }}
+              >
+                {status || '—'}
+              </button>
+
+              {status === 'CR' && earnedDateShort && (
+                <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px] z-10">
+                  {earnedDateShort}
+                </span>
+              )}
+
+              {status !== 'CR' && status !== 'P' && status !== '' && log?.remarks && (
+                <span className="text-[7.2px] font-bold text-slate-500 block leading-none select-none pointer-events-none mt-[-2px] z-10 truncate max-w-[42px]" title={log.remarks}>
+                  {log.remarks.replace('Order: ', '')}
+                </span>
+              )}
+            </div>
+          </td>
+        );
+      })}
+
+      {/* Remarks cell */}
+      <td className="py-2 px-3 border-l border-slate-200">
+        <input
+          type="text"
+          placeholder="No remarks"
+          value={empGrid[days[0]?.dateStr]?.remarks || ''}
+          onChange={(e) => {
+            if (days[0]) {
+              handleRemarksChange(emp.emp_id, days[0].dateStr, empGrid[days[0].dateStr]?.status || 'P', e.target.value);
+            }
+          }}
+          className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-700 focus:outline-none focus:border-blue-500"
+        />
+      </td>
+    </tr>
+  );
+});
+
+RosterRow.displayName = 'RosterRow';
 
 export default function AttendanceGrid() {
   const [activeSection, setActiveSection] = useState<string>('KKVS');
@@ -635,7 +781,7 @@ export default function AttendanceGrid() {
   }, [selectedMonth, selectedYear]);
 
   // Handle cell edit in grid
-  const handleCellChange = async (empId: number, dateStr: string, value: string, remarks?: string) => {
+  const handleCellChange = useCallback(async (empId: number, dateStr: string, value: string, remarks?: string) => {
     if (value === 'CUSTOM_CODE') {
       const existing = gridData[empId]?.[dateStr];
       const existingStatus = existing?.status || '';
@@ -695,7 +841,24 @@ export default function AttendanceGrid() {
       };
     });
     setIsModified(true);
-  };
+  }, [gridData, crLedgers, employees]);
+
+  const handleRemarksChange = useCallback((empId: number, dateStr: string, status: string, text: string) => {
+    setGridData((prev) => {
+      const eg = { ...prev[empId] };
+      const oldLog = eg[dateStr];
+      eg[dateStr] = {
+        ...oldLog,
+        emp_id: empId,
+        date: dateStr,
+        status: (status || 'P') as any,
+        is_night: status === 'P/N',
+        remarks: text
+      };
+      return { ...prev, [empId]: eg };
+    });
+    setIsModified(true);
+  }, []);
 
   // Undo / Rollback grid changes to matching database state loaded
   const handleUndoRollback = () => {
@@ -988,7 +1151,7 @@ export default function AttendanceGrid() {
     showToast(`Bulk entry complete. Applied ${logsList.length} cells. Save to commit.`, "success");
   };
 
-  const getCellStyle = (status: string, isSunday: boolean) => {
+  const getCellStyle = useCallback((status: string, isSunday: boolean) => {
     if (isSunday && !status) return { backgroundColor: 'rgba(239, 68, 68, 0.08)', color: '#DC2626' };
     if (!status) return { color: '#64748B' };
 
@@ -1001,7 +1164,7 @@ export default function AttendanceGrid() {
       };
     }
     return { backgroundColor: '#F1F5F9', color: '#1E293B' };
-  };
+  }, [allCodes]);
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full min-h-screen">      {/* Title & Toolbar */}
@@ -1287,122 +1450,21 @@ export default function AttendanceGrid() {
                     }
 
                     rows.push(
-                      <tr key={emp.emp_id} className="hover:bg-slate-50/50 transition-colors">
-                        {/* Fixed Staff info cell */}
-                        <td className="py-2 px-3 text-left bg-slate-50 sticky left-0 z-10 border-r border-slate-200 flex flex-col justify-center h-[60px] w-[180px]">
-                          <span className="font-bold text-slate-800 text-[11px] truncate max-w-[160px]" title={emp.name}>
-                            {slToShow}. {emp.name}
-                          </span>
-                          <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-slate-550 mt-0.5 font-semibold">
-                            <span className="text-slate-400">PF:</span>
-                            <span className="text-blue-700 font-bold">{emp.pf_number}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5 font-semibold">
-                            {emp.designation}
-                            <span className="text-[9px] text-blue-600 font-bold">L{emp.level}</span>
-                          </span>
-                        </td>
-
-                        {/* Date cells */}
-                        {days.map((day) => {
-                          const log = empGrid[day.dateStr];
-                          const status = log ? log.status : '';
-                          const earnedDateShort = log?.remarks && log.remarks.startsWith('CR_EARNED_DATE:')
-                            ? (() => {
-                                const parts = log.remarks.split('CR_EARNED_DATE:');
-                                if (parts[1]) {
-                                  const dParts = parts[1].split('-');
-                                  if (dParts[1] && dParts[2]) {
-                                    return `${dParts[2]}.${dParts[1]}`;
-                                  }
-                                }
-                                return '';
-                              })()
-                            : '';
-
-                          return (
-                            <td
-                              key={day.dateStr}
-                              className="p-1 border-r border-slate-200 relative animate-fade-in cursor-pointer"
-                              style={getCellStyle(status, day.isSunday)}
-                              onMouseEnter={() => {
-                                if (activeDropdownCell) return;
-                                setHoveredCell({
-                                  empName: emp.name,
-                                  designation: emp.designation,
-                                  dateStr: day.dateStr,
-                                  weekday: day.weekday,
-                                  status: status || '—'
-                                });
-                              }}
-                              onMouseLeave={() => {
-                                setHoveredCell(null);
-                              }}
-                              onMouseMove={(e) => {
-                                setMousePos({ x: e.clientX, y: e.clientY });
-                              }}
-                            >
-                              <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px] relative">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (activeDropdownCell?.empId === emp.emp_id && activeDropdownCell?.dateStr === day.dateStr) {
-                                      setActiveDropdownCell(null);
-                                      setDropdownPos(null);
-                                    } else {
-                                      setActiveDropdownCell({ empId: emp.emp_id, dateStr: day.dateStr });
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      setDropdownPos({
-                                        top: rect.bottom,
-                                        left: rect.left + rect.width / 2,
-                                        width: rect.width
-                                      });
-                                      setHoveredCell(null);
-                                    }
-                                  }}
-                                  className="w-full h-full text-center bg-transparent border-none font-black text-[10.5px] focus:outline-none cursor-pointer flex items-center justify-center min-h-[30px] transition-transform active:scale-95 duration-100 hover:bg-slate-200/20 rounded-md"
-                                  style={{ color: getCellStyle(status, day.isSunday).color }}
-                                >
-                                  {status || '—'}
-                                </button>
-
-                                {status === 'CR' && earnedDateShort && (
-                                  <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px] z-10">
-                                    {earnedDateShort}
-                                  </span>
-                                )}
-
-                                {status !== 'CR' && status !== 'P' && status !== '' && log?.remarks && (
-                                  <span className="text-[7.2px] font-bold text-slate-500 block leading-none select-none pointer-events-none mt-[-2px] z-10 truncate max-w-[42px]" title={log.remarks}>
-                                    {log.remarks.replace('Order: ', '')}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-
-                        {/* Remarks cell */}
-                        <td className="py-2 px-3 border-l border-slate-200">
-                          <input
-                            type="text"
-                            placeholder="No remarks"
-                            value={empGrid[days[0]?.dateStr]?.remarks || ''}
-                            onChange={(e) => {
-                              if (days[0]) {
-                                handleCellChange(emp.emp_id, days[0].dateStr, empGrid[days[0].dateStr]?.status || 'P');
-                                setGridData((prev) => {
-                                  const eg = { ...prev[emp.emp_id] };
-                                  eg[days[0].dateStr].remarks = e.target.value;
-                                  return { ...prev, [emp.emp_id]: eg };
-                                });
-                              }
-                            }}
-                            className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-700 focus:outline-none focus:border-blue-500"
-                          />
-                        </td>
-                      </tr>
+                      <RosterRow
+                        key={emp.emp_id}
+                        emp={emp}
+                        slToShow={slToShow}
+                        empGrid={empGrid}
+                        days={days}
+                        getCellStyle={getCellStyle}
+                        handleCellChange={handleCellChange}
+                        handleRemarksChange={handleRemarksChange}
+                        activeDropdownCell={activeDropdownCell}
+                        setActiveDropdownCell={setActiveDropdownCell}
+                        setDropdownPos={setDropdownPos}
+                        setHoveredCell={setHoveredCell}
+                        setMousePos={setMousePos}
+                      />
                     );
                     return rows;
                   });
