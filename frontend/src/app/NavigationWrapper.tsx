@@ -197,10 +197,16 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     const handleMySectionChange = () => {
       const mySec = localStorage.getItem('erp_my_section') || 'KKVS';
       setActiveSection(mySec);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('erp_active_section', mySec);
+      }
       const matchingSec = sections.find(s => s.section_code === mySec);
       if (matchingSec) {
         setSelectedLineId(matchingSec.line_id);
         localStorage.setItem('erp_active_line_id', String(matchingSec.line_id));
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_section_changed'));
       }
     };
 
@@ -320,7 +326,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } transition-all duration-300 ease-in-out bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
+        } transition-[width] duration-300 cubic-bezier(0.16, 1, 0.3, 1) will-change-[width] bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9] overflow-hidden">
@@ -403,37 +409,42 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             {/* Dynamic Active Line & Section selector tabs */}
             <div className="flex items-center gap-3">
               {lines.length > 0 && (
-                <select
-                  value={selectedLineId}
-                  onChange={(e) => {
-                    const lineId = Number(e.target.value);
-                    setSelectedLineId(lineId);
-                    localStorage.setItem('erp_active_line_id', String(lineId));
-                    // Find first section of this line and switch
-                    const firstSec = sections.find(s => s.line_id === lineId);
-                    if (firstSec) {
-                      handleSectionChange(firstSec.section_code);
-                    }
-                  }}
-                  className="bg-slate-100 hover:bg-slate-200/60 border border-slate-200 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-lg focus:outline-none cursor-pointer"
-                >
-                  {lines.map(l => (
-                    <option key={l.id} value={l.id}>{l.line_name}</option>
-                  ))}
-                </select>
+                <div className="relative flex items-center border border-slate-200/80 bg-slate-50 hover:bg-slate-100/80 rounded-xl transition-colors select-none">
+                  <select
+                    value={selectedLineId}
+                    onChange={(e) => {
+                      const lineId = Number(e.target.value);
+                      setSelectedLineId(lineId);
+                      localStorage.setItem('erp_active_line_id', String(lineId));
+                      // Find first section of this line and switch
+                      const firstSec = sections.find(s => s.line_id === lineId);
+                      if (firstSec) {
+                        handleSectionChange(firstSec.section_code);
+                      }
+                    }}
+                    className="bg-transparent border-none text-[11px] font-black text-slate-700 pl-3.5 pr-8 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wider"
+                  >
+                    {lines.map(l => (
+                      <option key={l.id} value={l.id}>{l.line_name.toUpperCase()}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-2.5 pointer-events-none text-slate-400 flex items-center">
+                    <ChevronRight size={11} className="rotate-90" />
+                  </div>
+                </div>
               )}
 
-              <div className="bg-slate-100 border border-slate-200/60 p-1 rounded-xl flex items-center gap-1">
+              <div className="bg-slate-50 border border-slate-200/80 p-0.5 rounded-xl flex items-center gap-0.5 shadow-2xs">
                 {sections
                   .filter(s => s.line_id === selectedLineId)
                   .map((sec) => (
                     <button 
                       key={sec.section_code}
                       onClick={() => handleSectionChange(sec.section_code)}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${
                         activeSection === sec.section_code 
-                          ? 'bg-blue-600 text-white shadow-sm' 
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
+                          ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/10' 
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
                       }`}
                     >
                       {sec.section_code}
@@ -441,10 +452,10 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   ))}
                 <button 
                   onClick={() => handleSectionChange('ALL')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${
                     activeSection === 'ALL' 
-                      ? 'bg-blue-600 text-white shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
+                      ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/10' 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
                   }`}
                 >
                   {getTranslation(lang, 'Joint View')}
@@ -453,7 +464,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
               {/* Inline Checklist for selecting active sections under Joint View */}
               {activeSection === 'ALL' && (
-                <div className="flex items-center gap-3 ml-2 px-3 py-1 bg-white border border-[#E2E0D9] rounded-xl shadow-2xs animate-in fade-in duration-200 select-none">
+                <div className="flex items-center gap-3.5 ml-2 px-3.5 py-1.5 bg-[#FDFDFD] border border-slate-200/80 rounded-xl shadow-2xs animate-in fade-in duration-200 select-none">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{getTranslation(lang, 'Include')}:</span>
                   {sections
                     .filter(s => s.line_id === selectedLineId)
@@ -462,13 +473,13 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                       return (
                         <label 
                           key={sec.section_code} 
-                          className="flex items-center gap-1.5 cursor-pointer text-xs font-black text-slate-750 hover:text-slate-900 select-none transition-colors"
+                          className="flex items-center gap-1.5 cursor-pointer text-xs font-black text-slate-700 hover:text-slate-900 select-none transition-colors"
                         >
                           <input 
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => toggleJoinSection(sec.section_code)}
-                            className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                            className="w-3.5 h-3.5 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
                           />
                           {sec.section_code}
                         </label>
@@ -479,15 +490,15 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-3">
             {/* Quick Search and Command Palette Button */}
             <button 
               onClick={() => setIsPaletteOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200/65 rounded-lg border border-slate-200 transition cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-250/60 shadow-2xs transition cursor-pointer"
             >
-              <Search size={13} />
+              <Search size={13} className="text-slate-400" />
               <span className="hidden sm:inline">{getTranslation(lang, 'Search / Actions')}</span>
-              <kbd className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-400 font-mono shadow-xs ml-1 flex items-center gap-0.5">
+              <kbd className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-450 font-mono shadow-xs ml-1 flex items-center gap-0.5">
                 <Keyboard size={9} />
                 Ctrl+K
               </kbd>
@@ -496,17 +507,17 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             {/* Help Button */}
             <Link 
               href="/help"
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200/65 rounded-lg border border-slate-200 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-extrabold text-slate-650 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-250/60 shadow-2xs transition cursor-pointer"
             >
-              <BookOpen size={13} className="text-slate-400" />
+              <BookOpen size={13} className="text-slate-405" />
               <span>{getTranslation(lang, 'Help')}</span>
             </Link>
 
             {/* Language Flag Dropdown */}
-            <div className="relative flex items-center border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors select-none">
+            <div className="relative flex items-center border border-slate-250/60 bg-slate-50 hover:bg-slate-100/90 rounded-xl shadow-2xs transition-colors select-none">
               <span className="pl-2.5 text-xs">🇮🇳</span>
               <select 
-                className="bg-transparent border-none text-[10px] font-extrabold text-slate-600 pl-1 pr-6 py-1.5 focus:outline-none cursor-pointer appearance-none"
+                className="bg-transparent border-none text-[10px] font-black text-slate-605 pl-1.5 pr-6 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wide"
                 value={lang}
                 onChange={(e) => {
                   const val = e.target.value as 'en' | 'bn' | 'hi';
@@ -519,8 +530,8 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 <option value="bn">BN (IN)</option>
                 <option value="hi">HI (IN)</option>
               </select>
-              <div className="absolute right-1.5 pointer-events-none text-slate-500 flex items-center">
-                <ChevronRight size={10} className="rotate-90" />
+              <div className="absolute right-2 pointer-events-none text-slate-400 flex items-center">
+                <ChevronRight size={9} className="rotate-90" />
               </div>
             </div>
 
@@ -532,9 +543,9 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   setHasUnreadNotifications(false);
                   loadNotifications();
                 }}
-                className="relative w-8.5 h-8.5 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 transition text-slate-500 hover:text-slate-800 cursor-pointer"
+                className="relative w-8.5 h-8.5 flex items-center justify-center rounded-xl border border-slate-250/60 bg-slate-50 hover:bg-slate-105 transition text-slate-505 hover:text-slate-800 shadow-2xs cursor-pointer"
               >
-                <Bell size={16} />
+                <Bell size={15} />
                 {hasUnreadNotifications && (
                   <span className="absolute top-1.5 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
                 )}

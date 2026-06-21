@@ -1388,7 +1388,7 @@ export default function AdminPanel() {
           
           {/* TAB 1: EMPLOYEES & TRANSFER */}
           {activeTab === 'employees' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Add & Transfer Forms Column */}
               <div className="space-y-6">
                 {/* Employee Form */}
@@ -1984,12 +1984,12 @@ export default function AdminPanel() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* TAB 2: LINES & SECTIONS */}
           {activeTab === 'lines' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Form columns */}
               <div className="space-y-6">
                 {/* Line Form */}
@@ -2201,12 +2201,12 @@ export default function AdminPanel() {
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* TAB 3: SHIFT RULES */}
           {activeTab === 'shifts' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Form columns */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
@@ -2407,12 +2407,12 @@ export default function AdminPanel() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* TAB 4: ROSTER PLANNER */}
           {activeTab === 'roster' && (
-            <div className="lg:col-span-3 glass-panel p-6 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col space-y-6">
+            <div className="page-transition lg:col-span-3 glass-panel p-6 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col space-y-6">
               {/* Header selectors */}
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
                 <div>
@@ -2580,7 +2580,7 @@ export default function AdminPanel() {
 
           {/* TAB 5: ROSTER CODES */}
           {activeTab === 'codes' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Add form */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
@@ -2738,12 +2738,12 @@ export default function AdminPanel() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* TAB 6: HOLIDAY MASTER */}
           {activeTab === 'holidays' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Form */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b">
@@ -2872,12 +2872,12 @@ export default function AdminPanel() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* TAB 7: BACKUPS & RECOVERY */}
           {activeTab === 'backups' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* SQLite Health metrics check */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
@@ -2954,12 +2954,12 @@ export default function AdminPanel() {
                   )}
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* TAB 8: AUDIT TRAIL LOGS */}
           {activeTab === 'audit' && (
-            <div className="lg:col-span-3 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+            <div className="page-transition lg:col-span-3 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
               <div className="px-5 py-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h3 className="font-bold text-slate-855 flex items-center gap-1.5">
                   <Clock size={16} className="text-slate-500" />
@@ -3029,7 +3029,7 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'updates' && (
-            <>
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column: Version & Info */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
@@ -3181,11 +3181,11 @@ export default function AdminPanel() {
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {activeTab === 'settings' && (
-            <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
+            <div className="page-transition glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
               <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
                 <Settings size={15} className="text-blue-600" />
                 {getTranslation(lang, 'System Preferences & Settings')}
