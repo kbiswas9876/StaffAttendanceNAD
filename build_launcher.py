@@ -104,11 +104,70 @@ def update_project_versions(version):
         with open(csproj_path, "w", encoding="utf-8") as f:
             f.write(content)
 
+def ensure_frontend_built():
+    frontend_dir = "frontend"
+    out_dir = os.path.join(frontend_dir, "out")
+    
+    # If out directory doesn't exist or is empty, build Next.js frontend
+    if not os.path.exists(out_dir) or not os.listdir(out_dir):
+        print("\nFrontend build ('frontend/out') not found or empty. Starting frontend build...")
+        
+        # Check node_modules
+        node_modules = os.path.join(frontend_dir, "node_modules")
+        if not os.path.exists(node_modules):
+            print("node_modules not found. Running npm install...")
+            try:
+                subprocess.run(["npm", "install"], cwd=frontend_dir, check=True, shell=True)
+            except Exception as e:
+                print(f"Error running npm install: {e}")
+                return False
+                
+        print("Running npm run build...")
+        try:
+            subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True, shell=True)
+            print("Frontend successfully built.")
+            return True
+        except Exception as e:
+            print(f"Error running npm run build: {e}")
+            return False
+    else:
+        print("Existing frontend build found at 'frontend/out'.")
+        return True
+
+def ensure_backend_db():
+    db_path = os.path.join("backend", "database.db")
+    if not os.path.exists(db_path):
+        print(f"\nDefault template database ('{db_path}') not found. Generating a clean template database...")
+        env = os.environ.copy()
+        env["ERP_DB_PATH"] = db_path
+        try:
+            # Initialize template database using a separate python subprocess
+            cmd = [sys.executable, "-c", "import sys; sys.path.append('backend'); import main"]
+            subprocess.run(cmd, env=env, check=True)
+            print(f"Successfully initialized default database structure at {db_path}.")
+            return True
+        except Exception as e:
+            print(f"Error creating default database: {e}")
+            return False
+    else:
+        print(f"Existing template database found at '{db_path}'.")
+        return True
+
 def build_executable():
     version = get_version()
     print(f"=======================================================")
     print(f"Building Metro Railway S&T ERP with Version: v{version}")
     print(f"=======================================================")
+    
+    # Pre-build checks to ensure frontend/out and backend/database.db exist
+    if not ensure_frontend_built():
+        print("Failed to ensure frontend build is present. Aborting...")
+        return
+        
+    if not ensure_backend_db():
+        print("Failed to ensure default database is present. Aborting...")
+        return
+        
     update_project_versions(version)
     
     # Make sure we have the icon

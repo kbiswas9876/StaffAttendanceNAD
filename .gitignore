@@ -30,6 +30,7 @@ backend/database.db
 backend/backups/
 backend/exports/
 *.xlsx
+!TA bill.xlsx
 *.pdf
 
 # Python coverage / test artifacts

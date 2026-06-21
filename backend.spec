@@ -4,7 +4,7 @@ a = Analysis(
     ['backend/main.py'],
     pathex=['backend'],
     binaries=[],
-    datas=[('frontend/out', 'out'), ('backend/database.db', '.')],
+    datas=[('frontend/out', 'out'), ('backend/database.db', '.'), ('TA bill.xlsx', '.')],
     hiddenimports=[
         'version',
         'uvicorn', 

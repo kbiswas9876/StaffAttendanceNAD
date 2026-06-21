@@ -24,7 +24,7 @@ from reportlab.pdfgen import canvas
 # Setup persistent directory in User's Documents to keep Desktop clean
 doc_dir = os.path.join(os.path.expanduser("~"), "Documents", "MetroRailwayERP")
 os.makedirs(doc_dir, exist_ok=True)
-DB_PATH = os.path.join(doc_dir, "database.db")
+DB_PATH = os.getenv("ERP_DB_PATH", os.path.join(doc_dir, "database.db"))
 BACKUP_DIR = os.path.join(doc_dir, "backups")
 
 # Ensure directories exist
