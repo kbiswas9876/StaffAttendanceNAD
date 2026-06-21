@@ -2792,6 +2792,7 @@ def delete_ta_bill(id: int):
         conn.close()
 
 def num_to_words(n):
+    n = int(round(n))
     if n == 0:
         return "Zero"
     
@@ -3068,18 +3069,45 @@ def export_ta_bill_excel(id: int):
         
     ws = wb[sheet_to_keep]
     
-    emp_name = bill.get("emp_name", "") or ""
-    pf_number = bill.get("pf_number", "") or ""
-    designation = bill.get("designation", "") or ""
+    emp_name = (bill.get("emp_name", "") or "").strip()
+    if not emp_name:
+        emp_name = "[Enter Employee Name]"
+        
+    pf_number = (bill.get("pf_number", "") or "").strip()
+    if not pf_number:
+        pf_number = "[Enter PF Number]"
+        
+    designation = (bill.get("designation", "") or "").strip()
+    if not designation:
+        designation = "[Enter Designation]"
+        
     level = bill.get("level", 1) or 1
     basic_pay = bill.get("basic_pay", 0) or 0
-    joining_date = bill.get("joining_date", "") or ""
+    basic_pay_display = f"Rs. {basic_pay}" if basic_pay > 0 else "[Enter Basic Pay]"
+    
+    joining_date = (bill.get("joining_date", "") or "").strip()
     month_year = bill.get("month_year", "") or ""
-    book_no = bill.get("book_no", "") or ""
-    page_no = bill.get("page_no", "") or ""
-    serial_no_from = bill.get("serial_no_from", "") or ""
-    serial_no_to = bill.get("serial_no_to", "") or ""
-    bill_unit = bill.get("bill_unit", "") or ""
+    
+    book_no = (bill.get("book_no", "") or "").strip()
+    if not book_no:
+        book_no = "[Enter Book Number]"
+        
+    page_no = (bill.get("page_no", "") or "").strip()
+    if not page_no:
+        page_no = "[Enter Page Number]"
+        
+    serial_no_from = (bill.get("serial_no_from", "") or "").strip()
+    if not serial_no_from:
+        serial_no_from = "[Start Serial]"
+        
+    serial_no_to = (bill.get("serial_no_to", "") or "").strip()
+    if not serial_no_to:
+        serial_no_to = "[End Serial]"
+        
+    bill_unit = (bill.get("bill_unit", "") or "").strip()
+    if not bill_unit:
+        bill_unit = "[Enter Bill Unit]"
+        
     section_code = bill.get("section_code", "") or "KKVS"
 
     # Helpers to dynamically unmerge and format premium header blocks
@@ -3140,13 +3168,15 @@ def export_ta_bill_excel(id: int):
     except Exception:
         month_year_display = month_year.upper()
 
-    joining_date_display = joining_date or ""
+    joining_date_display = ""
     if joining_date:
         try:
             dt_ap = datetime.strptime(joining_date, "%Y-%m-%d")
             joining_date_display = dt_ap.strftime("%d.%m.%Y")
         except Exception:
-            pass
+            joining_date_display = joining_date
+    else:
+        joining_date_display = "[Enter Joining Date]"
 
     # Build the header grid fields cleanly
     if journey_type == "NORMAL":
@@ -3166,7 +3196,7 @@ def export_ta_bill_excel(id: int):
         # Row 5
         write_meta_box(ws, 5, 1, 5, 1, "is claimed", "TA", alignment="left")
         write_meta_box(ws, 5, 2, 5, 3, "Designation", designation, alignment="left")
-        write_meta_box(ws, 5, 4, 5, 5, "Pay", f"Rs. {basic_pay}", alignment="center")
+        write_meta_box(ws, 5, 4, 5, 5, "Pay", basic_pay_display, alignment="center")
         write_meta_box(ws, 5, 6, 5, 6, "Level", level, alignment="center")
         write_meta_box(ws, 5, 7, 5, 8, "Date of appointment", joining_date_display, alignment="center")
         write_meta_box(ws, 5, 9, 5, 10, "Rule by which governed", "SRTA", alignment="right")
@@ -3187,7 +3217,7 @@ def export_ta_bill_excel(id: int):
         # Row 5
         write_meta_box(ws, 5, 1, 5, 1, "is claimed", "TA", alignment="left")
         write_meta_box(ws, 5, 2, 5, 3, "Designation", designation, alignment="left")
-        write_meta_box(ws, 5, 4, 5, 5, "Pay", f"Rs. {basic_pay}", alignment="center")
+        write_meta_box(ws, 5, 4, 5, 5, "Pay", basic_pay_display, alignment="center")
         write_meta_box(ws, 5, 6, 5, 6, "Level", level, alignment="center")
         write_meta_box(ws, 5, 7, 5, 9, "Date of appointment", joining_date_display, alignment="center")
         write_meta_box(ws, 5, 10, 5, 11, "Rule by which governed", "SRTA", alignment="right")

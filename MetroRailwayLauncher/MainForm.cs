@@ -13,7 +13,7 @@ namespace MetroRailwayLauncher;
 
 public class MainForm : Form
 {
-    public const string APP_VERSION = "v1.2.1.1";
+    public const string APP_VERSION = "v1.2.2";
     private WebView2 webView = null!;
     private Process? backendProcess;
     private bool isClosing = false;

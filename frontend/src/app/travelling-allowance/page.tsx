@@ -590,117 +590,135 @@ export default function TravellingAllowancePage() {
       {/* Premium History Dialog Modal */}
       {showHistory && (
         <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4 animate-fade-in">
-          <div className="bg-white border border-[#E2E0D9] w-full max-w-5xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+          <div className="bg-white w-full max-w-5xl max-h-[88vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up" style={{border: '1px solid #e2e8f0', boxShadow: '0 25px 60px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(99,102,241,0.08)'}}>
             
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-indigo-600" />
-                Travelling Allowance Journal History ({activeSection})
-              </h2>
+            {/* Premium Gradient Modal Header */}
+            <div className="px-7 py-5 flex items-center justify-between" style={{background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)', borderBottom: '1px solid #e0e7ff'}}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md">
+                  <BookOpen className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-800 tracking-wide">TRAVELLING ALLOWANCE JOURNAL HISTORY</h2>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Section: {activeSection} · {taBills.length} record{taBills.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
               <button 
                 onClick={() => { setShowHistory(false); setHistorySearch(''); }} 
-                className="text-slate-400 hover:text-slate-600 font-extrabold text-sm hover:scale-105 transition-all p-1 cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer text-base font-bold"
               >
                 ✕
               </button>
             </div>
             
-            {/* Search filter for history */}
-            <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-150 flex items-center gap-3">
-              <input
-                type="text"
-                placeholder="Search by Employee Name or PF Number..."
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold text-slate-750 focus:outline-none focus:border-indigo-500"
-              />
+            {/* Search filter */}
+            <div className="px-7 py-4 flex items-center gap-3" style={{background: '#f8fafc', borderBottom: '1px solid #f1f5f9'}}>
+              <div className="relative flex-1">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input
+                  type="text"
+                  placeholder="Search by Employee Name or PF Number..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-all placeholder:font-normal placeholder:text-slate-400"
+                />
+              </div>
             </div>
             
-            {/* Modal Body / History Table */}
-            <div className="p-6 overflow-y-auto flex-1">
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto px-7 py-5">
               {filteredTaBills.length === 0 ? (
-                <div className="text-center py-20 text-slate-400 font-semibold italic text-xs">
-                  {taBills.length === 0 ? "No Travelling Allowance bills found in this section. Create one below!" : "No matching journals found for search query."}
+                <div className="text-center py-20 text-slate-400 font-semibold italic text-xs flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 text-slate-300" />
+                  </div>
+                  {taBills.length === 0 ? "No Travelling Allowance bills found in this section. Create one below!" : "No matching journals found for your search query."}
                 </div>
               ) : (
-                <div className="overflow-hidden border border-slate-100 rounded-xl">
-                  <table className="min-w-full divide-y divide-slate-200 text-xs">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
-                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">PF Number</th>
-                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Month / Year</th>
-                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Total Amount</th>
-                        <th className="px-6 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-100">
-                      {filteredTaBills.map((bill) => (
-                        <tr key={bill.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-700">{bill.emp_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-slate-500">
-                            {bill.pf_number}
-                            {bill.bill_unit && <span className="text-slate-400 text-xs font-normal"> (BU: {bill.bill_unit})</span>}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">
-                            {(() => {
-                              try {
-                                const d = new Date(bill.month_year + "-01");
-                                return d.toLocaleString('default', { month: 'long', year: 'numeric' });
-                              } catch (e) {
-                                return bill.month_year;
-                              }
-                            })()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black ${
-                              bill.journey_type === 'NORMAL' 
-                                ? 'bg-sky-50 text-sky-700 border border-sky-200/50' 
-                                : 'bg-amber-50 text-amber-700 border border-amber-200/50'
-                            }`}>
-                              {bill.journey_type === 'NORMAL' ? 'Local Duties' : 'Training Stays'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-800">Rs. {bill.total_amount}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-medium">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => { handleLoadBill(bill.id!); setHistorySearch(''); }}
-                                className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                              >
-                                View / Edit
-                              </button>
-                              <button
-                                onClick={() => handleExportExcel(bill.id!)}
-                                className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-colors gap-1 cursor-pointer"
-                              >
-                                <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
-                              </button>
-                              <button
-                                onClick={() => handleDeleteBill(bill.id!)}
-                                className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="rounded-2xl overflow-hidden" style={{border: '1px solid #e8ecf0'}}>
+                  {/* Column Header Bar */}
+                  <div className="grid items-center px-5 py-3 gap-3" style={{gridTemplateColumns: '1.6fr 1.4fr 1fr 0.9fr 0.9fr 1.8fr', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)'}}>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Employee</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">PF Number</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Month / Year</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Type</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Amount</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-1">Actions</div>
+                  </div>
+                  {/* Card Rows — no dividers */}
+                  <div className="flex flex-col" style={{background: '#fafbfc'}}>
+                    {filteredTaBills.map((bill, idx) => (
+                      <div
+                        key={bill.id}
+                        className="grid items-center px-5 py-3.5 gap-3 hover:bg-indigo-50/40 transition-all group"
+                        style={{
+                          gridTemplateColumns: '1.6fr 1.4fr 1fr 0.9fr 0.9fr 1.8fr',
+                          borderTop: idx === 0 ? '1px solid #e8ecf0' : '1px solid #f1f5f9',
+                        }}
+                      >
+                        <div className="font-bold text-slate-800 text-xs truncate">{bill.emp_name}</div>
+                        <div className="text-slate-500 text-xs truncate">
+                          {bill.pf_number}
+                          {bill.bill_unit && <span className="text-slate-400 font-normal ml-1">(BU: {bill.bill_unit})</span>}
+                        </div>
+                        <div className="text-slate-600 font-semibold text-xs">
+                          {(() => {
+                            try {
+                              const d = new Date(bill.month_year + "-01");
+                              return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                            } catch (e) {
+                              return bill.month_year;
+                            }
+                          })()}
+                        </div>
+                        <div>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black ${
+                            bill.journey_type === 'NORMAL' 
+                              ? 'bg-sky-50 text-sky-700 border border-sky-200/70' 
+                              : 'bg-amber-50 text-amber-700 border border-amber-200/70'
+                          }`}>
+                            {bill.journey_type === 'NORMAL' ? 'Local Duties' : 'Training'}
+                          </span>
+                        </div>
+                        <div className="font-black text-indigo-700 text-xs">Rs. {bill.total_amount}</div>
+                        {/* Actions — right-aligned with overflow-visible so nothing clips */}
+                        <div className="flex items-center justify-end gap-1.5 min-w-0">
+                          <button
+                            onClick={() => { handleLoadBill(bill.id!); setHistorySearch(''); }}
+                            className="flex-shrink-0 inline-flex items-center px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            View / Edit
+                          </button>
+                          <button
+                            onClick={() => handleExportExcel(bill.id!)}
+                            className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            <FileSpreadsheet className="w-3 h-3" /> Excel
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBill(bill.id!)}
+                            className="flex-shrink-0 inline-flex items-center px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 border border-rose-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
             
             {/* Modal Footer */}
-            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-150 flex items-center justify-end">
+            <div className="px-7 py-4 flex items-center justify-between" style={{background: '#f8fafc', borderTop: '1px solid #f1f5f9'}}>
+              <p className="text-[10px] text-slate-400 font-semibold">
+                Showing {filteredTaBills.length} of {taBills.length} records
+              </p>
               <button 
                 onClick={() => { setShowHistory(false); setHistorySearch(''); }}
-                className="px-4 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 font-bold text-xs uppercase tracking-wide transition-all cursor-pointer shadow-sm"
               >
-                Close History Register
+                Close Register
               </button>
             </div>
           </div>
