@@ -1,22 +1,22 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { 
-  Users, 
-  PlusCircle, 
-  UserPlus, 
-  Edit3, 
-  Trash2, 
-  User, 
-  Key, 
-  Calendar, 
+import {
+  Users,
+  PlusCircle,
+  UserPlus,
+  Edit3,
+  Trash2,
+  User,
+  Key,
+  Calendar,
   ChevronRight,
   ShieldAlert,
-  Clock, 
-  Database, 
-  FileText, 
-  MapPin, 
-  Milestone, 
+  Clock,
+  Database,
+  FileText,
+  MapPin,
+  Milestone,
   ArrowLeft,
   ChevronLeft,
   CheckCircle,
@@ -36,21 +36,21 @@ import {
   Sunset
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  getEmployees, 
-  createEmployee, 
-  updateEmployee, 
-  deleteEmployee, 
-  getSections, 
-  getEmployeeById, 
-  getLeaveBank, 
-  getEmployeeAttendanceLogs, 
-  getSpecialEvents, 
-  Section, 
-  Employee, 
-  LeaveBank, 
-  AttendanceLog, 
-  SpecialEvent, 
+import {
+  getEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  getSections,
+  getEmployeeById,
+  getLeaveBank,
+  getEmployeeAttendanceLogs,
+  getSpecialEvents,
+  Section,
+  Employee,
+  LeaveBank,
+  AttendanceLog,
+  SpecialEvent,
   updateLeaveBank,
   getWeeklyScheduleDefault,
   reorderEmployees,
@@ -212,35 +212,35 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     if (!employee) return;
     setIsSaving(true);
 
-    const weeklySchedulePayload = scheduleType === 'simple' 
+    const weeklySchedulePayload = scheduleType === 'simple'
       ? {
-          type: 'simple',
-          ...empWeeklySchedule,
-          custom_night_weeks: customNightWeeks
-        }
+        type: 'simple',
+        ...empWeeklySchedule,
+        custom_night_weeks: customNightWeeks
+      }
       : scheduleType === 'flexible'
-      ? {
+        ? {
           type: 'flexible',
           custom_night_weeks: customNightWeeks
         }
-      : scheduleType === 'rotating-3week'
-      ? {
-          type: 'rotating-3week',
-          anchor_date: empAnchorDate,
-          week1: rotatingSchedule.week1,
-          week2: rotatingSchedule.week2,
-          week3: rotatingSchedule.week3,
-          custom_night_weeks: customNightWeeks
-        }
-      : {
-          type: 'rotating',
-          anchor_date: empAnchorDate,
-          week1: rotatingSchedule.week1,
-          week2: rotatingSchedule.week2,
-          week3: rotatingSchedule.week3,
-          week4: rotatingSchedule.week4,
-          custom_night_weeks: customNightWeeks
-        };
+        : scheduleType === 'rotating-3week'
+          ? {
+            type: 'rotating-3week',
+            anchor_date: empAnchorDate,
+            week1: rotatingSchedule.week1,
+            week2: rotatingSchedule.week2,
+            week3: rotatingSchedule.week3,
+            custom_night_weeks: customNightWeeks
+          }
+          : {
+            type: 'rotating',
+            anchor_date: empAnchorDate,
+            week1: rotatingSchedule.week1,
+            week2: rotatingSchedule.week2,
+            week3: rotatingSchedule.week3,
+            week4: rotatingSchedule.week4,
+            custom_night_weeks: customNightWeeks
+          };
 
     try {
       await updateEmployee({
@@ -325,7 +325,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
   // Compile timeline journey blocks
   const timelineJourney: { date: string; title: string; desc: string; type: 'milestone' | 'event' | 'leave' }[] = [];
-  
+
   if (employee.joining_date) {
     timelineJourney.push({
       date: employee.joining_date,
@@ -385,7 +385,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           const daysInMonth = new Date(selectedYear, mIdx + 1, 0).getDate();
           const firstDayOffset = new Date(selectedYear, mIdx, 1).getDay();
           const gridCells = [];
-          
+
           for (let i = 0; i < (firstDayOffset === 0 ? 6 : firstDayOffset - 1); i++) {
             gridCells.push(<div key={`blank-${i}`} className="w-6 h-6 rounded bg-transparent"></div>);
           }
@@ -394,8 +394,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             const dateStr = `${selectedYear}-${String(mIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const status = attendanceMap[dateStr];
             gridCells.push(
-              <div 
-                key={dateStr} 
+              <div
+                key={dateStr}
                 className={`w-6 h-6 rounded flex items-center justify-center text-[9px] font-black cursor-pointer transition ${getStatusColor(status)}`}
                 title={`${dateStr}: ${status || 'No entry'}`}
               >
@@ -424,7 +424,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const todayObjForDash = new Date();
   const DASHBOARD_TODAY = `${todayObjForDash.getFullYear()}-${String(todayObjForDash.getMonth() + 1).padStart(2, '0')}-${String(todayObjForDash.getDate()).padStart(2, '0')}`;
   const todayStatus = attendanceMap[DASHBOARD_TODAY] || 'No Log';
-  
+
   const completedDuties = attendance.filter(log => log.date < DASHBOARD_TODAY && ['P', 'P/N'].includes(log.status));
   completedDuties.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const lastDuty = completedDuties[0] || null;
@@ -490,8 +490,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       const anchor = new Date(anchorStr);
       const target = new Date(dateStr);
 
-      anchor.setHours(0,0,0,0);
-      target.setHours(0,0,0,0);
+      anchor.setHours(0, 0, 0, 0);
+      target.setHours(0, 0, 0, 0);
 
       const diffTime = target.getTime() - anchor.getTime();
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
@@ -524,7 +524,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       }
       return getBaseRotatingShiftForDate(sched, dateStr);
     };
-    const renderDayPill = (dayName: string, shift: string) => {
+
+    const renderDayPill = (dayName: string, shift: string) => {
       const code = (shift || 'R').toUpperCase();
       let bgClass = '';
       let icon = null;
@@ -710,7 +711,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 Anchor Date: <span className="font-mono font-extrabold text-slate-800">{new Date(anchorDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {['week1', 'week2', 'week3', ...(isRotating4Week ? ['week4'] : [])].map((wkKey, wkIdx) => {
                 const weekData = sched[wkKey] || {};
@@ -772,7 +773,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={onClose}
             className="p-2 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 transition cursor-pointer"
           >
@@ -793,7 +794,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
         <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-sm font-bold text-slate-800">
           <Calendar size={15} className="text-slate-500 ml-1" />
-          <select 
+          <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
             className="bg-transparent border-none focus:outline-none cursor-pointer"
@@ -946,13 +947,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               <div className="relative border-l border-slate-200 ml-2.5 pl-6 space-y-6 text-xs">
                 {timelineJourney.map((item, idx) => (
                   <div key={idx} className="relative">
-                    <span className={`absolute -left-[30px] top-0.5 w-3 h-3 rounded-full border-2 ${
-                      item.type === 'milestone' 
-                        ? 'bg-blue-600 border-white ring-2 ring-blue-100' 
-                        : item.type === 'event' 
-                          ? 'bg-purple-600 border-white ring-2 ring-purple-100' 
+                    <span className={`absolute -left-[30px] top-0.5 w-3 h-3 rounded-full border-2 ${item.type === 'milestone'
+                        ? 'bg-blue-600 border-white ring-2 ring-blue-100'
+                        : item.type === 'event'
+                          ? 'bg-purple-600 border-white ring-2 ring-purple-100'
                           : 'bg-amber-600 border-white ring-2 ring-amber-100'
-                    }`}></span>
+                      }`}></span>
                     <span className="text-[10px] font-bold text-slate-400 block">{new Date(item.date).toLocaleDateString('en-GB')}</span>
                     <h4 className="font-bold text-slate-800 mt-1">{item.title}</h4>
                     <p className="text-slate-500 font-semibold mt-1 leading-relaxed">{item.desc}</p>
@@ -1047,13 +1047,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       <tr key={log.id} className="hover:bg-slate-50/50">
                         <td className="py-2.5 px-4 font-mono">{new Date(log.date).toLocaleDateString('en-GB')}</td>
                         <td className="py-2.5 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
-                            log.status === 'CL' 
-                              ? 'bg-amber-50 text-amber-700 border-amber-250' 
-                              : log.status === 'LAP' 
-                                ? 'bg-orange-50 text-orange-700 border-orange-250' 
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${log.status === 'CL'
+                              ? 'bg-amber-50 text-amber-700 border-amber-250'
+                              : log.status === 'LAP'
+                                ? 'bg-orange-50 text-orange-700 border-orange-250'
                                 : 'bg-red-50 text-red-700 border-red-250'
-                          }`}>
+                            }`}>
                             {log.status}
                           </span>
                         </td>
@@ -1081,7 +1080,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 {crLedger.map((cr, idx) => (
                   <div key={idx} className="p-3 bg-slate-50 border rounded-lg text-xs font-semibold space-y-1">
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
-                      <span>CR LOG ID: {cr.id || idx+1}</span>
+                      <span>CR LOG ID: {cr.id || idx + 1}</span>
                       <span className="text-blue-600 font-extrabold">CREDIT</span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -1198,15 +1197,15 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 <CalendarDays size={16} className="text-blue-600" />
                 Roster Schedule Configuration
               </h3>
-              <button 
+              <button
                 type="button"
-                onClick={() => setIsScheduleEditOpen(false)} 
+                onClick={() => setIsScheduleEditOpen(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold text-sm transition"
               >
                 ✕
               </button>
             </div>
-            
+
             <form onSubmit={handleUpdateSchedule} className="p-5 space-y-4 text-xs font-bold text-slate-700">
               <div className="space-y-1">
                 <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Schedule Type</label>
@@ -1242,7 +1241,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
-                    <input 
+                    <input
                       type="date"
                       value={empAnchorDate}
                       onChange={(e) => setEmpAnchorDate(e.target.value)}
@@ -1298,7 +1297,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                           </button>
                         ))}
                       </div>
-                      
+
                       <div className="grid grid-cols-4 gap-2">
                         {getWeekdaysStartingFrom(empAnchorDate).map(day => (
                           <div key={day} className="flex flex-col gap-0.5">
@@ -1334,7 +1333,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 <div className="grid grid-cols-4 gap-1.5 items-end">
                   <div>
                     <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">From Date</label>
-                    <input 
+                    <input
                       type="date"
                       value={overrideFrom}
                       onChange={(e) => setOverrideFrom(e.target.value)}
@@ -1343,7 +1342,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                   </div>
                   <div>
                     <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">To Date</label>
-                    <input 
+                    <input
                       type="date"
                       value={overrideTo}
                       onChange={(e) => setOverrideTo(e.target.value)}
@@ -1407,7 +1406,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                 <div>
                   <label className="block mb-1 text-[10px] uppercase text-slate-400 tracking-wider">Weekly Rest Day</label>
-                  <select 
+                  <select
                     value={empRestDay}
                     onChange={(e) => {
                       const newRest = e.target.value;
@@ -1422,7 +1421,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     }}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer font-semibold focus:outline-none focus:border-blue-500"
                   >
-                    {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday','Flexible'].map(d => (
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible'].map(d => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
@@ -1430,15 +1429,15 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               </div>
 
               <div className="pt-4 border-t border-slate-150 flex justify-end gap-2 text-xs">
-                <button 
-                  type="button" 
-                  onClick={() => setIsScheduleEditOpen(false)} 
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleEditOpen(false)}
                   className="px-4 py-2 border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 font-bold transition cursor-pointer"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition cursor-pointer shadow-sm"
                   disabled={isSaving}
                 >
@@ -1477,12 +1476,12 @@ function StaffDirectory() {
 
   const handleDragEnter = (e: React.DragEvent, targetIndex: number) => {
     if (draggedIndex === null || draggedIndex === targetIndex) return;
-    
+
     const newEmployees = [...employees];
     const draggedItem = newEmployees[draggedIndex];
     newEmployees.splice(draggedIndex, 1);
     newEmployees.splice(targetIndex, 0, draggedItem);
-    
+
     setEmployees(newEmployees);
     setDraggedIndex(targetIndex);
   };
@@ -1524,7 +1523,7 @@ function StaffDirectory() {
     try {
       const storedSecs = await getSections();
       setSections(storedSecs);
-      
+
       const emps = await getEmployees(section === 'ALL' ? undefined : section);
       setEmployees(emps);
     } catch (e) {
@@ -1654,7 +1653,7 @@ function StaffDirectory() {
           </p>
         </div>
 
-        <button 
+        <button
           onClick={openAddModal}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-md shadow-blue-500/10 cursor-pointer"
         >
@@ -1700,18 +1699,17 @@ function StaffDirectory() {
                 </tr>
               ) : (
                 employees.map((emp, index) => (
-                  <tr 
-                    key={emp.emp_id} 
+                  <tr
+                    key={emp.emp_id}
                     draggable={dragEnabledId === emp.emp_id}
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnter={(e) => handleDragEnter(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`hover:bg-slate-50/50 transition-colors select-none ${
-                      draggedIndex === index ? 'opacity-40 bg-blue-50/20' : ''
-                    }`}
+                    className={`hover:bg-slate-50/50 transition-colors select-none ${draggedIndex === index ? 'opacity-40 bg-blue-50/20' : ''
+                      }`}
                   >
-                    <td 
+                    <td
                       className="py-3.5 px-2 text-center no-print cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"
                       onMouseDown={() => setDragEnabledId(emp.emp_id)}
                       onMouseUp={() => setDragEnabledId(null)}
@@ -1720,7 +1718,7 @@ function StaffDirectory() {
                     </td>
                     <td className="py-3.5 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
                     <td className="py-3.5 px-5 font-bold text-slate-800">
-                      <button 
+                      <button
                         onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
                         className="hover:text-blue-600 hover:underline font-bold text-slate-850 cursor-pointer text-left bg-transparent border-none"
                       >
@@ -1736,14 +1734,14 @@ function StaffDirectory() {
                     <td className="py-3.5 px-5 font-semibold text-slate-700">{emp.default_rest_day}</td>
                     <td className="py-3.5 px-5 font-mono text-slate-600">{emp.joining_date || "—"}</td>
                     <td className="py-3.5 px-5 text-center space-x-2 no-print">
-                      <button 
+                      <button
                         onClick={() => openEditModal(emp)}
                         className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition cursor-pointer"
                         title="Edit Details"
                       >
                         <Edit3 size={15} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDelete(emp.emp_id)}
                         className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
                         title="Delete Employee"
@@ -1772,8 +1770,8 @@ function StaffDirectory() {
             <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs font-bold text-slate-700">
               <div>
                 <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">P.F. Number</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={pfNumber}
                   onChange={(e) => setPfNumber(e.target.value)}
                   placeholder="e.g. 52229800622"
@@ -1783,8 +1781,8 @@ function StaffDirectory() {
               </div>
               <div>
                 <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Employee Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Subrata Naskar"
@@ -1794,8 +1792,8 @@ function StaffDirectory() {
               </div>
               <div>
                 <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Designation</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={designation}
                   onChange={(e) => setDesignation(e.target.value)}
                   placeholder="e.g. JE/Sig or Tech-II"
@@ -1806,19 +1804,19 @@ function StaffDirectory() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Pay Level</label>
-                  <select 
+                  <select
                     value={level}
                     onChange={(e) => setLevel(Number(e.target.value))}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
                   >
-                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(l => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(l => (
                       <option key={l} value={l}>Level {l}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Section Code</label>
-                  <select 
+                  <select
                     value={sectionId || ""}
                     onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : null)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
@@ -1833,20 +1831,20 @@ function StaffDirectory() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Weekly Rest Day</label>
-                  <select 
+                  <select
                     value={restDay}
                     onChange={(e) => setRestDay(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
                   >
-                    {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Joining Date</label>
-                  <input 
-                    type="date" 
+                  <input
+                    type="date"
                     value={joiningDate}
                     onChange={(e) => setJoiningDate(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 cursor-pointer"

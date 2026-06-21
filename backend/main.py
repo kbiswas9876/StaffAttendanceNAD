@@ -3016,7 +3016,7 @@ def export_ta_bill_excel(id: int):
                     ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
                 except Exception:
                     pass
-        title_font = Font(name="Segoe UI", size=11, bold=True, color="1B365D")
+        title_font = Font(name="Segoe UI", size=13, bold=True, color="1B365D")
         for r in range(start_row, end_row + 1):
             for c in range(start_col, end_col + 1):
                 cell = ws.cell(row=r, column=c)
@@ -3024,7 +3024,7 @@ def export_ta_bill_excel(id: int):
                 cell.font = title_font
                 cell.fill = PatternFill(fill_type=None)
                 cell.border = Border()
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         ws.cell(row=start_row, column=start_col).value = title
         if start_row != end_row or start_col != end_col:
             ws.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
@@ -3046,46 +3046,46 @@ def export_ta_bill_excel(id: int):
     # Build the header grid fields cleanly
     if journey_type == "NORMAL":
         # Row 1
-        write_meta_box(ws, 1, 1, 1, 3, "Book No", book_no, bold_val=True, alignment="left")
-        write_meta_box(ws, 1, 4, 1, 7, "Section/Station", section_code, bold_val=True, alignment="center")
-        write_meta_box(ws, 1, 8, 1, 10, "P.F. No", pf_number, bold_val=True, alignment="right")
+        write_meta_box(ws, 1, 1, 1, 4, "", f"TA Movement Register Book No. {book_no} at {section_code}", bold_val=True, alignment="left")
+        write_meta_box(ws, 1, 9, 1, 10, "", f"P.F. No. {pf_number}", bold_val=True, alignment="right")
         # Row 2
-        write_meta_box(ws, 2, 1, 2, 2, "Page No", page_no, alignment="left")
-        write_meta_box(ws, 2, 3, 2, 5, "Serial No", f"{serial_no_from} to {serial_no_to}", alignment="center")
-        write_meta_box(ws, 2, 6, 2, 7, "B.U. No", bill_unit, alignment="center")
-        write_title_box(ws, 2, 8, 2, 10, "TRAVELLING ALLOWANCE JOURNAL")
+        write_meta_box(ws, 2, 1, 2, 2, "", f"Page No. {page_no}", alignment="left")
+        write_meta_box(ws, 2, 3, 2, 4, "", f"Serial No. from {serial_no_from} to {serial_no_to}", alignment="center")
+        write_meta_box(ws, 2, 9, 2, 10, "", f"B.U. No. {bill_unit}", alignment="right")
+        write_title_box(ws, 1, 5, 2, 8, "TRAVELLING ALLOWANCE JOURNAL")
         # Row 4
         write_meta_box(ws, 4, 1, 4, 2, "Department", "S&T", alignment="left")
-        write_meta_box(ws, 4, 3, 4, 4, "Division HQs", section_code, alignment="center")
-        write_meta_box(ws, 4, 5, 4, 8, "Journal Performed by", f"Sri {emp_name}", bold_val=True, alignment="left")
-        write_meta_box(ws, 4, 9, 4, 10, "Allowance for", month_year_display, alignment="right")
+        write_meta_box(ws, 4, 3, 4, 4, "Division Headquarters at", section_code, alignment="center")
+        write_meta_box(ws, 4, 5, 4, 8, "Journal of duties performed by", f"Sri {emp_name}", bold_val=True, alignment="left")
+        write_meta_box(ws, 4, 9, 4, 10, "For which allowance is claimed", month_year_display, alignment="right")
         # Row 5
-        write_meta_box(ws, 5, 1, 5, 2, "Designation", designation, alignment="left")
-        write_meta_box(ws, 5, 3, 5, 4, "Pay", f"Rs. {basic_pay}", alignment="center")
-        write_meta_box(ws, 5, 5, 5, 6, "Level", level, alignment="center")
-        write_meta_box(ws, 5, 7, 5, 8, "DOA", joining_date_display, alignment="center")
-        write_meta_box(ws, 5, 9, 5, 10, "Rule", "SRTA", alignment="right")
+        write_meta_box(ws, 5, 1, 5, 1, "is claimed", "TA", alignment="left")
+        write_meta_box(ws, 5, 2, 5, 3, "Designation", designation, alignment="left")
+        write_meta_box(ws, 5, 4, 5, 5, "Pay", f"Rs. {basic_pay}", alignment="center")
+        write_meta_box(ws, 5, 6, 5, 6, "Level", level, alignment="center")
+        write_meta_box(ws, 5, 7, 5, 8, "Date of appointment", joining_date_display, alignment="center")
+        write_meta_box(ws, 5, 9, 5, 10, "Rule by which governed", "SRTA", alignment="right")
     else:
         # Row 1
-        write_meta_box(ws, 1, 1, 1, 3, "Book No", book_no, bold_val=True, alignment="left")
-        write_meta_box(ws, 1, 4, 1, 7, "Section/Station", section_code, bold_val=True, alignment="center")
-        write_meta_box(ws, 1, 8, 1, 11, "P.F. No", pf_number, bold_val=True, alignment="right")
+        write_meta_box(ws, 1, 1, 1, 4, "", f"TA Movement Register Book No. {book_no} at {section_code}", bold_val=True, alignment="left")
+        write_meta_box(ws, 1, 10, 1, 11, "", f"P.F. No. {pf_number}", bold_val=True, alignment="right")
         # Row 2
-        write_meta_box(ws, 2, 1, 2, 2, "Page No", page_no, alignment="left")
-        write_meta_box(ws, 2, 3, 2, 5, "Serial No", f"{serial_no_from} to {serial_no_to}", alignment="center")
-        write_meta_box(ws, 2, 6, 2, 7, "B.U. No", bill_unit, alignment="center")
-        write_title_box(ws, 2, 8, 2, 11, "TRAVELLING ALLOWANCE JOURNAL")
+        write_meta_box(ws, 2, 1, 2, 2, "", f"Page No. {page_no}", alignment="left")
+        write_meta_box(ws, 2, 3, 2, 4, "", f"Serial No. from {serial_no_from} to {serial_no_to}", alignment="center")
+        write_meta_box(ws, 2, 10, 2, 11, "", f"B.U. No. {bill_unit}", alignment="right")
+        write_title_box(ws, 1, 5, 2, 9, "TRAVELLING ALLOWANCE JOURNAL")
         # Row 4
         write_meta_box(ws, 4, 1, 4, 2, "Department", "S&T", alignment="left")
-        write_meta_box(ws, 4, 3, 4, 4, "Division HQs", section_code, alignment="center")
-        write_meta_box(ws, 4, 5, 4, 9, "Journal Performed by", f"Sri {emp_name}", bold_val=True, alignment="left")
-        write_meta_box(ws, 4, 10, 4, 11, "Allowance for", month_year_display, alignment="right")
+        write_meta_box(ws, 4, 3, 4, 4, "Division Headquarters at", section_code, alignment="center")
+        write_meta_box(ws, 4, 5, 4, 9, "Journal of duties performed by", f"Sri {emp_name}", bold_val=True, alignment="left")
+        write_meta_box(ws, 4, 10, 4, 11, "For which allowance is claimed", month_year_display, alignment="right")
         # Row 5
-        write_meta_box(ws, 5, 1, 5, 2, "Designation", designation, alignment="left")
-        write_meta_box(ws, 5, 3, 5, 4, "Pay", f"Rs. {basic_pay}", alignment="center")
-        write_meta_box(ws, 5, 5, 5, 6, "Level", level, alignment="center")
-        write_meta_box(ws, 5, 7, 5, 9, "DOA", joining_date_display, alignment="center")
-        write_meta_box(ws, 5, 10, 5, 11, "Rule", "SRTA", alignment="right")
+        write_meta_box(ws, 5, 1, 5, 1, "is claimed", "TA", alignment="left")
+        write_meta_box(ws, 5, 2, 5, 3, "Designation", designation, alignment="left")
+        write_meta_box(ws, 5, 4, 5, 5, "Pay", f"Rs. {basic_pay}", alignment="center")
+        write_meta_box(ws, 5, 6, 5, 6, "Level", level, alignment="center")
+        write_meta_box(ws, 5, 7, 5, 9, "Date of appointment", joining_date_display, alignment="center")
+        write_meta_box(ws, 5, 10, 5, 11, "Rule by which governed", "SRTA", alignment="right")
 
     # Write data
     total_amount = 0
