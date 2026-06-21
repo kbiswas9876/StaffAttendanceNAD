@@ -9,7 +9,8 @@ import {
   Info,
   Settings
 } from 'lucide-react';
-import { getEmployees, getAttendanceLogs, Employee, AttendanceLog } from '../../lib/api';
+import { getEmployees, getAttendanceLogs, Employee, AttendanceLog, getSections, Section } from '../../lib/api';
+import { getTranslation } from '../../lib/translations';
 
 interface NDAStaffRow {
   sl: number;
@@ -18,6 +19,7 @@ interface NDAStaffRow {
   designation: string;
   level: number;
   dates: string;
+  section_code: string;
   rawDates?: { day: number, monthStr: string }[];
   total_days: number;
   total_hours: number;
@@ -59,6 +61,21 @@ export default function NightDutyNDA() {
   const [loading, setLoading] = useState<boolean>(true);
   const [exporting, setExporting] = useState<string | null>(null);
   const [billUnit, setBillUnit] = useState<string>('');
+  const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
+  const [sections, setSections] = useState<Section[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
+    }
+    const handleLangChange = () => {
+      if (typeof window !== 'undefined') {
+        setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
+      }
+    };
+    window.addEventListener('erp_lang_changed', handleLangChange);
+    return () => window.removeEventListener('erp_lang_changed', handleLangChange);
+  }, []);
 
   useEffect(() => {
     setBillUnit(activeSection === 'KMUK' ? '2201-807' : '2201-806');
@@ -174,8 +191,36 @@ export default function NightDutyNDA() {
   const loadNDAData = async (section: string, month: number, year: number) => {
     setLoading(true);
     try {
+      let currentSections = sections;
+      if (currentSections.length === 0) {
+        try {
+          currentSections = await getSections();
+          setSections(currentSections);
+        } catch (e) {
+          console.error("Failed to load sections", e);
+        }
+      }
+
+      let activeSectionsList: string[] = [];
+      if (section === 'ALL' && typeof window !== 'undefined') {
+        const lineId = localStorage.getItem('erp_active_line_id') || '1';
+        const stored = localStorage.getItem(`erp_join_sections_${lineId}`);
+        if (stored) {
+          try {
+            activeSectionsList = JSON.parse(stored);
+          } catch (e) {}
+        }
+        if (activeSectionsList.length === 0) {
+          activeSectionsList = currentSections.filter(s => s.line_id === Number(lineId)).map(s => s.section_code);
+        }
+      }
+
       const emps = await getEmployees(section === 'ALL' ? undefined : section);
-      setEmployees(emps);
+      const filteredEmps = section === 'ALL'
+        ? emps.filter(e => e.section_code && activeSectionsList.includes(e.section_code))
+        : emps;
+      
+      setEmployees(filteredEmps);
 
       // Compute date ranges
       let prevM = month - 1;
@@ -185,22 +230,24 @@ export default function NightDutyNDA() {
       const startDateStr = `${prevY}-${String(prevM + 1).padStart(2, '0')}-11`;
       const endDateStr = `${year}-${String(month + 1).padStart(2, '0')}-10`;
 
-      const logs = await getAttendanceLogs(
-        section === 'ALL' ? 'KKVS' : section,
-        startDateStr,
-        endDateStr
-      );
-      let jointLogs = [...logs];
+      let jointLogs: AttendanceLog[] = [];
       if (section === 'ALL') {
-        const logsKmuk = await getAttendanceLogs('KMUK', startDateStr, endDateStr);
-        jointLogs = [...jointLogs, ...logsKmuk];
+        for (const secCode of activeSectionsList) {
+          try {
+            const secLogs = await getAttendanceLogs(secCode, startDateStr, endDateStr);
+            jointLogs = [...jointLogs, ...secLogs];
+          } catch (e) {
+            console.error(`Failed to load logs for section ${secCode}`, e);
+          }
+        }
+      } else {
+        jointLogs = await getAttendanceLogs(section, startDateStr, endDateStr);
       }
 
       // Process and extract P/N shifts for each employee
       const rowsList: NDAStaffRow[] = [];
-      let slCounter = 1;
 
-      emps.forEach((emp) => {
+      filteredEmps.forEach((emp) => {
         const empLogs = jointLogs.filter(log => log.emp_id === emp.emp_id && log.status === 'P/N');
         
         // Sort logs by date order
@@ -228,11 +275,12 @@ export default function NightDutyNDA() {
         const weightage = `${String(wtHrs).padStart(2, '0')} HRS ${String(wtMins).padStart(2, '0')} MIN.`;
 
         rowsList.push({
-          sl: slCounter++,
+          sl: 0, // Assigned after sorting
           pf_number: emp.pf_number,
           name: emp.name,
           designation: emp.designation,
           level: emp.level,
+          section_code: emp.section_code || '',
           dates: dayNumbers.length > 0 ? dayNumbers.join(',') : 'Nil',
           rawDates,
           total_days,
@@ -241,12 +289,34 @@ export default function NightDutyNDA() {
         });
       });
 
-      // Grouping by level descending and designation
-      rowsList.sort((a, b) => b.level - a.level || a.designation.localeCompare(b.designation));
+      // Sorting
+      if (section === 'ALL') {
+        rowsList.sort((a, b) => {
+          const secA = a.section_code || '';
+          const secB = b.section_code || '';
+          if (secA !== secB) {
+            return secA.localeCompare(secB);
+          }
+          return b.level - a.level || a.designation.localeCompare(b.designation);
+        });
+      } else {
+        rowsList.sort((a, b) => b.level - a.level || a.designation.localeCompare(b.designation));
+      }
       
       // Re-adjust serial numbers after sorting
+      let lastSec = '';
+      let secCounter = 0;
       rowsList.forEach((r, i) => {
-        r.sl = i + 1;
+        if (section === 'ALL') {
+          if (r.section_code !== lastSec) {
+            lastSec = r.section_code;
+            secCounter = 0;
+          }
+          secCounter++;
+          r.sl = secCounter;
+        } else {
+          r.sl = i + 1;
+        }
       });
 
       setNdaRows(rowsList);
@@ -308,6 +378,7 @@ export default function NightDutyNDA() {
         level: r.level,
         dates: r.dates === 'Nil' ? '' : (formatDates(r) === 'Nil' ? '' : formatDates(r)),
         total_days: r.total_days,
+        section_code: r.section_code || '',
         remarks: ''
       }))
     };
@@ -350,9 +421,9 @@ export default function NightDutyNDA() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-            Night Duty Allowance (NDA) Calculator
+            {getTranslation(lang, 'Night Duty Allowance (NDA) Calculator')}
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-bold uppercase tracking-wider">
-              {activeSection === 'ALL' ? 'Joint View' : `${activeSection} Section`}
+              {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
           <p className="text-sm text-slate-500 mt-1">
@@ -368,7 +439,7 @@ export default function NightDutyNDA() {
             <select 
               value={selectedMonth} 
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer"
+              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer text-xs"
             >
               {monthsList.map((m) => {
                 let prevM = m.val - 1;
@@ -386,7 +457,7 @@ export default function NightDutyNDA() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer ml-1"
+              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer ml-1 text-xs"
             >
               <option value={2026} className="bg-white text-slate-800">2026</option>
               <option value={2025} className="bg-white text-slate-800">2025</option>
@@ -399,7 +470,7 @@ export default function NightDutyNDA() {
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer ${showSigConfig ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 border-slate-250 text-slate-700 hover:bg-slate-200'}`}
           >
             <Settings size={14} />
-            Signatories
+            {getTranslation(lang, 'Signatories')}
           </button>
 
           {/* Export buttons */}
@@ -409,16 +480,14 @@ export default function NightDutyNDA() {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer"
           >
             <FileSpreadsheet size={14} />
-            {exporting === 'excel' ? 'Exporting...' : 'Export Excel'}
+            {exporting === 'excel' ? 'Exporting...' : getTranslation(lang, 'Export Excel')}
           </button>
-
-
         </div>
       </div>
 
       {/* Signatory Config Panel */}
       {showSigConfig && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-750 select-none">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-755 select-none">
           <div className="flex flex-col gap-1.5">
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Left Signatory (SSE In-Charge)</label>
             <select
@@ -523,9 +592,9 @@ export default function NightDutyNDA() {
         <div className="w-9 h-9 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
           <Info size={18} className="stroke-[2.5]" />
         </div>
-        <div className="text-xs text-slate-700 space-y-2 flex-1">
-          <h4 className="font-black text-slate-850 text-xs uppercase tracking-wider">NDA Weightage Algorithm Calculation</h4>
-          <p className="leading-relaxed font-semibold">
+        <div className="text-xs text-slate-700 space-y-2 flex-1 font-semibold">
+          <h4 className="font-black text-slate-850 text-xs uppercase tracking-wider">{getTranslation(lang, 'NDA Weightage Algorithm Calculation')}</h4>
+          <p className="leading-relaxed">
             The system extracts shift data matching the code <strong className="text-blue-600 bg-blue-100/50 px-1.5 py-0.5 rounded font-mono">P/N</strong> (Present with Night Duty) and applies the following computations:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
@@ -542,7 +611,7 @@ export default function NightDutyNDA() {
               </span>
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 font-bold mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             * Shift results are grouped and sorted hierarchically by Employee Pay Level according to official establishment rules.
           </p>
         </div>
@@ -553,7 +622,7 @@ export default function NightDutyNDA() {
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <Moon size={18} className="text-blue-600" />
-            Night Duty Allowance Statement Preview
+            {getTranslation(lang, 'Night Duty Allowance Statement Preview')}
           </h3>
           <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-650">
             {ndaRows.length} Rows
@@ -564,15 +633,15 @@ export default function NightDutyNDA() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50">
-                <th className="py-3 px-5 w-[60px] text-center">SL</th>
-                <th className="py-3 px-5">P.F. No.</th>
-                <th className="py-3 px-5">Name of Staff</th>
-                <th className="py-3 px-5">Desig</th>
-                <th className="py-3 px-5 text-center">Level</th>
-                <th className="py-3 px-5">Night Duty Dates</th>
-                <th className="py-3 px-5 text-center">Total Days</th>
-                <th className="py-3 px-5 text-center">Total Hours</th>
-                <th className="py-3 px-5 text-center">Weightage</th>
+                <th className="py-3 px-5 w-[60px] text-center">{getTranslation(lang, 'SL')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'P.F. No.')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Name of Staff')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Desig')}</th>
+                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Level')}</th>
+                <th className="py-3 px-5">{getTranslation(lang, 'Night Duty Dates')}</th>
+                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Total Days')}</th>
+                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Total Hours')}</th>
+                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Weightage')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -589,27 +658,50 @@ export default function NightDutyNDA() {
                   </td>
                 </tr>
               ) : (
-                ndaRows.map((row) => (
-                  <tr key={row.pf_number} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3 px-5 text-center text-slate-400 font-bold">{row.sl}</td>
-                    <td className="py-3 px-5 font-mono text-slate-500 text-xs">{row.pf_number}</td>
-                    <td className="py-3 px-5 font-bold text-slate-700">{row.name}</td>
-                    <td className="py-3 px-5">
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">
-                        {row.designation}
-                      </span>
-                    </td>
-                    <td className="py-3 px-5 text-center">
-                      <span className="text-xs font-extrabold text-blue-600">Lvl {row.level}</span>
-                    </td>
-                    <td className="py-3 px-5 text-xs text-slate-650 max-w-[200px] truncate" title={formatDates(row)}>
-                      {formatDates(row)}
-                    </td>
-                    <td className="py-3 px-5 text-center font-bold text-slate-700">{row.total_days}</td>
-                    <td className="py-3 px-5 text-center font-mono text-slate-500 text-xs">{row.total_hours} Hrs</td>
-                    <td className="py-3 px-5 text-center font-bold text-blue-600">{row.weightage}</td>
-                  </tr>
-                ))
+                (() => {
+                  let lastSection = '';
+                  return ndaRows.flatMap((row) => {
+                    const showSectionHeader = activeSection === 'ALL' && row.section_code !== lastSection;
+                    if (showSectionHeader) {
+                      lastSection = row.section_code;
+                    }
+                    const rows = [];
+                    if (showSectionHeader) {
+                      rows.push(
+                        <tr key={`sec-header-${row.section_code}`} className="bg-slate-100 font-extrabold text-[11px] tracking-wider text-slate-700 uppercase no-print select-none">
+                          <td colSpan={9} className="py-2 px-5 text-left border-y border-slate-200 bg-slate-150">
+                            <span className="bg-blue-600 text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
+                            <span className="font-black text-slate-800">
+                              {row.section_code === 'KKVS' ? 'Kavi Subhash (KKVS)' : row.section_code === 'KMUK' ? 'Kavi Nazrul (KMUK)' : row.section_code}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    rows.push(
+                      <tr key={row.pf_number} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 px-5 text-center text-slate-400 font-bold">{row.sl}</td>
+                        <td className="py-3 px-5 font-mono text-slate-550 text-xs">{row.pf_number}</td>
+                        <td className="py-3 px-5 font-bold text-slate-800">{row.name}</td>
+                        <td className="py-3 px-5">
+                          <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">
+                            {row.designation}
+                          </span>
+                        </td>
+                        <td className="py-3 px-5 text-center">
+                          <span className="text-xs font-extrabold text-blue-600">Lvl {row.level}</span>
+                        </td>
+                        <td className="py-3 px-5 text-xs text-slate-655 max-w-[200px] truncate" title={formatDates(row)}>
+                          {formatDates(row)}
+                        </td>
+                        <td className="py-3 px-5 text-center font-bold text-slate-800">{row.total_days}</td>
+                        <td className="py-3 px-5 text-center font-mono text-slate-550 text-xs">{row.total_hours} Hrs</td>
+                        <td className="py-3 px-5 text-center font-bold text-blue-600">{row.weightage}</td>
+                      </tr>
+                    );
+                    return rows;
+                  });
+                })()
               )}
             </tbody>
           </table>

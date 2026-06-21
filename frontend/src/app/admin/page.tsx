@@ -8,6 +8,7 @@ import {
   CalendarDays, 
   Calendar, 
   Settings, 
+  Sliders,
   Database, 
   History, 
   Plus, 
@@ -25,6 +26,7 @@ import {
   Info,
   AlertTriangle
 } from 'lucide-react';
+import { getTranslation } from '../../lib/translations';
 import { 
   getEmployees, createEmployee, updateEmployee, deleteEmployee, Employee,
   getLines, createLine, updateLine, deleteLine, MetroLine,
@@ -181,8 +183,25 @@ const monthsList = [
 ];
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates' | 'settings'>('employees');
+  const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
+  const [mySection, setMySection] = useState('KKVS');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
+      setMySection(localStorage.getItem('erp_my_section') || 'KKVS');
+    }
+    
+    const handleLangChange = () => {
+      if (typeof window !== 'undefined') {
+        setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
+      }
+    };
+    window.addEventListener('erp_lang_changed', handleLangChange);
+    return () => window.removeEventListener('erp_lang_changed', handleLangChange);
+  }, []);
 
   // Data lists
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1288,17 +1307,18 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs navigation grid */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2 border-b border-slate-200 pb-3">
+      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-10 gap-2 border-b border-slate-200 pb-3">
         {[
           { id: 'employees', label: 'Enroll & Transfer', icon: Users },
           { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
           { id: 'shifts', label: 'Shift Rules', icon: Clock },
           { id: 'roster', label: 'Roster Planner', icon: Calendar },
-          { id: 'codes', label: 'Roster Codes', icon: Settings },
+          { id: 'codes', label: 'Roster Codes', icon: Sliders },
           { id: 'holidays', label: 'Holidays Master', icon: CalendarDays },
           { id: 'backups', label: 'DB Backups', icon: Database },
           { id: 'audit', label: 'Audit Logs', icon: History },
-          { id: 'updates', label: 'System Update', icon: RefreshCw }
+          { id: 'updates', label: 'System Update', icon: RefreshCw },
+          { id: 'settings', label: getTranslation(lang, 'My Section'), icon: Settings }
         ].map(tab => (
           <button
             key={tab.id}
@@ -3162,6 +3182,39 @@ export default function AdminPanel() {
                 )}
               </div>
             </>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+                <Settings size={15} className="text-blue-600" />
+                {getTranslation(lang, 'System Preferences & Settings')}
+              </h3>
+              
+              <div className="space-y-4 text-xs font-bold text-slate-600 max-w-sm">
+                <div>
+                  <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-500">{getTranslation(lang, 'Preferred Default Section (My Section)')}</label>
+                  <select 
+                    value={mySection}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMySection(val);
+                      localStorage.setItem('erp_my_section', val);
+                      showToast("Preferred default section updated successfully.", "success");
+                      window.dispatchEvent(new Event('erp_my_section_changed'));
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    {sections.map(sec => (
+                      <option key={sec.id} value={sec.section_code}>{sec.section_code} - {sec.section_name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed font-semibold">
+                    Choosing a section here sets it as your default "My Section". The ERP will load this section by default on startup.
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
         </div>

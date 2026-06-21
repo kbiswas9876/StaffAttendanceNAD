@@ -31,8 +31,11 @@ import {
   updateCRLedgerEntry,
   deleteAttendanceLog,
   deleteAttendanceLogsRange,
-  createBackup
+  createBackup,
+  getSections,
+  Section
 } from '../../lib/api';
+import { getTranslation } from '../../lib/translations';
 
 interface DayInfo {
   dateStr: string;
@@ -225,6 +228,24 @@ export default function AttendanceGrid() {
   const [activeDropdownCell, setActiveDropdownCell] = useState<{ empId: number; dateStr: string } | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   
+  const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
+  const [sections, setSections] = useState<Section[]>([]);
+  const [hoveredCell, setHoveredCell] = useState<{ empName: string; designation: string; dateStr: string; weekday: string; status: string } | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
+    }
+    const handleLangChange = () => {
+      if (typeof window !== 'undefined') {
+        setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
+      }
+    };
+    window.addEventListener('erp_lang_changed', handleLangChange);
+    return () => window.removeEventListener('erp_lang_changed', handleLangChange);
+  }, []);
+
   // Roster Simulation/Preview Modal state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [rosterChanges, setRosterChanges] = useState<{ empName: string; date: string; oldVal: string; newVal: string }[]>([]);
@@ -484,8 +505,47 @@ export default function AttendanceGrid() {
     computeDays(month, year);
 
     try {
+      let currentSections = sections;
+      if (currentSections.length === 0) {
+        try {
+          currentSections = await getSections();
+          setSections(currentSections);
+        } catch (e) {
+          console.error("Failed to load sections", e);
+        }
+      }
+
+      let activeSectionsList: string[] = [];
+      if (section === 'ALL' && typeof window !== 'undefined') {
+        const lineId = localStorage.getItem('erp_active_line_id') || '1';
+        const stored = localStorage.getItem(`erp_join_sections_${lineId}`);
+        if (stored) {
+          try {
+            activeSectionsList = JSON.parse(stored);
+          } catch (e) {}
+        }
+        if (activeSectionsList.length === 0) {
+          activeSectionsList = currentSections.filter(s => s.line_id === Number(lineId)).map(s => s.section_code);
+        }
+      }
+
       const emps = await getEmployees(section === 'ALL' ? undefined : section);
-      setEmployees(emps);
+      const filteredEmps = section === 'ALL'
+        ? emps.filter(e => e.section_code && activeSectionsList.includes(e.section_code))
+        : emps;
+
+      // Sort and group by section code, then level descending
+      if (section === 'ALL') {
+        filteredEmps.sort((a, b) => {
+          const secA = a.section_code || '';
+          const secB = b.section_code || '';
+          if (secA !== secB) {
+            return secA.localeCompare(secB);
+          }
+          return b.level - a.level;
+        });
+      }
+      setEmployees(filteredEmps);
 
       let prevM = month - 1;
       let prevY = year;
@@ -493,19 +553,22 @@ export default function AttendanceGrid() {
       const startDateStr = `${prevY}-${String(prevM + 1).padStart(2, '0')}-11`;
       const endDateStr = `${year}-${String(month + 1).padStart(2, '0')}-10`;
 
-      const logs = await getAttendanceLogs(
-        section === 'ALL' ? 'KKVS' : section,
-        startDateStr,
-        endDateStr
-      );
-      let jointLogs = [...logs];
+      let jointLogs: AttendanceLog[] = [];
       if (section === 'ALL') {
-        const logsKmuk = await getAttendanceLogs('KMUK', startDateStr, endDateStr);
-        jointLogs = [...jointLogs, ...logsKmuk];
+        for (const secCode of activeSectionsList) {
+          try {
+            const secLogs = await getAttendanceLogs(secCode, startDateStr, endDateStr);
+            jointLogs = [...jointLogs, ...secLogs];
+          } catch (e) {
+            console.error(`Failed to load logs for section ${secCode}`, e);
+          }
+        }
+      } else {
+        jointLogs = await getAttendanceLogs(section, startDateStr, endDateStr);
       }
 
       const newGrid: { [empId: number]: { [dateStr: string]: AttendanceLog } } = {};
-      emps.forEach((emp) => {
+      filteredEmps.forEach((emp) => {
         newGrid[emp.emp_id] = {};
       });
 
@@ -526,7 +589,7 @@ export default function AttendanceGrid() {
 
       const ledgersMap: { [empId: number]: CRLedgerEntry[] } = {};
       const assocMap: { [key: string]: number } = {};
-      for (const emp of emps) {
+      for (const emp of filteredEmps) {
         const ledger = await getCRLedger(emp.emp_id);
         ledgersMap[emp.emp_id] = ledger;
         ledger.forEach(entry => {
@@ -937,15 +1000,13 @@ export default function AttendanceGrid() {
   };
 
   return (
-    <div className="p-6 space-y-6 flex flex-col h-full min-h-screen">
-
-      {/* Title & Toolbar */}
+    <div className="p-6 space-y-6 flex flex-col h-full min-h-screen">      {/* Title & Toolbar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-850 flex items-center gap-2">
-            Smart Attendance Roster
+            {getTranslation(lang, 'Smart Attendance Roster')}
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00c2b2]/10 text-[#00c2b2] border border-[#00c2b2]/20 font-black uppercase tracking-wider">
-              {activeSection === 'ALL' ? 'Joint View' : `${activeSection} Section`}
+              {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
           <p className="text-xs font-semibold text-slate-500 mt-1">
@@ -991,7 +1052,7 @@ export default function AttendanceGrid() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 font-bold text-xs tracking-wider uppercase transition no-print cursor-pointer"
           >
             <Sparkles size={14} />
-            Auto-Fill
+            {getTranslation(lang, 'Auto-Fill')}
           </button>
 
           <button
@@ -1004,7 +1065,7 @@ export default function AttendanceGrid() {
             }`}
           >
             <RotateCcw size={14} />
-            Undo
+            {getTranslation(lang, 'Undo')}
           </button>
 
           <button
@@ -1012,7 +1073,7 @@ export default function AttendanceGrid() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 font-bold text-xs tracking-wider uppercase transition no-print cursor-pointer"
           >
             <Trash2 size={14} />
-            Delete Roster Month
+            {getTranslation(lang, 'Delete Roster Month')}
           </button>
 
           <button
@@ -1023,7 +1084,7 @@ export default function AttendanceGrid() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs tracking-wider uppercase transition no-print cursor-pointer"
           >
             <PlusCircle size={14} />
-            Bulk Entry
+            {getTranslation(lang, 'Bulk Entry')}
           </button>
 
           {/* Signatories Config Toggle */}
@@ -1032,7 +1093,7 @@ export default function AttendanceGrid() {
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer ${showSigConfig ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 border-slate-250 text-slate-700 hover:bg-slate-200'}`}
           >
             <Settings size={14} />
-            Signatories
+            {getTranslation(lang, 'Signatories')}
           </button>
 
           <button
@@ -1041,10 +1102,8 @@ export default function AttendanceGrid() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer"
           >
             <FileSpreadsheet size={14} />
-            {exporting === 'excel' ? 'Excel...' : 'Export Excel'}
+            {exporting === 'excel' ? 'Excel...' : getTranslation(lang, 'Export Excel')}
           </button>
-
-
 
           <button
             onClick={handleOpenSimulation}
@@ -1055,7 +1114,7 @@ export default function AttendanceGrid() {
               }`}
           >
             <Save size={14} />
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? 'Saving...' : getTranslation(lang, 'Save Changes')}
           </button>
         </div>
       </div>
@@ -1194,115 +1253,189 @@ export default function AttendanceGrid() {
 
               {/* Table Body */}
               <tbody className="divide-y divide-slate-100 bg-white">
-                {employees.map((emp) => {
-                  const empGrid = gridData[emp.emp_id] || {};
+                {(() => {
+                  let lastSection = '';
+                  let localSl = 0;
+                  return employees.flatMap((emp, idx) => {
+                    const empGrid = gridData[emp.emp_id] || {};
+                    const showSectionHeader = activeSection === 'ALL' && emp.section_code !== lastSection;
+                    if (showSectionHeader) {
+                      lastSection = emp.section_code || '';
+                      localSl = 0; // Reset local serial number
+                    }
+                    localSl++;
 
-                  return (
-                    <tr key={emp.emp_id} className="hover:bg-slate-50/50 transition-colors">
-                      {/* Fixed Staff info cell */}
-                      <td className="py-2 px-3 text-left bg-slate-50 sticky left-0 z-10 border-r border-slate-200 flex flex-col justify-center h-[60px] w-[180px]">
-                        <span className="font-bold text-slate-800 text-[11px] truncate max-w-[160px]">
-                          {emp.name}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-slate-550 mt-0.5 font-semibold">
-                          <span className="text-slate-400">PF:</span>
-                          <span className="text-blue-700 font-bold">{emp.pf_number}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5 font-semibold">
-                          {emp.designation}
-                          <span className="text-[9px] text-blue-600 font-bold">L{emp.level}</span>
-                        </span>
-                      </td>
-
-                      {/* Date cells */}
-                      {days.map((day) => {
-                        const log = empGrid[day.dateStr];
-                        const status = log ? log.status : '';
-                        const earnedDateShort = log?.remarks && log.remarks.startsWith('CR_EARNED_DATE:')
-                          ? (() => {
-                              const parts = log.remarks.split('CR_EARNED_DATE:');
-                              if (parts[1]) {
-                                const dParts = parts[1].split('-');
-                                if (dParts[1] && dParts[2]) {
-                                  return `${dParts[2]}.${dParts[1]}`;
-                                }
-                              }
-                              return '';
-                            })()
-                          : '';
-
-                        return (
-                          <td
-                            key={day.dateStr}
-                            className="p-1 border-r border-slate-200 relative animate-fade-in"
-                            style={getCellStyle(status, day.isSunday)}
-                          >
-                            <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px] relative">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (activeDropdownCell?.empId === emp.emp_id && activeDropdownCell?.dateStr === day.dateStr) {
-                                    setActiveDropdownCell(null);
-                                    setDropdownPos(null);
-                                  } else {
-                                    setActiveDropdownCell({ empId: emp.emp_id, dateStr: day.dateStr });
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    setDropdownPos({
-                                      top: rect.bottom,
-                                      left: rect.left + rect.width / 2,
-                                      width: rect.width
-                                    });
-                                  }
-                                }}
-                                className="w-full h-full text-center bg-transparent border-none font-black text-[10.5px] focus:outline-none cursor-pointer flex items-center justify-center min-h-[30px] transition-transform active:scale-95 duration-100 hover:bg-slate-200/20 rounded-md"
-                                style={{ color: getCellStyle(status, day.isSunday).color }}
-                              >
-                                {status || '—'}
-                              </button>
-
-                              {status === 'CR' && earnedDateShort && (
-                                <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px] z-10">
-                                  {earnedDateShort}
-                                </span>
-                              )}
-
-                              {status !== 'CR' && status !== 'P' && status !== '' && log?.remarks && (
-                                <span className="text-[7.2px] font-bold text-slate-500 block leading-none select-none pointer-events-none mt-[-2px] z-10 truncate max-w-[42px]" title={log.remarks}>
-                                  {log.remarks.replace('Order: ', '')}
-                                </span>
-                              )}
-                            </div>
+                    const globalSl = idx + 1;
+                    const slToShow = activeSection === 'ALL' ? localSl : globalSl;
+                    
+                    const rows = [];
+                    if (showSectionHeader) {
+                      rows.push(
+                        <tr key={`sec-header-${emp.section_code}`} className="bg-slate-100 font-extrabold text-[11px] tracking-wider text-slate-700 uppercase no-print select-none">
+                          <td colSpan={days.length + 2} className="py-2 px-4 text-left border-y border-slate-200 bg-slate-150">
+                            <span className="bg-blue-600 text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
+                            <span className="font-black text-slate-800">
+                              {emp.section_code === 'KKVS' ? 'Kavi Subhash (KKVS)' : emp.section_code === 'KMUK' ? 'Kavi Nazrul (KMUK)' : emp.section_code}
+                            </span>
                           </td>
-                        );
-                      })}
+                        </tr>
+                      );
+                    }
 
-                      {/* Remarks cell */}
-                      <td className="py-2 px-3 border-l border-slate-200">
-                        <input
-                          type="text"
-                          placeholder="No remarks"
-                          value={empGrid[days[0]?.dateStr]?.remarks || ''}
-                          onChange={(e) => {
-                            if (days[0]) {
-                              handleCellChange(emp.emp_id, days[0].dateStr, empGrid[days[0].dateStr]?.status || 'P');
-                              setGridData((prev) => {
-                                const eg = { ...prev[emp.emp_id] };
-                                eg[days[0].dateStr].remarks = e.target.value;
-                                return { ...prev, [emp.emp_id]: eg };
-                              });
-                            }
-                          }}
-                          className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-700 focus:outline-none focus:border-blue-500"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
+                    rows.push(
+                      <tr key={emp.emp_id} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Fixed Staff info cell */}
+                        <td className="py-2 px-3 text-left bg-slate-50 sticky left-0 z-10 border-r border-slate-200 flex flex-col justify-center h-[60px] w-[180px]">
+                          <span className="font-bold text-slate-800 text-[11px] truncate max-w-[160px]" title={emp.name}>
+                            {slToShow}. {emp.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-slate-550 mt-0.5 font-semibold">
+                            <span className="text-slate-400">PF:</span>
+                            <span className="text-blue-700 font-bold">{emp.pf_number}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5 font-semibold">
+                            {emp.designation}
+                            <span className="text-[9px] text-blue-600 font-bold">L{emp.level}</span>
+                          </span>
+                        </td>
+
+                        {/* Date cells */}
+                        {days.map((day) => {
+                          const log = empGrid[day.dateStr];
+                          const status = log ? log.status : '';
+                          const earnedDateShort = log?.remarks && log.remarks.startsWith('CR_EARNED_DATE:')
+                            ? (() => {
+                                const parts = log.remarks.split('CR_EARNED_DATE:');
+                                if (parts[1]) {
+                                  const dParts = parts[1].split('-');
+                                  if (dParts[1] && dParts[2]) {
+                                    return `${dParts[2]}.${dParts[1]}`;
+                                  }
+                                }
+                                return '';
+                              })()
+                            : '';
+
+                          return (
+                            <td
+                              key={day.dateStr}
+                              className="p-1 border-r border-slate-200 relative animate-fade-in cursor-pointer"
+                              style={getCellStyle(status, day.isSunday)}
+                              onMouseEnter={() => {
+                                if (activeDropdownCell) return;
+                                setHoveredCell({
+                                  empName: emp.name,
+                                  designation: emp.designation,
+                                  dateStr: day.dateStr,
+                                  weekday: day.weekday,
+                                  status: status || '—'
+                                });
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredCell(null);
+                              }}
+                              onMouseMove={(e) => {
+                                setMousePos({ x: e.clientX, y: e.clientY });
+                              }}
+                            >
+                              <div className="flex flex-col justify-center items-center w-full h-full min-h-[38px] relative">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (activeDropdownCell?.empId === emp.emp_id && activeDropdownCell?.dateStr === day.dateStr) {
+                                      setActiveDropdownCell(null);
+                                      setDropdownPos(null);
+                                    } else {
+                                      setActiveDropdownCell({ empId: emp.emp_id, dateStr: day.dateStr });
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setDropdownPos({
+                                        top: rect.bottom,
+                                        left: rect.left + rect.width / 2,
+                                        width: rect.width
+                                      });
+                                      setHoveredCell(null);
+                                    }
+                                  }}
+                                  className="w-full h-full text-center bg-transparent border-none font-black text-[10.5px] focus:outline-none cursor-pointer flex items-center justify-center min-h-[30px] transition-transform active:scale-95 duration-100 hover:bg-slate-200/20 rounded-md"
+                                  style={{ color: getCellStyle(status, day.isSunday).color }}
+                                >
+                                  {status || '—'}
+                                </button>
+
+                                {status === 'CR' && earnedDateShort && (
+                                  <span className="text-[7.5px] font-black text-blue-700 block leading-none select-none pointer-events-none mt-[-2px] z-10">
+                                    {earnedDateShort}
+                                  </span>
+                                )}
+
+                                {status !== 'CR' && status !== 'P' && status !== '' && log?.remarks && (
+                                  <span className="text-[7.2px] font-bold text-slate-500 block leading-none select-none pointer-events-none mt-[-2px] z-10 truncate max-w-[42px]" title={log.remarks}>
+                                    {log.remarks.replace('Order: ', '')}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+
+                        {/* Remarks cell */}
+                        <td className="py-2 px-3 border-l border-slate-200">
+                          <input
+                            type="text"
+                            placeholder="No remarks"
+                            value={empGrid[days[0]?.dateStr]?.remarks || ''}
+                            onChange={(e) => {
+                              if (days[0]) {
+                                handleCellChange(emp.emp_id, days[0].dateStr, empGrid[days[0].dateStr]?.status || 'P');
+                                setGridData((prev) => {
+                                  const eg = { ...prev[emp.emp_id] };
+                                  eg[days[0].dateStr].remarks = e.target.value;
+                                  return { ...prev, [emp.emp_id]: eg };
+                                });
+                              }
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-700 focus:outline-none focus:border-blue-500"
+                          />
+                        </td>
+                      </tr>
+                    );
+                    return rows;
+                  });
+                })()}
               </tbody>
             </table>
           </div>
         )}
+
+        {/* Static Roster Inspector Footer Bar */}
+        <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-700 select-none shrink-0 no-print">
+          <div className="flex items-center gap-2">
+            <Info size={14} className="text-slate-400 animate-pulse" />
+            <span className="text-slate-400 uppercase tracking-wider text-[10px]">{getTranslation(lang, 'Roster Inspector')}:</span>
+            {hoveredCell ? (
+              <div className="flex items-center gap-4 animate-fade-in">
+                <span className="text-slate-800 font-extrabold">{hoveredCell.empName} <span className="text-slate-400 font-semibold">({hoveredCell.designation})</span></span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-600">{getTranslation(lang, 'Date')}: <span className="text-slate-800">{hoveredCell.dateStr}</span> ({getTranslation(lang, hoveredCell.weekday) || hoveredCell.weekday})</span>
+                <span className="text-slate-300">|</span>
+                <span className="flex items-center gap-1.5">
+                  <span 
+                    className="w-2 h-2 rounded-full shrink-0 animate-pulse" 
+                    style={{ backgroundColor: allCodes.find(c => c.code === hoveredCell.status)?.text_color || '#94A3B8' }}
+                  />
+                  <span className="text-slate-850 font-black">{hoveredCell.status}</span>
+                  <span className="text-slate-455 font-medium font-sans">({getTranslation(lang, allCodes.find(c => c.code === hoveredCell.status)?.description || '') || allCodes.find(c => c.code === hoveredCell.status)?.description || 'Unassigned'})</span>
+                </span>
+              </div>
+            ) : (
+              <span className="text-slate-400 font-medium italic">{getTranslation(lang, 'Hover over any roster cell to view detailed signaller assignment details.')}</span>
+            )}
+          </div>
+          {hoveredCell && (
+            <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase tracking-widest font-black shrink-0">Live Inspect</span>
+          )}
+        </div>
       </div>
 
       {/* Roster Simulation Preview Dialog Modal */}
@@ -1888,78 +2021,151 @@ export default function AttendanceGrid() {
       )}
 
       {/* Global Attendance Cell Dropdown Menu */}
-      {activeDropdownCell && dropdownPos && (
-        <>
-          {/* Click outside to close */}
-          <div 
-            className="fixed inset-0 z-40 cursor-default" 
-            onClick={() => {
-              setActiveDropdownCell(null);
-              setDropdownPos(null);
-            }}
-          />
-          
-          {/* Dropdown Menu */}
-          <div 
-            className="fixed bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 flex flex-col text-left overflow-hidden select-none"
-            style={{ 
-              top: `${dropdownPos.top + 4}px`, 
-              left: `${dropdownPos.left}px`,
-              transform: 'translateX(-50%)',
-              minWidth: '110px'
-            }}
-          >
-            <button
-              type="button"
+      {activeDropdownCell && dropdownPos && (() => {
+        const currentStatus = gridData[activeDropdownCell.empId]?.[activeDropdownCell.dateStr]?.status || '';
+        return (
+          <>
+            {/* Click outside to close */}
+            <div 
+              className="fixed inset-0 z-40 cursor-default" 
               onClick={() => {
-                handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "");
                 setActiveDropdownCell(null);
                 setDropdownPos(null);
               }}
-              className="w-full px-3 py-1.5 hover:bg-slate-100 text-[10px] font-extrabold text-slate-400 text-center transition cursor-pointer"
+            />
+            
+            {/* Dropdown Menu */}
+            <div 
+              className="fixed bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-100 flex flex-col text-left overflow-hidden select-none"
+              style={{ 
+                top: `${dropdownPos.top + 4}px`, 
+                left: `${dropdownPos.left}px`,
+                transform: 'translateX(-50%)',
+                width: '85px'
+              }}
             >
-              —
-            </button>
-            {allCodes.map((c) => (
               <button
-                key={c.code}
                 type="button"
                 onClick={() => {
-                  handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, c.code);
+                  handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "");
                   setActiveDropdownCell(null);
                   setDropdownPos(null);
                 }}
-                className="w-full px-3 py-1.5 hover:bg-slate-100 text-[10px] font-black transition text-center cursor-pointer"
-                style={{ color: c.text_color }}
+                className={`w-full px-2 py-1 flex items-center justify-between hover:bg-slate-50 transition text-[10px] font-extrabold text-slate-400 cursor-pointer ${!currentStatus ? 'bg-slate-100' : ''}`}
               >
-                {c.code}
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-slate-300" />
+                  <span>—</span>
+                </div>
+                {!currentStatus && (
+                  <Check size={10} className="text-slate-450 stroke-[3]" />
+                )}
               </button>
-            ))}
-            <div className="border-t border-slate-100 my-1"></div>
-            <button
-              type="button"
-              onClick={() => {
-                handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "CUSTOM_CODE");
-                setActiveDropdownCell(null);
-                setDropdownPos(null);
-              }}
-              className="w-full px-3 py-1.5 hover:bg-blue-50 text-[10px] font-black text-blue-600 text-center transition cursor-pointer"
-            >
-              Custom...
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "DELETE");
-                setActiveDropdownCell(null);
-                setDropdownPos(null);
-              }}
-              className="w-full px-3 py-1.5 hover:bg-rose-50 text-[10px] font-black text-rose-600 text-center transition cursor-pointer"
-            >
-              Delete
-            </button>
+              {allCodes.map((c) => {
+                const isSelected = currentStatus === c.code;
+                return (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => {
+                      handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, c.code);
+                      setActiveDropdownCell(null);
+                      setDropdownPos(null);
+                    }}
+                    className={`w-full px-2 py-1 flex items-center justify-between hover:bg-slate-50 transition text-[10px] font-black cursor-pointer ${isSelected ? 'bg-slate-100' : ''}`}
+                    style={{ color: c.text_color }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span 
+                        className="w-1.5 h-1.5 rounded-full shrink-0" 
+                        style={{ 
+                          backgroundColor: c.text_color, 
+                          boxShadow: `0 0 3px ${c.text_color}60`
+                        }}
+                      />
+                      <span>{c.code}</span>
+                    </div>
+                    {isSelected && (
+                      <Check size={10} className="text-slate-650 stroke-[3]" />
+                    )}
+                  </button>
+                );
+              })}
+              <div className="border-t border-slate-100 my-0.5"></div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "CUSTOM_CODE");
+                  setActiveDropdownCell(null);
+                  setDropdownPos(null);
+                }}
+                className="w-full px-2 py-1 flex items-center gap-1.5 hover:bg-blue-50 text-[10px] font-black text-blue-600 transition cursor-pointer"
+              >
+                <Sparkles size={10} className="text-blue-500 shrink-0" />
+                <span>Custom...</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleCellChange(activeDropdownCell.empId, activeDropdownCell.dateStr, "DELETE");
+                  setActiveDropdownCell(null);
+                  setDropdownPos(null);
+                }}
+                className="w-full px-2 py-1 flex items-center gap-1.5 hover:bg-rose-50 text-[10px] font-black text-rose-600 transition cursor-pointer"
+              >
+                <Trash2 size={10} className="text-rose-500 shrink-0" />
+                <span>Delete</span>
+              </button>
+            </div>
+          </>
+        );
+      })()}
+
+      {/* Floating Hover Roster Inspector Card */}
+      {hoveredCell && !activeDropdownCell && (
+        <div 
+          className="fixed z-50 pointer-events-none bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl p-4 flex flex-col gap-2 text-white animate-in fade-in zoom-in-95 duration-100 max-w-xs"
+          style={{ 
+            top: `${mousePos.y + 15}px`, 
+            left: `${typeof window !== 'undefined' && mousePos.x + 220 > window.innerWidth ? mousePos.x - 220 : mousePos.x + 15}px`,
+          }}
+        >
+          {/* Employee Info */}
+          <div className="flex items-center gap-2.5 border-b border-slate-700/50 pb-2">
+            <span className="w-8 h-8 rounded-full bg-blue-600/35 border border-blue-500/50 flex items-center justify-center font-bold text-xs uppercase text-blue-300">
+              {hoveredCell.empName.charAt(0)}
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-extrabold text-[12px] leading-tight truncate text-slate-100">{hoveredCell.empName}</span>
+              <span className="text-[10px] font-semibold text-slate-400 mt-0.5">{hoveredCell.designation}</span>
+            </div>
           </div>
-        </>
+
+          {/* Date & Shift Info */}
+          <div className="grid grid-cols-2 gap-4 text-[10.5px] font-semibold">
+            <div className="flex flex-col">
+              <span className="text-slate-500 uppercase text-[8px] tracking-wider font-bold">{getTranslation(lang, 'Date')}</span>
+              <span className="text-slate-200 mt-0.5">{hoveredCell.dateStr}</span>
+              <span className="text-slate-400 text-[9px] mt-0.5">({getTranslation(lang, hoveredCell.weekday) || hoveredCell.weekday})</span>
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-slate-500 uppercase text-[8px] tracking-wider font-bold">{getTranslation(lang, 'Roster Code')}</span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span 
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{
+                    backgroundColor: allCodes.find(c => c.code === hoveredCell.status)?.text_color || '#94A3B8',
+                    boxShadow: `0 0 6px ${allCodes.find(c => c.code === hoveredCell.status)?.text_color || '#94A3B8'}80`
+                  }}
+                />
+                <span className="font-extrabold text-slate-200">{hoveredCell.status}</span>
+              </div>
+              <span className="text-[9px] text-slate-400 mt-0.5 leading-none">
+                {getTranslation(lang, allCodes.find(c => c.code === hoveredCell.status)?.description || '') || allCodes.find(c => c.code === hoveredCell.status)?.description || 'Unassigned'}
+              </span>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

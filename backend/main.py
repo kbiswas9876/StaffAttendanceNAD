@@ -738,6 +738,7 @@ class NightDutyRow(BaseModel):
     level: int
     dates: str # Comma-separated days, e.g. "20,21,24,30"
     total_days: int
+    section_code: Optional[str] = ""
     remarks: Optional[str] = ""
 
 class NightDutyExportRequest(BaseModel):
@@ -764,6 +765,7 @@ class AttendanceRow(BaseModel):
     name: str
     designation: str
     days: List[AttendanceDay]
+    section_code: Optional[str] = ""
     remarks: Optional[str] = ""
 
 class AttendanceExportRequest(BaseModel):
@@ -1831,46 +1833,61 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     # ====== SECTION E: TABLE DATA ======
     nd_rows_with_data = 0
     current_row = 12
-    for idx, row in enumerate(req.rows):
-        is_alt = idx % 2 == 1
-        d_fmt = data_alt_fmt if is_alt else data_center_fmt
-        n_fmt = name_alt_fmt if is_alt else name_fmt
+    
+    is_joint_view = req.section_code == 'ALL'
+    from collections import defaultdict
+    grouped_rows = defaultdict(list)
+    for row in req.rows:
+        grouped_rows[row.section_code or 'KKVS'].append(row)
         
-        wt_hrs_val, wt_mins_val = calculate_weightage_numeric(row.total_days)
-        total_hrs = row.total_days * 8
-        has_dates = row.dates and row.dates.strip()
+    for sec_code in sorted(grouped_rows.keys()):
+        rows_in_sec = grouped_rows[sec_code]
         
-        # Estimate number of lines needed for the Dates string
-        dates_str = row.dates or ""
-        # Width of col 5 is 60. Segoe UI 9pt can fit about 1.4 characters per unit of width.
-        # So width 60 fits about 84 characters in one line. Let's use ~80 characters per line safety limit.
-        lines_needed = max(1, (len(dates_str) + 75) // 80)
-        row_height = max(22, lines_needed * 14 + 6)
-        
-        sheet.set_row(current_row, row_height)
-        sheet.write(current_row, 0, row.sl, d_fmt)
-        sheet.write(current_row, 1, row.pf_number, d_fmt)
-        sheet.write(current_row, 2, row.name, n_fmt)
-        sheet.write(current_row, 3, row.designation, d_fmt)
-        sheet.write(current_row, 4, row.level, d_fmt)
-        
-        # Dates with Nil for empty
-        if has_dates:
-            sheet.write(current_row, 5, row.dates, d_fmt)
-            sheet.write(current_row, 6, row.total_days, d_fmt)
-            sheet.write(current_row, 7, total_hrs, d_fmt)
-            sheet.write(current_row, 8, wt_hrs_val, wt_fmt)
-            sheet.write(current_row, 9, wt_mins_val, wt_fmt)
-            nd_rows_with_data += 1
-        else:
-            sheet.write(current_row, 5, "Nil", nil_fmt)
-            sheet.write(current_row, 6, 0, d_fmt)
-            sheet.write(current_row, 7, 0, d_fmt)
-            sheet.write(current_row, 8, "—", d_fmt)
-            sheet.write(current_row, 9, "—", d_fmt)
-        
-        sheet.write(current_row, 10, row.remarks or "", d_fmt)
-        current_row += 1
+        if is_joint_view:
+            # Merged section header row
+            section_title = f" SECTION: {sec_code.upper()} ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            sheet.merge_range(current_row, 0, current_row, 10, section_title, sub_banner_fmt)
+            sheet.set_row(current_row, 22)
+            current_row += 1
+            
+        for idx, row in enumerate(rows_in_sec):
+            is_alt = idx % 2 == 1
+            d_fmt = data_alt_fmt if is_alt else data_center_fmt
+            n_fmt = name_alt_fmt if is_alt else name_fmt
+            
+            wt_hrs_val, wt_mins_val = calculate_weightage_numeric(row.total_days)
+            total_hrs = row.total_days * 8
+            has_dates = row.dates and row.dates.strip()
+            
+            # Estimate number of lines needed for the Dates string
+            dates_str = row.dates or ""
+            lines_needed = max(1, (len(dates_str) + 75) // 80)
+            row_height = max(22, lines_needed * 14 + 6)
+            
+            sheet.set_row(current_row, row_height)
+            sheet.write(current_row, 0, row.sl, d_fmt)
+            sheet.write(current_row, 1, row.pf_number, d_fmt)
+            sheet.write(current_row, 2, row.name, n_fmt)
+            sheet.write(current_row, 3, row.designation, d_fmt)
+            sheet.write(current_row, 4, row.level, d_fmt)
+            
+            # Dates with Nil for empty
+            if has_dates:
+                sheet.write(current_row, 5, row.dates, d_fmt)
+                sheet.write(current_row, 6, row.total_days, d_fmt)
+                sheet.write(current_row, 7, total_hrs, d_fmt)
+                sheet.write(current_row, 8, wt_hrs_val, wt_fmt)
+                sheet.write(current_row, 9, wt_mins_val, wt_fmt)
+                nd_rows_with_data += 1
+            else:
+                sheet.write(current_row, 5, "Nil", nil_fmt)
+                sheet.write(current_row, 6, 0, d_fmt)
+                sheet.write(current_row, 7, 0, d_fmt)
+                sheet.write(current_row, 8, "—", d_fmt)
+                sheet.write(current_row, 9, "—", d_fmt)
+            
+            sheet.write(current_row, 10, row.remarks or "", d_fmt)
+            current_row += 1
 
     # ====== SECTION F: TOTALS ROW ======
     sheet.set_row(current_row, 22)
@@ -2001,26 +2018,13 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
         Paragraph("Remarks", header_style)
     ]
     
-    table_data = [table_headers]
+    is_joint_view = req.section_code == 'ALL'
+    from collections import defaultdict
+    grouped_rows = defaultdict(list)
     for row in req.rows:
-        wt_hrs, wt_mins = calculate_weightage(row.total_days)
-        tot_hrs = row.total_days * 8
-        has_dates = row.dates and row.dates.strip()
-        table_data.append([
-            Paragraph(str(row.sl), normal_style),
-            Paragraph(row.pf_number, normal_style),
-            Paragraph(row.name, normal_style),
-            Paragraph(row.designation, normal_style),
-            Paragraph(str(row.level), normal_style),
-            Paragraph(row.dates or "Nil", normal_style),
-            Paragraph(str(row.total_days), normal_style),
-            Paragraph(f"{tot_hrs} Hrs", normal_style),
-            Paragraph(str(wt_hrs) if has_dates else "—", normal_style),
-            Paragraph(str(wt_mins) if has_dates else "—", normal_style),
-            Paragraph(row.remarks or "", normal_style)
-        ])
-
-    grid_table = Table(table_data, colWidths=[20, 75, 105, 60, 35, 210, 40, 45, 45, 45, 90])
+        grouped_rows[row.section_code or 'KKVS'].append(row)
+        
+    table_data = [table_headers]
     t_style = [
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1B365D")),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
@@ -2030,10 +2034,53 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
         ('BOTTOMPADDING', (0,0), (-1,0), 6),
         ('TOPPADDING', (0,0), (-1,0), 6),
     ]
-    for r_idx in range(1, len(table_data)):
-        row_bg = colors.HexColor("#F8FAFC") if r_idx % 2 == 1 else colors.white
-        t_style.append(('BACKGROUND', (0, r_idx), (-1, r_idx), row_bg))
+    
+    section_title_style = ParagraphStyle(
+        'PDFSectionTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=10.5,
+        textColor=colors.HexColor("#1E293B")
+    )
+    
+    current_r_idx = 1
+    for sec_code in sorted(grouped_rows.keys()):
+        rows_in_sec = grouped_rows[sec_code]
         
+        if is_joint_view:
+            banner_text = f"<b>SECTION: {sec_code.upper()}</b> ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            table_data.append([
+                Paragraph(banner_text, section_title_style),
+                "", "", "", "", "", "", "", "", "", ""
+            ])
+            t_style.append(('SPAN', (0, current_r_idx), (-1, current_r_idx)))
+            t_style.append(('BACKGROUND', (0, current_r_idx), (-1, current_r_idx), colors.HexColor("#E2E8F0")))
+            t_style.append(('ALIGN', (0, current_r_idx), (-1, current_r_idx), 'LEFT'))
+            current_r_idx += 1
+            
+        for idx, row in enumerate(rows_in_sec):
+            wt_hrs, wt_mins = calculate_weightage(row.total_days)
+            tot_hrs = row.total_days * 8
+            has_dates = row.dates and row.dates.strip()
+            table_data.append([
+                Paragraph(str(row.sl), normal_style),
+                Paragraph(row.pf_number, normal_style),
+                Paragraph(row.name, normal_style),
+                Paragraph(row.designation, normal_style),
+                Paragraph(str(row.level), normal_style),
+                Paragraph(row.dates or "Nil", normal_style),
+                Paragraph(str(row.total_days), normal_style),
+                Paragraph(f"{tot_hrs} Hrs", normal_style),
+                Paragraph(str(wt_hrs) if has_dates else "—", normal_style),
+                Paragraph(str(wt_mins) if has_dates else "—", normal_style),
+                Paragraph(row.remarks or "", normal_style)
+            ])
+            row_bg = colors.HexColor("#F8FAFC") if idx % 2 == 1 else colors.white
+            t_style.append(('BACKGROUND', (0, current_r_idx), (-1, current_r_idx), row_bg))
+            current_r_idx += 1
+
+    grid_table = Table(table_data, colWidths=[20, 75, 105, 60, 35, 210, 40, 45, 45, 45, 90])
     grid_table.setStyle(TableStyle(t_style))
     story.append(grid_table)
     story.append(Spacer(1, 30))
@@ -2089,6 +2136,12 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     })
     name_pf_format = workbook.add_format({
         'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'text_wrap': True
+    })
+    section_banner_fmt = workbook.add_format({
+        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True,
+        'align': 'left', 'valign': 'vcenter',
+        'bg_color': '#E2E8F0', 'font_color': '#1E293B',
+        'border': 1, 'border_color': '#CBD5E1'
     })
     
     # CR rich text elements formats (bg_color is inherited from parent cell_format in write_rich_string)
@@ -2152,13 +2205,29 @@ async def export_attendance_excel(req: AttendanceExportRequest):
 
     # 3. Write Data
     curr_row = 4
-    for emp_idx, emp in enumerate(req.rows):
-        sheet.set_row(curr_row, 35) # Row height set to 35 to cleanly fit name/PF and custom code/order details
-        sheet.write(curr_row, 0, emp.sl, data_format)
+    
+    is_joint_view = req.section_code == 'ALL'
+    from collections import defaultdict
+    grouped_emps = defaultdict(list)
+    for emp in req.rows:
+        grouped_emps[emp.section_code or 'KKVS'].append(emp)
         
-        # Combined Name & PF
-        name_pf_text = f"{emp.name}\n(PF: {emp.pf_number})"
-        sheet.write(curr_row, 1, name_pf_text, name_pf_format)
+    for sec_code in sorted(grouped_emps.keys()):
+        emps_in_sec = grouped_emps[sec_code]
+        
+        if is_joint_view:
+            section_title = f" SECTION: {sec_code.upper()} ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            sheet.merge_range(curr_row, 0, curr_row, 34, section_title, section_banner_fmt)
+            sheet.set_row(curr_row, 22)
+            curr_row += 1
+            
+        for emp in emps_in_sec:
+            sheet.set_row(curr_row, 35) # Row height set to 35 to cleanly fit name/PF and custom code/order details
+            sheet.write(curr_row, 0, emp.sl, data_format)
+            
+            # Combined Name & PF
+            name_pf_text = f"{emp.name}\n(PF: {emp.pf_number})"
+            sheet.write(curr_row, 1, name_pf_text, name_pf_format)
         
         sheet.write(curr_row, 2, emp.designation, data_format)
         
@@ -2394,111 +2463,134 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         ('RIGHTPADDING', (0,0), (-1,-1), 1),
     ]
 
-    # Apply alternating background color for rows (excluding Sunday/Holiday day cols)
-    for r_idx in range(1, len(req.rows) + 1):
-        row_bg = colors.HexColor("#F8FAFC") if r_idx % 2 == 1 else colors.white
-        t_style.append(('BACKGROUND', (0, r_idx), (2, r_idx), row_bg))
-        t_style.append(('BACKGROUND', (-1, r_idx), (-1, r_idx), row_bg))
-
-    # Color Sundays columns dynamically (starting at index 3 and row 1 to preserve header background)
-    for d_idx, day in enumerate(days_in_grid):
-        if day.weekday == "Sun":
-            col_c = 3 + d_idx
-            t_style.append(('BACKGROUND', (col_c, 1), (col_c, -1), colors.HexColor("#FEE2E2")))
-        elif day.is_holiday:
-            col_c = 3 + d_idx
-            t_style.append(('BACKGROUND', (col_c, 1), (col_c, -1), colors.HexColor("#FEF3C7")))
-
-    # Fill data & build SPAN merges for consecutive leave/rest days
-    for r_idx, row in enumerate(req.rows):
-        row_num = r_idx + 1
-        name_pf_html = f"<b>{row.name}</b><br/><font size=5.5 color='#4A5568'>PF: {row.pf_number}</font>"
+    is_joint_view = req.section_code == 'ALL'
+    from collections import defaultdict
+    grouped_rows = defaultdict(list)
+    for row in req.rows:
+        grouped_rows[row.section_code or 'KKVS'].append(row)
         
-        data_line = [
-            Paragraph(str(row.sl), cell_style),
-            Paragraph(name_pf_html, name_pf_style),
-            Paragraph(row.designation, cell_style)
-        ]
+    section_title_style = ParagraphStyle(
+        'PDFAttSectionTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#1E293B")
+    )
+    
+    row_num = 1 # Index 0 is header_row_1
+    for sec_code in sorted(grouped_rows.keys()):
+        rows_in_sec = grouped_rows[sec_code]
         
-        # Spans logic
-        spans = []
-        n = len(row.days)
-        i = 0
-        while i < n:
-            status = row.days[i].status
-            start_idx = i
-            while i < n - 1 and row.days[i+1].status == status:
+        if is_joint_view:
+            banner_text = f"<b>SECTION: {sec_code.upper()}</b> ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            banner_row = [Paragraph(banner_text, section_title_style)] + [""] * (len(days_in_grid) + 2)
+            table_data.append(banner_row)
+            
+            t_style.append(('SPAN', (0, row_num), (-1, row_num)))
+            t_style.append(('BACKGROUND', (0, row_num), (-1, row_num), colors.HexColor("#E2E8F0")))
+            t_style.append(('ALIGN', (0, row_num), (-1, row_num), 'LEFT'))
+            t_style.append(('BOTTOMPADDING', (0, row_num), (-1, row_num), 3))
+            t_style.append(('TOPPADDING', (0, row_num), (-1, row_num), 3))
+            row_num += 1
+            
+        for idx, row in enumerate(rows_in_sec):
+            row_bg = colors.HexColor("#F8FAFC") if idx % 2 == 1 else colors.white
+            t_style.append(('BACKGROUND', (0, row_num), (2, row_num), row_bg))
+            t_style.append(('BACKGROUND', (-1, row_num), (-1, row_num), row_bg))
+            
+            name_pf_html = f"<b>{row.name}</b><br/><font size=5.5 color='#4A5568'>PF: {row.pf_number}</font>"
+            
+            data_line = [
+                Paragraph(str(row.sl), cell_style),
+                Paragraph(name_pf_html, name_pf_style),
+                Paragraph(row.designation, cell_style)
+            ]
+            
+            # Spans logic
+            spans = []
+            n = len(row.days)
+            i = 0
+            while i < n:
+                status = row.days[i].status
+                start_idx = i
+                while i < n - 1 and row.days[i+1].status == status:
+                    i += 1
+                end_idx = i
+                spans.append((start_idx, end_idx, status))
                 i += 1
-            end_idx = i
-            spans.append((start_idx, end_idx, status))
-            i += 1
-            
-        day_cells = [None] * len(days_in_grid)
-        for start_idx, end_idx, status in spans:
-            # Merging consecutive identical statuses except P, CR, empty
-            should_merge = status not in ('P', 'CR', '', None) and start_idx < end_idx
-            
-            if should_merge:
-                order = row.days[start_idx].remarks
-                if status not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order:
-                    status_html = f"<b>{status}</b><br/><font size=4>{order}</font>"
+                
+            day_cells = [None] * len(days_in_grid)
+            for start_idx, end_idx, status in spans:
+                should_merge = status not in ('P', 'CR', '', None) and start_idx < end_idx
+                
+                if should_merge:
+                    order = row.days[start_idx].remarks
+                    if status not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order:
+                        status_html = f"<b>{status}</b><br/><font size=4>{order}</font>"
+                    else:
+                        status_html = f"<b>{status}</b>"
+                    day_cells[start_idx] = Paragraph(status_html, cell_bold_style)
+                    for s_idx in range(start_idx + 1, end_idx + 1):
+                        day_cells[s_idx] = ""
+                    t_style.append(('SPAN', (3 + start_idx, row_num), (3 + end_idx, row_num)))
                 else:
-                    status_html = f"<b>{status}</b>"
-                day_cells[start_idx] = Paragraph(status_html, cell_bold_style)
-                for idx in range(start_idx + 1, end_idx + 1):
-                    day_cells[idx] = ""
-                # Span indices shifted left by 1: starts at 3
-                t_style.append(('SPAN', (3 + start_idx, row_num), (3 + end_idx, row_num)))
-            else:
-                for idx in range(start_idx, end_idx + 1):
-                    val = row.days[idx].status
-                    day_obj = row.days[idx]
-                    
-                    display_html = val
-                    if val == 'CR' and day_obj.remarks:
-                        if "CR_EARNED_DATE:" in day_obj.remarks:
-                            edate = day_obj.remarks.split("CR_EARNED_DATE:")[1].strip()[:10]
-                            try:
-                                dt = datetime.strptime(edate, "%Y-%m-%d")
-                                display_html = f"<b>CR</b><br/><font size=4 color='#1D4ED8'>{dt.strftime('%d.%m')}</font>"
-                            except Exception:
-                                display_html = f"<b>{val}</b>"
-                        else:
-                            display_html = f"<b>{val}</b>"
-                    elif val in ('R', 'Sick', 'CL', 'LAP', 'SCL', 'PH', 'P/N'):
-                        display_html = f"<b>{val}</b>"
-                    elif val not in ('P', '', None):
-                        if day_obj.remarks:
-                            display_html = f"<b>{val}</b><br/><font size=4>{day_obj.remarks}</font>"
-                        else:
-                            display_html = f"<b>{val}</b>"
+                    for s_idx in range(start_idx, end_idx + 1):
+                        val = row.days[s_idx].status
+                        day_obj = row.days[s_idx]
                         
-                    day_cells[idx] = Paragraph(display_html, cell_bold_style if val not in ('P', '', None) else cell_style)
-                    
-        for val in day_cells:
-            data_line.append(val)
-            
-        data_line.append(Paragraph(row.remarks or "", cell_style))
-        table_data.append(data_line)
+                        display_html = val
+                        if val == 'CR' and day_obj.remarks:
+                            if "CR_EARNED_DATE:" in day_obj.remarks:
+                                edate = day_obj.remarks.split("CR_EARNED_DATE:")[1].strip()[:10]
+                                try:
+                                    dt = datetime.strptime(edate, "%Y-%m-%d")
+                                    display_html = f"<b>CR</b><br/><font size=4 color='#1D4ED8'>{dt.strftime('%d.%m')}</font>"
+                                except Exception:
+                                    display_html = f"<b>{val}</b>"
+                            else:
+                                display_html = f"<b>{val}</b>"
+                        elif val in ('R', 'Sick', 'CL', 'LAP', 'SCL', 'PH', 'P/N'):
+                            display_html = f"<b>{val}</b>"
+                        elif val not in ('P', '', None):
+                            if day_obj.remarks:
+                                display_html = f"<b>{val}</b><br/><font size=4>{day_obj.remarks}</font>"
+                            else:
+                                display_html = f"<b>{val}</b>"
+                            
+                        day_cells[s_idx] = Paragraph(display_html, cell_bold_style if val not in ('P', '', None) else cell_style)
+                        
+            for val in day_cells:
+                data_line.append(val)
+                
+            data_line.append(Paragraph(row.remarks or "", cell_style))
+            table_data.append(data_line)
 
-        # Apply coloring to individual/span cells
-        for d_idx, day in enumerate(row.days):
-            col_c = 3 + d_idx
-            val = day.status
-            color_map = {
-                'P/N': '#F3E8FF',
-                'R': '#F1F5F9',
-                'CR': '#EFF6FF',
-                'CL': '#FFFBEB',
-                'LAP': '#FFF7ED',
-                'Sick': '#FEF2F2',
-                'SCL': '#FFF1F2',
-                'PH': '#FEF9C3',
-            }
-            if val in color_map:
-                t_style.append(('BACKGROUND', (col_c, row_num), (col_c, row_num), colors.HexColor(color_map[val])))
-            elif val not in ('P', '', None):
-                t_style.append(('BACKGROUND', (col_c, row_num), (col_c, row_num), colors.HexColor('#E6FFFA')))
+            # Apply coloring to individual/span cells
+            for d_idx, day in enumerate(row.days):
+                col_c = 3 + d_idx
+                val = day.status
+                color_map = {
+                    'P/N': '#F3E8FF',
+                    'R': '#F1F5F9',
+                    'CR': '#EFF6FF',
+                    'CL': '#FFFBEB',
+                    'LAP': '#FFF7ED',
+                    'Sick': '#FEF2F2',
+                    'SCL': '#FFF1F2',
+                    'PH': '#FEF9C3',
+                }
+                if val in color_map:
+                    t_style.append(('BACKGROUND', (col_c, row_num), (col_c, row_num), colors.HexColor(color_map[val])))
+                elif val not in ('P', '', None):
+                    t_style.append(('BACKGROUND', (col_c, row_num), (col_c, row_num), colors.HexColor('#E6FFFA')))
+                else:
+                    if day.weekday == "Sun":
+                        t_style.append(('BACKGROUND', (col_c, row_num), (col_c, row_num), colors.HexColor("#FEE2E2")))
+                    elif day.is_holiday:
+                        t_style.append(('BACKGROUND', (col_c, row_num), (col_c, row_num), colors.HexColor("#FEF3C7")))
+                        
+            row_num += 1
 
     # Printable area centered with margins
     # Total width for landscape A4 = 841.89 - 56*2 = 729.89pt
