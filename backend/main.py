@@ -2391,24 +2391,13 @@ async def export_attendance_excel(req: AttendanceExportRequest):
                 spans.append((s, i, st))
                 i += 1
 
+            STANDARD_NON_MERGED = {'P', 'P/N', 'R', 'CR', 'CL', 'LAP', 'SCL', 'PH', '', None}
+
             for si, ei, val in spans:
                 sc = 3 + si
                 ec = 3 + ei
 
-                if   val == 'P/N':  sfmt = f_pn
-                elif val == 'R':    sfmt = f_r
-                elif val == 'CR':   sfmt = f_cr
-                elif val == 'CL':   sfmt = f_cl
-                elif val == 'LAP':  sfmt = f_lap
-                elif val == 'Sick': sfmt = f_sick
-                elif val == 'SCL':  sfmt = f_scl
-                elif val == 'PH':   sfmt = f_ph
-                elif val not in ('P', '', None): sfmt = f_cu
-                elif emp.days[si].weekday == 'Sun': sfmt = f_sun
-                elif emp.days[si].is_holiday:        sfmt = f_hol
-                else: sfmt = None
-
-                if val in ('P', 'CR', '', None):
+                if val in STANDARD_NON_MERGED:
                     for ci in range(sc, ec + 1):
                         dobj = emp.days[ci - 3]
                         if val == 'CR':
@@ -2427,24 +2416,50 @@ async def export_attendance_excel(req: AttendanceExportRequest):
                                     pass
                             if not done:
                                 sheet.write(curr_row, ci, 'CR', f_cr)
+                        elif val == 'P':
+                            if dobj.weekday == 'Sun':
+                                sheet.write(curr_row, ci, 'P', f_sun)
+                            elif dobj.is_holiday:
+                                sheet.write(curr_row, ci, 'P', f_hol)
+                            else:
+                                sheet.write(curr_row, ci, 'P', f_p(bg))
+                        elif val == 'P/N':
+                            sheet.write(curr_row, ci, 'P/N', f_pn)
+                        elif val == 'R':
+                            sheet.write(curr_row, ci, 'R', f_r)
+                        elif val == 'CL':
+                            sheet.write(curr_row, ci, 'CL', f_cl)
+                        elif val == 'LAP':
+                            sheet.write(curr_row, ci, 'LAP', f_lap)
+                        elif val == 'SCL':
+                            sheet.write(curr_row, ci, 'SCL', f_scl)
+                        elif val == 'PH':
+                            sheet.write(curr_row, ci, 'PH', f_ph)
                         else:
                             if dobj.weekday == 'Sun':
-                                sheet.write(curr_row, ci, val or '', f_sun)
+                                sheet.write(curr_row, ci, '', f_sun)
                             elif dobj.is_holiday:
-                                sheet.write(curr_row, ci, val or '', f_hol)
-                            elif val == 'P':
-                                sheet.write(curr_row, ci, 'P', f_p(bg))
+                                sheet.write(curr_row, ci, '', f_hol)
                             else:
                                 sheet.write(curr_row, ci, '', f_empty(bg))
                 else:
                     order = emp.days[si].remarks
-                    disp  = val
-                    if val not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order:
-                        disp = f"{val}\n({order})"
-                    if sc == ec:
-                        sheet.write(curr_row, sc, disp, sfmt)
+                    if val == 'Sick':
+                        if sc == ec:
+                            sheet.write(curr_row, sc, 'Sick', f_sick)
+                        else:
+                            sheet.merge_range(curr_row, sc, curr_row, ec, 'Sick', f_sick)
                     else:
-                        sheet.merge_range(curr_row, sc, curr_row, ec, disp, sfmt)
+                        if sc == ec:
+                            disp = val
+                            if order:
+                                disp = f"{val}\n({order})"
+                            sheet.write(curr_row, sc, disp, f_cu)
+                        else:
+                            disp = f"◀  {val}  ▶"
+                            if order:
+                                disp = f"◀  {val} ({order})  ▶"
+                            sheet.merge_range(curr_row, sc, curr_row, ec, disp, f_cu)
 
             sheet.write(curr_row, RC, emp.remarks or '', f_remarks(bg))
             curr_row += 1
