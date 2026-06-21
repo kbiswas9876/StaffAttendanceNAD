@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -52,23 +52,19 @@ export default function TravellingAllowancePage() {
   const [billUnit, setBillUnit] = useState<string>('');
   const [basicPay, setBasicPay] = useState<number>(0);
 
-  // Sync monthYear with selectedMonth and selectedYearVal dropdowns
-  useEffect(() => {
-    if (monthYear) {
-      const parts = monthYear.split('-');
-      if (parts.length === 2) {
-        setSelectedYearVal(parts[0]);
-        setSelectedMonth(parts[1]);
-        return;
-      }
+  const handleMonthChange = (m: string) => {
+    setSelectedMonth(m);
+    if (m && selectedYearVal) {
+      setMonthYear(`${selectedYearVal}-${m}`);
+    } else {
+      setMonthYear('');
     }
-    setSelectedMonth('');
-    setSelectedYearVal('');
-  }, [monthYear]);
+  };
 
-  const handleCustomMonthYearChange = (m: string, y: string) => {
-    if (m && y) {
-      setMonthYear(`${y}-${m}`);
+  const handleYearChange = (y: string) => {
+    setSelectedYearVal(y);
+    if (selectedMonth && y) {
+      setMonthYear(`${y}-${selectedMonth}`);
     } else {
       setMonthYear('');
     }
@@ -83,6 +79,16 @@ export default function TravellingAllowancePage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [historySearch, setHistorySearch] = useState<string>('');
+
+  const filteredTaBills = useMemo(() => {
+    if (!historySearch.trim()) return taBills;
+    const q = historySearch.toLowerCase();
+    return taBills.filter(bill => 
+      (bill.emp_name || '').toLowerCase().includes(q) || 
+      (bill.pf_number || '').toLowerCase().includes(q)
+    );
+  }, [taBills, historySearch]);
 
   // Load staff and bills
   const loadInitialData = async (sectionCode: string) => {
@@ -144,6 +150,8 @@ export default function TravellingAllowancePage() {
     setSelectedEmpId('');
     setSelectedEmp(null);
     setMonthYear('');
+    setSelectedMonth('');
+    setSelectedYearVal('');
     setJourneyType('NORMAL');
     setBookNo('');
     setPageNo('');
@@ -248,7 +256,7 @@ export default function TravellingAllowancePage() {
       days_nights: '0.7',
       object_journey: 'Attended Metro Bhavan for paper work as per instruction of higher authority.',
       rate: baseRate,
-      amount: baseRate * 0.7
+      amount: Math.round(baseRate * 0.7)
     };
     
     const newInward: TAEntry = {
@@ -379,7 +387,7 @@ export default function TravellingAllowancePage() {
         updated[index].station_from = loc;
         updated[index].days_nights = `100%X${numDays}`;
         updated[index].train_no = `STAYED AT ${loc} hostel campus for refresher course from ${startDisplay} to ${endDisplay}`;
-        updated[index].amount = numDays * baseRate;
+        updated[index].amount = Math.round(numDays * baseRate);
       } else {
         // Training leg: manual multiplier input in days_nights
         if (field === 'days_nights') {
@@ -396,7 +404,7 @@ export default function TravellingAllowancePage() {
 
   // Compute Total amount
   const calculateTotalAmount = (): number => {
-    return entries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+    return Math.round(entries.reduce((sum, entry) => sum + (entry.amount || 0), 0));
   };
 
   // Save TA Bill to Database
@@ -471,6 +479,16 @@ export default function TravellingAllowancePage() {
       setBillId(bill.id);
       setSelectedEmpId(bill.emp_id);
       setMonthYear(bill.month_year);
+      if (bill.month_year) {
+        const parts = bill.month_year.split('-');
+        if (parts.length === 2) {
+          setSelectedYearVal(parts[0]);
+          setSelectedMonth(parts[1]);
+        }
+      } else {
+        setSelectedMonth('');
+        setSelectedYearVal('');
+      }
       setJourneyType(bill.journey_type);
       setBookNo(bill.book_no || '');
       setPageNo(bill.page_no || '');
@@ -569,88 +587,125 @@ export default function TravellingAllowancePage() {
         </div>
       )}
 
-      {/* Drawer overlay for history */}
-      {showHistory ? (
-        <div className="border border-slate-200 bg-white rounded-2xl p-6 shadow-sm animate-in zoom-in-95 duration-200">
-          <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-indigo-600" />
-            Travelling Allowance Journal History ({activeSection})
-          </h2>
-          {taBills.length === 0 ? (
-            <div className="text-center py-10 text-slate-400">
-              No Travelling Allowance bills found in this section. Create one below!
+      {/* Premium History Dialog Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4 animate-fade-in">
+          <div className="bg-white border border-[#E2E0D9] w-full max-w-5xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-indigo-600" />
+                Travelling Allowance Journal History ({activeSection})
+              </h2>
+              <button 
+                onClick={() => { setShowHistory(false); setHistorySearch(''); }} 
+                className="text-slate-400 hover:text-slate-600 font-extrabold text-sm hover:scale-105 transition-all p-1 cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">PF Number</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Month / Year</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Amount</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-slate-100">
-                  {taBills.map((bill) => (
-                    <tr key={bill.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-700">{bill.emp_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                        {bill.pf_number}
-                        {bill.bill_unit && <span className="text-slate-400 text-xs font-normal"> (BU: {bill.bill_unit})</span>}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">
-                        {(() => {
-                          try {
-                            const d = new Date(bill.month_year + "-01");
-                            return d.toLocaleString('default', { month: 'long', year: 'numeric' });
-                          } catch (e) {
-                            return bill.month_year;
-                          }
-                        })()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
-                          bill.journey_type === 'NORMAL' 
-                            ? 'bg-sky-50 text-sky-700 border border-sky-200' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {bill.journey_type === 'NORMAL' ? 'Local Duties' : 'Training Stays'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800">Rs. {bill.total_amount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleLoadBill(bill.id!)}
-                            className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors"
-                          >
-                            View / Edit
-                          </button>
-                          <button
-                            onClick={() => handleExportExcel(bill.id!)}
-                            className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors gap-1"
-                          >
-                            <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
-                          </button>
-                          <button
-                            onClick={() => handleDeleteBill(bill.id!)}
-                            className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            
+            {/* Search filter for history */}
+            <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-150 flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search by Employee Name or PF Number..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold text-slate-750 focus:outline-none focus:border-indigo-500"
+              />
             </div>
-          )}
+            
+            {/* Modal Body / History Table */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {filteredTaBills.length === 0 ? (
+                <div className="text-center py-20 text-slate-400 font-semibold italic text-xs">
+                  {taBills.length === 0 ? "No Travelling Allowance bills found in this section. Create one below!" : "No matching journals found for search query."}
+                </div>
+              ) : (
+                <div className="overflow-hidden border border-slate-100 rounded-xl">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
+                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">PF Number</th>
+                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Month / Year</th>
+                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                        <th className="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Total Amount</th>
+                        <th className="px-6 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {filteredTaBills.map((bill) => (
+                        <tr key={bill.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-700">{bill.emp_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-500">
+                            {bill.pf_number}
+                            {bill.bill_unit && <span className="text-slate-400 text-xs font-normal"> (BU: {bill.bill_unit})</span>}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">
+                            {(() => {
+                              try {
+                                const d = new Date(bill.month_year + "-01");
+                                return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                              } catch (e) {
+                                return bill.month_year;
+                              }
+                            })()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black ${
+                              bill.journey_type === 'NORMAL' 
+                                ? 'bg-sky-50 text-sky-700 border border-sky-200/50' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200/50'
+                            }`}>
+                              {bill.journey_type === 'NORMAL' ? 'Local Duties' : 'Training Stays'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-800">Rs. {bill.total_amount}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center font-medium">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => { handleLoadBill(bill.id!); setHistorySearch(''); }}
+                                className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                View / Edit
+                              </button>
+                              <button
+                                onClick={() => handleExportExcel(bill.id!)}
+                                className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-colors gap-1 cursor-pointer"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBill(bill.id!)}
+                                className="inline-flex items-center justify-center px-3 py-1.5 h-8 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-150 flex items-center justify-end">
+              <button 
+                onClick={() => { setShowHistory(false); setHistorySearch(''); }}
+                className="px-4 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase cursor-pointer"
+              >
+                Close History Register
+              </button>
+            </div>
+          </div>
         </div>
-      ) : null}
+      )}
 
       {/* Primary Input Form & Table */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
@@ -724,7 +779,7 @@ export default function TravellingAllowancePage() {
                 <select
                   value={selectedMonth}
                   onChange={(e) => {
-                    handleCustomMonthYearChange(e.target.value, selectedYearVal);
+                    handleMonthChange(e.target.value);
                   }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer appearance-none"
                 >
@@ -750,7 +805,7 @@ export default function TravellingAllowancePage() {
                 <select
                   value={selectedYearVal}
                   onChange={(e) => {
-                    handleCustomMonthYearChange(selectedMonth, e.target.value);
+                    handleYearChange(e.target.value);
                   }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer appearance-none font-mono"
                 >
@@ -958,7 +1013,7 @@ export default function TravellingAllowancePage() {
                     
                     if (journeyType === 'NORMAL') {
                       return (
-                        <tr key={idx} className={`${isEvenRow ? 'bg-white' : 'bg-slate-50/40'} border-b border-slate-100 hover:bg-indigo-50/20 transition-colors`}>
+                        <tr key={idx} className={`${isEvenRow ? 'bg-white' : 'bg-slate-50/30'} border-b border-slate-100 hover:bg-indigo-50/20 transition-colors`}>
                           {/* Date (Merge visually) */}
                           <td className="px-3 py-2">
                             {isEvenRow ? (
@@ -966,10 +1021,10 @@ export default function TravellingAllowancePage() {
                                 type="date"
                                 value={entry.entry_date}
                                 onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                                className="bg-slate-50 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-700 outline-none focus:bg-white"
+                                className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all cursor-pointer"
                               />
                             ) : (
-                              <div className="text-slate-400 font-semibold text-center italic">Inward</div>
+                              <div className="text-slate-400 font-bold text-center italic text-[10px] tracking-wider uppercase">Inward Leg</div>
                             )}
                           </td>
                           
@@ -980,7 +1035,7 @@ export default function TravellingAllowancePage() {
                               value={entry.train_no || ''}
                               onChange={(e) => handleEntryChange(idx, 'train_no', e.target.value)}
                               placeholder="e.g. By Metro"
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                             />
                           </td>
                           
@@ -991,7 +1046,7 @@ export default function TravellingAllowancePage() {
                               value={entry.time_left || ''}
                               onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
                               placeholder="11:10"
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white text-center"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
                             />
                           </td>
                           
@@ -1002,7 +1057,7 @@ export default function TravellingAllowancePage() {
                               value={entry.time_arrived || ''}
                               onChange={(e) => handleEntryChange(idx, 'time_arrived', e.target.value)}
                               placeholder="12:00"
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white text-center"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
                             />
                           </td>
                           
@@ -1013,7 +1068,7 @@ export default function TravellingAllowancePage() {
                               value={entry.station_from || ''}
                               onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
                               placeholder="KKVS"
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                             />
                           </td>
                           
@@ -1024,7 +1079,7 @@ export default function TravellingAllowancePage() {
                               value={entry.station_to || ''}
                               onChange={(e) => handleEntryChange(idx, 'station_to', e.target.value)}
                               placeholder="M.Bhavan"
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                             />
                           </td>
                           
@@ -1041,7 +1096,7 @@ export default function TravellingAllowancePage() {
                                 value={entry.object_journey || ''}
                                 onChange={(e) => handleEntryChange(idx, 'object_journey', e.target.value)}
                                 placeholder="Object of journey details"
-                                className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                                className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                               />
                             ) : null}
                           </td>
@@ -1062,7 +1117,7 @@ export default function TravellingAllowancePage() {
                               <button
                                 type="button"
                                 onClick={() => removeEntry(idx)}
-                                className="p-1 hover:bg-rose-50 rounded text-rose-500 hover:text-rose-600 transition-colors"
+                                className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1084,15 +1139,15 @@ export default function TravellingAllowancePage() {
                               type="date"
                               value={entry.entry_date}
                               onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                              className="bg-slate-50 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-700 outline-none focus:bg-white"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all cursor-pointer"
                             />
-                            {isStay && <span className="text-[10px] text-amber-600 block mt-0.5 font-bold uppercase">Stay Start</span>}
+                            {isStay && <span className="text-[10px] text-amber-600 block mt-0.5 font-bold uppercase tracking-wider">Stay Start</span>}
                           </td>
                           
                           {/* Mode/Train details or Stay Campus Details */}
                           <td className="px-3 py-2" colSpan={isStay ? 5 : 1}>
                             {isStay ? (
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-1.5">
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-[10px] font-bold text-slate-400">Campus:</span>
                                   <input
@@ -1100,10 +1155,10 @@ export default function TravellingAllowancePage() {
                                     value={entry.station_from || ''}
                                     onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
                                     placeholder="e.g. IRISET hostel campus at SCR"
-                                    className="flex-1 bg-amber-50/50 border border-amber-200 rounded px-2 py-1 font-semibold text-amber-800 outline-none focus:bg-white"
+                                    className="flex-1 bg-amber-50/30 border border-amber-250/60 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-900 outline-none focus:bg-white focus:border-amber-500 transition-all"
                                   />
                                 </div>
-                                <div className="text-[10px] text-slate-400 italic mt-0.5 truncate">
+                                <div className="text-[10px] text-slate-400 font-semibold italic truncate">
                                   {entry.train_no}
                                 </div>
                               </div>
@@ -1113,7 +1168,7 @@ export default function TravellingAllowancePage() {
                                 value={entry.train_no || ''}
                                 onChange={(e) => handleEntryChange(idx, 'train_no', e.target.value)}
                                 placeholder="Train/Metro Mode"
-                                className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                                className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                               />
                             )}
                           </td>
@@ -1127,7 +1182,7 @@ export default function TravellingAllowancePage() {
                                   value={entry.time_left || ''}
                                   onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
                                   placeholder="07:25"
-                                  className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white text-center"
+                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
                                 />
                               </td>
                               <td className="px-3 py-2">
@@ -1136,7 +1191,7 @@ export default function TravellingAllowancePage() {
                                   value={entry.time_arrived || ''}
                                   onChange={(e) => handleEntryChange(idx, 'time_arrived', e.target.value)}
                                   placeholder="10:30"
-                                  className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white text-center"
+                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
                                 />
                               </td>
                               <td className="px-3 py-2">
@@ -1145,7 +1200,7 @@ export default function TravellingAllowancePage() {
                                   value={entry.station_from || ''}
                                   onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
                                   placeholder="KKVS"
-                                  className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                                 />
                               </td>
                               <td className="px-3 py-2">
@@ -1154,7 +1209,7 @@ export default function TravellingAllowancePage() {
                                   value={entry.station_to || ''}
                                   onChange={(e) => handleEntryChange(idx, 'station_to', e.target.value)}
                                   placeholder="IRISET"
-                                  className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                                 />
                               </td>
                             </>
@@ -1166,7 +1221,7 @@ export default function TravellingAllowancePage() {
                                   type="date"
                                   value={entry.time_left || ''}
                                   onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
-                                  className="bg-amber-50/50 border border-amber-200 rounded px-2 py-1 font-semibold text-amber-800 outline-none focus:bg-white"
+                                  className="bg-amber-50/30 border border-amber-200/60 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-900 outline-none focus:bg-white focus:border-amber-500 transition-all cursor-pointer"
                                 />
                               </div>
                             </td>
@@ -1184,7 +1239,7 @@ export default function TravellingAllowancePage() {
                                 value={entry.days_nights || ''}
                                 onChange={(e) => handleEntryChange(idx, 'days_nights', e.target.value)}
                                 placeholder="1.0"
-                                className="w-12 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-center font-bold text-slate-700 outline-none focus:bg-white"
+                                className="w-16 bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
                               />
                             )}
                           </td>
@@ -1196,7 +1251,7 @@ export default function TravellingAllowancePage() {
                               value={entry.object_journey || ''}
                               onChange={(e) => handleEntryChange(idx, 'object_journey', e.target.value)}
                               placeholder="Object / Training letter reference details"
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-medium text-slate-700 outline-none focus:bg-white"
+                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
                               disabled={isStay}
                             />
                           </td>
@@ -1216,7 +1271,7 @@ export default function TravellingAllowancePage() {
                             <button
                               type="button"
                               onClick={() => removeEntry(idx)}
-                              className="p-1 hover:bg-rose-50 rounded text-rose-500 hover:text-rose-600 transition-colors"
+                              className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
