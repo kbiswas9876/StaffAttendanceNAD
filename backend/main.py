@@ -72,6 +72,19 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+def get_section_name_from_db(section_code: str) -> str:
+    if not section_code:
+        return ""
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT section_name FROM sections WHERE section_code = ?", (section_code,)).fetchone()
+        conn.close()
+        return row['section_name'] if row else section_code
+    except Exception as e:
+        print(f"Error fetching section name: {e}")
+        return section_code
+
+
 # --- Audit Logging Utility ---
 def log_audit(action: str, module: str, details: str, user: str = "System Admin"):
     try:
@@ -1845,7 +1858,7 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
         
         if is_joint_view:
             # Merged section header row
-            section_title = f" SECTION: {sec_code.upper()} ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            section_title = f" SECTION: {sec_code.upper()} ({get_section_name_from_db(sec_code)})"
             sheet.merge_range(current_row, 0, current_row, 10, section_title, sub_banner_fmt)
             sheet.set_row(current_row, 22)
             current_row += 1
@@ -2049,7 +2062,7 @@ async def export_night_duty_pdf(req: NightDutyExportRequest):
         rows_in_sec = grouped_rows[sec_code]
         
         if is_joint_view:
-            banner_text = f"<b>SECTION: {sec_code.upper()}</b> ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            banner_text = f"<b>SECTION: {sec_code.upper()}</b> ({get_section_name_from_db(sec_code)})"
             table_data.append([
                 Paragraph(banner_text, section_title_style),
                 "", "", "", "", "", "", "", "", "", ""
@@ -2216,7 +2229,7 @@ async def export_attendance_excel(req: AttendanceExportRequest):
         emps_in_sec = grouped_emps[sec_code]
         
         if is_joint_view:
-            section_title = f" SECTION: {sec_code.upper()} ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            section_title = f" SECTION: {sec_code.upper()} ({get_section_name_from_db(sec_code)})"
             sheet.merge_range(curr_row, 0, curr_row, 34, section_title, section_banner_fmt)
             sheet.set_row(curr_row, 22)
             curr_row += 1
@@ -2483,7 +2496,7 @@ async def export_attendance_pdf(req: AttendanceExportRequest):
         rows_in_sec = grouped_rows[sec_code]
         
         if is_joint_view:
-            banner_text = f"<b>SECTION: {sec_code.upper()}</b> ({'Kavi Subhash' if sec_code == 'KKVS' else 'Kavi Nazrul' if sec_code == 'KMUK' else sec_code})"
+            banner_text = f"<b>SECTION: {sec_code.upper()}</b> ({get_section_name_from_db(sec_code)})"
             banner_row = [Paragraph(banner_text, section_title_style)] + [""] * (len(days_in_grid) + 2)
             table_data.append(banner_row)
             

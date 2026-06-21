@@ -233,6 +233,11 @@ export default function AttendanceGrid() {
   const [hoveredCell, setHoveredCell] = useState<{ empName: string; designation: string; dateStr: string; weekday: string; status: string } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  const getSectionDisplayName = (code: string) => {
+    const sec = sections.find(s => s.section_code === code);
+    return sec ? `${sec.section_name} (${code})` : code;
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
@@ -387,11 +392,10 @@ export default function AttendanceGrid() {
     const formattedEndDate = `10.${String(selectedMonth + 1).padStart(2, '0')}.${selectedYear}`;
 
     const monthText = monthsList[selectedMonth].name.toUpperCase() + `-${selectedYear}`;
+    const matchedSection = sections.find(s => s.section_code === activeSection);
     const sectionName = activeSection === 'ALL'
-      ? 'KKVS & KMUK Sections'
-      : activeSection === 'KKVS'
-        ? 'Kavi Subhash Section'
-        : 'Tollygunge Section';
+      ? 'All Sections'
+      : matchedSection ? matchedSection.section_name : activeSection;
 
     // Build rows for payload
     const exportRows = employees.map((emp, idx) => {
@@ -1275,7 +1279,7 @@ export default function AttendanceGrid() {
                           <td colSpan={days.length + 2} className="py-2 px-4 text-left border-y border-slate-200 bg-slate-150">
                             <span className="bg-blue-600 text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
                             <span className="font-black text-slate-800">
-                              {emp.section_code === 'KKVS' ? 'Kavi Subhash (KKVS)' : emp.section_code === 'KMUK' ? 'Kavi Nazrul (KMUK)' : emp.section_code}
+                              {getSectionDisplayName(emp.section_code || '')}
                             </span>
                           </td>
                         </tr>

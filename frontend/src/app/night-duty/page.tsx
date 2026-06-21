@@ -64,6 +64,11 @@ export default function NightDutyNDA() {
   const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
   const [sections, setSections] = useState<Section[]>([]);
 
+  const getSectionDisplayName = (code: string) => {
+    const sec = sections.find(s => s.section_code === code);
+    return sec ? `${sec.section_name} (${code})` : code;
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setLang((localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi');
@@ -355,11 +360,10 @@ export default function NightDutyNDA() {
 
     setExporting(format);
     const monthText = getRosterMonthRangeName(selectedMonth, selectedYear);
+    const matchedSection = sections.find(s => s.section_code === activeSection);
     const sectionName = activeSection === 'ALL' 
-      ? 'KKVS & KMUK Sections' 
-      : activeSection === 'KKVS' 
-        ? 'Kavi Subhash Section' 
-        : 'Tollygunge Section';
+      ? 'All Sections' 
+      : matchedSection ? matchedSection.section_name : activeSection;
 
     const payload = {
       month_name: monthText,
@@ -672,7 +676,7 @@ export default function NightDutyNDA() {
                           <td colSpan={9} className="py-2 px-5 text-left border-y border-slate-200 bg-slate-150">
                             <span className="bg-blue-600 text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
                             <span className="font-black text-slate-800">
-                              {row.section_code === 'KKVS' ? 'Kavi Subhash (KKVS)' : row.section_code === 'KMUK' ? 'Kavi Nazrul (KMUK)' : row.section_code}
+                              {getSectionDisplayName(row.section_code || '')}
                             </span>
                           </td>
                         </tr>
