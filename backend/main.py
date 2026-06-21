@@ -2123,229 +2123,419 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     sheet = workbook.add_worksheet("Attendance")
 
-    # Layout Setup
+    # ─── Page Setup ─────────────────────────────────────────────────────────
     sheet.set_landscape()
-    sheet.set_paper(9) # A4
-    sheet.set_margins(0.3, 0.3, 0.3, 0.3)
+    sheet.set_paper(9)   # A4
+    sheet.set_margins(0.35, 0.35, 0.4, 0.4)
+    sheet.fit_to_pages(1, 0)   # Fit width to 1 page, height auto
 
-    # Styles
-    title_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 14, 'bold': True, 'align': 'center', 'valign': 'vcenter', 'font_color': '#1E3A8A'
+    # ─── Colour Palette ─────────────────────────────────────────────────────
+    # Header band
+    C_NAVY         = '#0F2D6B'   # Deep navy — title bg
+    C_NAVY_MID     = '#1A3F8F'   # Slightly lighter navy — subtitle bg
+    C_GOLD         = '#F5C842'   # Gold accent line / header text highlight
+    C_WHITE        = '#FFFFFF'
+    # Column header band
+    C_HEADER_BG    = '#1E3A8A'   # Indigo-900
+    C_HEADER_FG    = '#DBEAFE'   # Indigo-100
+    # Alternate row shading
+    C_ROW_ODD      = '#F8FAFF'   # Near-white with blue tint
+    C_ROW_EVEN     = '#EEF2FF'   # Soft indigo wash
+    C_ROW_FG       = '#1E293B'   # Slate-900 — main text
+    # Outer / thick border
+    C_BORDER_OUTER = '#1E3A8A'
+    C_BORDER_INNER = '#CBD5E1'   # Slate-300 — fine inner lines
+    # Status colours
+    C_P_BG         = '#F0FDF4';  C_P_FG  = '#166534'  # Present — green
+    C_PN_BG        = '#FAF5FF';  C_PN_FG = '#6B21A8'  # P/N — purple
+    C_R_BG         = '#F1F5F9';  C_R_FG  = '#475569'  # Rest — slate
+    C_CR_BG        = '#EFF6FF';  C_CR_FG = '#1D4ED8'  # CR — blue
+    C_CL_BG        = '#FFFBEB';  C_CL_FG = '#92400E'  # CL — amber
+    C_LAP_BG       = '#FFF7ED';  C_LAP_FG = '#C2410C' # LAP — orange
+    C_SICK_BG      = '#FFF1F2';  C_SICK_FG= '#9F1239' # Sick — rose
+    C_SCL_BG       = '#FDF2F8';  C_SCL_FG = '#86198F' # SCL — fuchsia
+    C_PH_BG        = '#FEFCE8';  C_PH_FG  = '#A16207' # PH — yellow
+    C_SUN_BG       = '#FEE2E2';  C_SUN_FG = '#991B1B' # Sunday — red
+    C_HOL_BG       = '#FEF3C7';  C_HOL_FG = '#78350F' # Holiday — warm amber
+    C_CUSTOM_BG    = '#ECFDF5';  C_CUSTOM_FG= '#065F46'# Custom — emerald
+    # Section banner (joint view)
+    C_SEC_BG       = '#1E3A8A';  C_SEC_FG = '#DBEAFE'
+
+    def fmt(props: dict):
+        """Shorthand — always apply Segoe UI and vcenter."""
+        base = {'font_name': 'Segoe UI', 'valign': 'vcenter'}
+        base.update(props)
+        return workbook.add_format(base)
+
+    # ─── Format Library ─────────────────────────────────────────────────────
+
+    # Title row 1 — deep navy with gold text
+    title_fmt = fmt({
+        'font_size': 15, 'bold': True, 'align': 'center',
+        'bg_color': C_NAVY, 'font_color': C_GOLD,
+        'top': 5, 'top_color': C_BORDER_OUTER,
+        'left': 5, 'left_color': C_BORDER_OUTER,
+        'right': 5, 'right_color': C_BORDER_OUTER,
     })
-    subtitle_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 11, 'bold': True, 'align': 'center', 'valign': 'vcenter'
+    # Title row 2 — mid-navy with white text
+    subtitle_fmt = fmt({
+        'font_size': 10, 'bold': True, 'align': 'center',
+        'bg_color': C_NAVY_MID, 'font_color': C_WHITE,
+        'bottom': 5, 'bottom_color': C_GOLD,
+        'left': 5, 'left_color': C_BORDER_OUTER,
+        'right': 5, 'right_color': C_BORDER_OUTER,
     })
-    sig_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True, 'align': 'center', 'valign': 'vcenter', 'text_wrap': True
+    # Column-header row — indigo band
+    col_hdr_fmt = fmt({
+        'font_size': 8, 'bold': True, 'align': 'center',
+        'bg_color': C_HEADER_BG, 'font_color': C_HEADER_FG,
+        'border': 1, 'border_color': '#2D4FAA', 'text_wrap': True,
+        'top': 2, 'top_color': C_GOLD,
     })
-    meta_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 10, 'align': 'center', 'valign': 'vcenter'
+    # Date number sub-header (same band, slightly larger)
+    date_hdr_fmt = fmt({
+        'font_size': 9, 'bold': True, 'align': 'center',
+        'bg_color': C_HEADER_BG, 'font_color': C_GOLD,
+        'border': 1, 'border_color': '#2D4FAA',
+        'top': 2, 'top_color': C_GOLD,
     })
-    header_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 9, 'bold': True, 'border': 1, 'bg_color': '#F1F5F9', 'align': 'center', 'valign': 'vcenter'
-    })
-    data_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter'
-    })
-    name_pf_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'text_wrap': True
-    })
-    section_banner_fmt = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True,
-        'align': 'left', 'valign': 'vcenter',
-        'bg_color': '#E2E8F0', 'font_color': '#1E293B',
-        'border': 1, 'border_color': '#CBD5E1'
-    })
-    
-    # CR rich text elements formats (bg_color is inherited from parent cell_format in write_rich_string)
-    cr_text_fmt = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 9, 'bold': True, 'font_color': '#1D4ED8'
-    })
-    cr_date_fmt = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 7, 'bold': False, 'font_color': '#1D4ED8'
-    })
-    
-    # Conditional formatting color registers
-    sunday_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEE2E2', 'font_color': '#991B1B'
-    })
-    holiday_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF3C7', 'font_color': '#92400E'
+    # Weekday sub-header
+    wday_hdr_fmt = fmt({
+        'font_size': 7, 'bold': False, 'align': 'center',
+        'bg_color': C_HEADER_BG, 'font_color': '#93C5FD',
+        'border': 1, 'border_color': '#2D4FAA',
+        'bottom': 2, 'bottom_color': C_GOLD,
     })
 
-    # Soft dynamic styles for roster codes
-    pn_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#F3E8FF', 'font_color': '#7E22CE', 'bold': True, 'text_wrap': True})
-    r_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#F1F5F9', 'font_color': '#64748B', 'text_wrap': True})
-    cr_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#EFF6FF', 'font_color': '#1D4ED8', 'bold': True, 'text_wrap': True})
-    cl_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFFBEB', 'font_color': '#B45309', 'bold': True, 'text_wrap': True})
-    lap_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFF7ED', 'font_color': '#C2410C', 'bold': True, 'text_wrap': True})
-    sick_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF2F2', 'font_color': '#B91C1C', 'bold': True, 'text_wrap': True})
-    scl_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FFF1F2', 'font_color': '#BE123C', 'bold': True, 'text_wrap': True})
-    ph_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#FEF9C3', 'font_color': '#A16207', 'bold': True, 'text_wrap': True})
-    custom_format = workbook.add_format({'font_name': 'Segoe UI', 'font_size': 9, 'border': 1, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#E6FFFA', 'font_color': '#047487', 'bold': True, 'text_wrap': True})
+    # Base data cell (odd/even row, injected per-row)
+    def data_cell(bg=C_ROW_ODD, bold=False, align='center', wrap=False, size=9, fg=C_ROW_FG):
+        return fmt({
+            'font_size': size, 'bold': bold, 'align': align,
+            'bg_color': bg, 'font_color': fg,
+            'border': 1, 'border_color': C_BORDER_INNER,
+            'text_wrap': wrap,
+        })
 
-    # 1. Header Information (spans A to AI, since we combine Name & PF into 1 col)
-    sheet.merge_range("A1:AI1", "METRO RAILWAY, KOLKATA", title_format)
-    sheet.merge_range("A2:AI2", f"ATTENDANCE SHEET OF SIGNAL DEPARTMENT ({req.section_name.upper()}) — For the Period from {req.period_start} to {req.period_end}", subtitle_format)
+    # SL number format
+    def sl_fmt(bg):
+        return fmt({
+            'font_size': 8, 'bold': True, 'align': 'center',
+            'bg_color': bg, 'font_color': '#94A3B8',
+            'border': 1, 'border_color': C_BORDER_INNER,
+            'left': 3, 'left_color': C_BORDER_OUTER,
+        })
 
-    # 2. Setup Columns & Headers (2 header rows: Row 3 & Row 4 / Index 2 & Index 3)
-    sheet.merge_range("A3:A4", "SL", header_format)
-    sheet.merge_range("B3:B4", "Name of Staff / P.F. No.", header_format)
-    sheet.merge_range("C3:C4", "Designation", header_format)
+    # Name/PF cell — left-aligned, bold name
+    def name_fmt(bg):
+        return fmt({
+            'font_size': 9, 'bold': True, 'align': 'left',
+            'bg_color': bg, 'font_color': C_ROW_FG,
+            'border': 1, 'border_color': C_BORDER_INNER,
+            'text_wrap': True,
+        })
 
-    # Column widths
-    sheet.set_column(0, 0, 4)   # SL
-    sheet.set_column(1, 1, 26)  # Name / PF
-    sheet.set_column(2, 2, 16)  # Designation
+    # Designation cell
+    def desig_fmt(bg):
+        return fmt({
+            'font_size': 8, 'bold': False, 'align': 'center',
+            'bg_color': bg, 'font_color': '#475569',
+            'border': 1, 'border_color': C_BORDER_INNER,
+            'italic': True,
+        })
 
-    # Set cell sizes for dates (31 columns: index 3 to 33)
+    # Remarks cell (last column)
+    def remarks_fmt(bg):
+        return fmt({
+            'font_size': 8, 'bold': False, 'align': 'left',
+            'bg_color': bg, 'font_color': '#64748B',
+            'border': 1, 'border_color': C_BORDER_INNER,
+            'right': 3, 'right_color': C_BORDER_OUTER,
+            'text_wrap': True,
+        })
+
+    # ── Status cell factories (same bg, injected with proper row alternation bg)
+    def status_fmt(bg_status, fg_status, row_bg, bold=True):
+        return fmt({
+            'font_size': 9, 'bold': bold, 'align': 'center',
+            'bg_color': bg_status, 'font_color': fg_status,
+            'border': 1, 'border_color': C_BORDER_INNER,
+            'text_wrap': True,
+        })
+
+    # Sunday / Holiday column formats (override row bg entirely)
+    sunday_fmt = fmt({
+        'font_size': 9, 'bold': True, 'align': 'center',
+        'bg_color': C_SUN_BG, 'font_color': C_SUN_FG,
+        'border': 1, 'border_color': '#FECACA',
+    })
+    holiday_fmt = fmt({
+        'font_size': 9, 'bold': True, 'align': 'center',
+        'bg_color': C_HOL_BG, 'font_color': C_HOL_FG,
+        'border': 1, 'border_color': '#FDE68A',
+    })
+
+    # Pre-built status formats (row-bg is embedded in status bg — status colour dominates)
+    pn_fmt     = status_fmt(C_PN_BG,   C_PN_FG,   C_ROW_ODD)
+    r_fmt      = status_fmt(C_R_BG,    C_R_FG,    C_ROW_ODD, bold=False)
+    cr_fmt     = status_fmt(C_CR_BG,   C_CR_FG,   C_ROW_ODD)
+    cl_fmt     = status_fmt(C_CL_BG,   C_CL_FG,   C_ROW_ODD)
+    lap_fmt    = status_fmt(C_LAP_BG,  C_LAP_FG,  C_ROW_ODD)
+    sick_fmt   = status_fmt(C_SICK_BG, C_SICK_FG, C_ROW_ODD)
+    scl_fmt    = status_fmt(C_SCL_BG,  C_SCL_FG,  C_ROW_ODD)
+    ph_fmt     = status_fmt(C_PH_BG,   C_PH_FG,   C_ROW_ODD)
+    custom_fmt = status_fmt(C_CUSTOM_BG, C_CUSTOM_FG, C_ROW_ODD)
+
+    # Present cell (uses row bg for visual rhythm)
+    def present_fmt(bg):
+        return fmt({
+            'font_size': 9, 'bold': True, 'align': 'center',
+            'bg_color': C_P_BG, 'font_color': C_P_FG,
+            'border': 1, 'border_color': '#BBF7D0',
+        })
+
+    # CR rich-text sub-formats
+    cr_main_fmt = fmt({'font_size': 9, 'bold': True,  'font_color': C_CR_FG, 'bg_color': C_CR_BG})
+    cr_sub_fmt  = fmt({'font_size': 7, 'bold': False, 'font_color': '#60A5FA', 'bg_color': C_CR_BG})
+
+    # Section banner (joint view)
+    sec_banner_fmt = fmt({
+        'font_size': 9, 'bold': True, 'align': 'left',
+        'bg_color': C_SEC_BG, 'font_color': C_SEC_FG,
+        'border': 1, 'border_color': C_BORDER_OUTER,
+        'italic': False,
+    })
+
+    # Signature formats
+    sig_left_fmt = fmt({
+        'font_size': 10, 'bold': True, 'align': 'left', 'valign': 'top',
+        'text_wrap': True,
+    })
+    sig_right_fmt = fmt({
+        'font_size': 10, 'bold': True, 'align': 'right', 'valign': 'top',
+        'text_wrap': True,
+    })
+
+    # ─── Column Widths ───────────────────────────────────────────────────────
+    sheet.set_column(0, 0, 3.5)   # SL
+    sheet.set_column(1, 1, 25)    # Name / PF
+    sheet.set_column(2, 2, 15)    # Designation
     for c in range(3, 34):
-        sheet.set_column(c, c, 6.0)
-    sheet.set_column(34, 34, 28) # Remarks (index 34)
+        sheet.set_column(c, c, 5.5)  # Day columns
+    sheet.set_column(34, 34, 26)  # Remarks
 
-    # Days arrays
+    # ─── Row Heights ────────────────────────────────────────────────────────
+    sheet.set_row(0, 26)   # Title row 1
+    sheet.set_row(1, 22)   # Title row 2
+    sheet.set_row(2, 20)   # Date numbers
+    sheet.set_row(3, 16)   # Weekday names
+
+    # ─── HEADER BLOCK ───────────────────────────────────────────────────────
+    # Row 1: Organisation name
+    sheet.merge_range("A1:AI1", "METRO RAILWAY, KOLKATA", title_fmt)
+
+    # Row 2: Section + period subtitle
+    sheet.merge_range(
+        "A2:AI2",
+        f"ATTENDANCE SHEET — SIGNAL DEPARTMENT  ({req.section_name.upper()})   "
+        f"Period: {req.period_start}  to  {req.period_end}",
+        subtitle_fmt
+    )
+
+    # ─── COLUMN HEADER ROWS (rows 3 & 4, index 2 & 3) ──────────────────────
+    sheet.merge_range("A3:A4", "SL",                          col_hdr_fmt)
+    sheet.merge_range("B3:B4", "Name of Staff\nP.F. Number",  col_hdr_fmt)
+    sheet.merge_range("C3:C4", "Designation",                 col_hdr_fmt)
+
     days_in_grid = req.rows[0].days if req.rows else []
-    
-    # Write dates (11, 12, etc.) and weekdays (Mon, Tue, etc.)
     for d_idx, day_obj in enumerate(days_in_grid):
         col_c = 3 + d_idx
-        # Date number written in Row 3 (index 2)
-        sheet.write(2, col_c, day_obj.day, header_format)
-        # Weekday written in Row 4 (index 3)
-        sheet.write(3, col_c, day_obj.weekday, header_format)
+        # Mark Sunday date headers deep rose
+        if day_obj.weekday == "Sun":
+            dn_fmt = fmt({
+                'font_size': 9, 'bold': True, 'align': 'center',
+                'bg_color': '#991B1B', 'font_color': '#FEE2E2',
+                'border': 1, 'border_color': '#7F1D1D',
+                'top': 2, 'top_color': C_GOLD,
+            })
+            wd_fmt = fmt({
+                'font_size': 7, 'bold': True, 'align': 'center',
+                'bg_color': '#991B1B', 'font_color': '#FCA5A5',
+                'border': 1, 'border_color': '#7F1D1D',
+                'bottom': 2, 'bottom_color': C_GOLD,
+            })
+        else:
+            dn_fmt = date_hdr_fmt
+            wd_fmt = wday_hdr_fmt
+        sheet.write(2, col_c, day_obj.day,     dn_fmt)
+        sheet.write(3, col_c, day_obj.weekday, wd_fmt)
 
-    sheet.merge_range("AI3:AI4", "Remarks / Special Events", header_format)
+    sheet.merge_range("AI3:AI4", "Remarks / Special Events", col_hdr_fmt)
 
-    # 3. Write Data
+    # ─── DATA ROWS ──────────────────────────────────────────────────────────
     curr_row = 4
-    
+
     is_joint_view = req.section_code == 'ALL'
     from collections import defaultdict
     grouped_emps = defaultdict(list)
     for emp in req.rows:
         grouped_emps[emp.section_code or 'KKVS'].append(emp)
-        
+
+    emp_counter = 0   # global counter for alternating rows
+
     for sec_code in sorted(grouped_emps.keys()):
         emps_in_sec = grouped_emps[sec_code]
-        
+
         if is_joint_view:
-            section_title = f" SECTION: {sec_code.upper()} ({get_section_name_from_db(sec_code)})"
-            sheet.merge_range(curr_row, 0, curr_row, 34, section_title, section_banner_fmt)
-            sheet.set_row(curr_row, 22)
+            section_title = f"  ▸  SECTION: {sec_code.upper()}   —   {get_section_name_from_db(sec_code)}"
+            sheet.merge_range(curr_row, 0, curr_row, 34, section_title, sec_banner_fmt)
+            sheet.set_row(curr_row, 20)
             curr_row += 1
-            
+
         for emp in emps_in_sec:
-            sheet.set_row(curr_row, 35) # Row height set to 35 to cleanly fit name/PF and custom code/order details
-            sheet.write(curr_row, 0, emp.sl, data_format)
-            
-            # Combined Name & PF
-            name_pf_text = f"{emp.name}\n(PF: {emp.pf_number})"
-            sheet.write(curr_row, 1, name_pf_text, name_pf_format)
-        
-        sheet.write(curr_row, 2, emp.designation, data_format)
-        
-        # Compute spans for leaves & rest
-        spans = []
-        n = len(emp.days)
-        i = 0
-        while i < n:
-            status = emp.days[i].status
-            start_idx = i
-            while i < n - 1 and emp.days[i+1].status == status:
+            emp_counter += 1
+            row_bg = C_ROW_ODD if emp_counter % 2 == 1 else C_ROW_EVEN
+            sheet.set_row(curr_row, 34)
+
+            # Left thick border for SL (outermost left)
+            sheet.write(curr_row, 0, emp.sl,          sl_fmt(row_bg))
+            sheet.write(curr_row, 1, f"{emp.name}\n(PF: {emp.pf_number})", name_fmt(row_bg))
+            sheet.write(curr_row, 2, emp.designation,  desig_fmt(row_bg))
+
+            # ── Compute consecutive-status spans ──────────────────────────
+            spans = []
+            n = len(emp.days)
+            i = 0
+            while i < n:
+                status = emp.days[i].status
+                start_idx = i
+                while i < n - 1 and emp.days[i + 1].status == status:
+                    i += 1
+                spans.append((start_idx, i, status))
                 i += 1
-            end_idx = i
-            spans.append((start_idx, end_idx, status))
-            i += 1
 
-        for start_idx, end_idx, status in spans:
-            start_col = 3 + start_idx
-            end_col = 3 + end_idx
-            val = status
-            
-            # Select format based on status code
-            if val == 'P/N':
-                cell_format = pn_format
-            elif val == 'R':
-                cell_format = r_format
-            elif val == 'CR':
-                cell_format = cr_format
-            elif val == 'CL':
-                cell_format = cl_format
-            elif val == 'LAP':
-                cell_format = lap_format
-            elif val == 'Sick':
-                cell_format = sick_format
-            elif val == 'SCL':
-                cell_format = scl_format
-            elif val == 'PH':
-                cell_format = ph_format
-            elif val not in ('P', '', None):
-                cell_format = custom_format
-            elif emp.days[start_idx].weekday == "Sun":
-                cell_format = sunday_format
-            elif emp.days[start_idx].is_holiday:
-                cell_format = holiday_format
-            else:
-                cell_format = data_format
+            # ── Write each span ───────────────────────────────────────────
+            for start_idx, end_idx, status in spans:
+                start_col = 3 + start_idx
+                end_col   = 3 + end_idx
+                val = status
 
-            # If it's a default/empty/present or CR, write individually to avoid merging Present/CR status
-            if val in ('P', 'CR', '', None):
-                for col_idx in range(start_col, end_col + 1):
-                    day_obj = emp.days[col_idx - 3]
-                    day_format = cell_format if val == 'CR' else data_format
-                    
-                    if val == 'CR':
-                        display_val = 'CR'
-                        has_rich = False
-                        if day_obj.remarks and "CR_EARNED_DATE:" in day_obj.remarks:
-                            edate = day_obj.remarks.split("CR_EARNED_DATE:")[1].strip()[:10]
-                            try:
-                                dt = datetime.strptime(edate, "%Y-%m-%d")
-                                date_str = dt.strftime('%d.%m')
-                                cell_format.set_text_wrap()
-                                sheet.write_rich_string(curr_row, col_idx, cr_text_fmt, 'CR\n', cr_date_fmt, date_str, cell_format)
-                                has_rich = True
-                            except Exception:
-                                pass
-                        if not has_rich:
-                            sheet.write(curr_row, col_idx, display_val, day_format)
-                    else:
-                        if day_obj.weekday == "Sun":
-                            day_format = sunday_format
-                        elif day_obj.is_holiday:
-                            day_format = holiday_format
-                        sheet.write(curr_row, col_idx, val, day_format)
-            else:
-                # Merge consecutive identical status cells (e.g. Sick, CL, R)
-                order_text = emp.days[start_idx].remarks
-                display_val = val
-                # Format custom codes as Code\n(Order) if order/remarks exist
-                if val not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order_text:
-                    display_val = f"{val}\n({order_text})"
-                
-                if start_col == end_col:
-                    sheet.write(curr_row, start_col, display_val, cell_format)
+                # Map status → format
+                if val == 'P/N':
+                    cell_fmt_base = pn_fmt
+                elif val == 'R':
+                    cell_fmt_base = r_fmt
+                elif val == 'CR':
+                    cell_fmt_base = cr_fmt
+                elif val == 'CL':
+                    cell_fmt_base = cl_fmt
+                elif val == 'LAP':
+                    cell_fmt_base = lap_fmt
+                elif val == 'Sick':
+                    cell_fmt_base = sick_fmt
+                elif val == 'SCL':
+                    cell_fmt_base = scl_fmt
+                elif val == 'PH':
+                    cell_fmt_base = ph_fmt
+                elif val not in ('P', '', None):
+                    cell_fmt_base = custom_fmt
+                elif emp.days[start_idx].weekday == "Sun":
+                    cell_fmt_base = sunday_fmt
+                elif emp.days[start_idx].is_holiday:
+                    cell_fmt_base = holiday_fmt
                 else:
-                    sheet.merge_range(curr_row, start_col, curr_row, end_col, display_val, cell_format)
-            
-        sheet.write(curr_row, 34, emp.remarks, data_format)
-        curr_row += 1
+                    cell_fmt_base = None  # plain present / empty
 
-    # 4. Signatures
-    sig_row = curr_row + 3
+                # ── Present / empty / CR: write cell by cell (no merge) ───
+                if val in ('P', 'CR', '', None):
+                    for col_idx in range(start_col, end_col + 1):
+                        day_obj = emp.days[col_idx - 3]
+
+                        if val == 'CR':
+                            # Try rich-string with earned date sub-line
+                            has_rich = False
+                            if day_obj.remarks and "CR_EARNED_DATE:" in day_obj.remarks:
+                                edate = day_obj.remarks.split("CR_EARNED_DATE:")[1].strip()[:10]
+                                try:
+                                    dt = datetime.strptime(edate, "%Y-%m-%d")
+                                    date_str = dt.strftime('%d.%m')
+                                    sheet.write_rich_string(
+                                        curr_row, col_idx,
+                                        cr_main_fmt, 'CR\n',
+                                        cr_sub_fmt,  date_str,
+                                        cr_fmt
+                                    )
+                                    has_rich = True
+                                except Exception:
+                                    pass
+                            if not has_rich:
+                                sheet.write(curr_row, col_idx, 'CR', cr_fmt)
+                        else:
+                            # Present or empty — apply day-specific colour
+                            if day_obj.weekday == "Sun":
+                                day_fmt = sunday_fmt
+                                display = val if val else ''
+                            elif day_obj.is_holiday:
+                                day_fmt = holiday_fmt
+                                display = val if val else ''
+                            else:
+                                if val == 'P':
+                                    day_fmt = present_fmt(row_bg)
+                                else:
+                                    day_fmt = data_cell(bg=row_bg)
+                                display = val if val else ''
+                            sheet.write(curr_row, col_idx, display, day_fmt)
+                else:
+                    # ── Leaves / special codes: merge consecutive cells ────
+                    order_text = emp.days[start_idx].remarks
+                    display_val = val
+                    if val not in ('CL', 'LAP', 'Sick', 'SCL', 'PH', 'R', 'P/N') and order_text:
+                        display_val = f"{val}\n({order_text})"
+
+                    if start_col == end_col:
+                        sheet.write(curr_row, start_col, display_val, cell_fmt_base)
+                    else:
+                        sheet.merge_range(curr_row, start_col, curr_row, end_col, display_val, cell_fmt_base)
+
+            # Remarks — right thick border
+            sheet.write(curr_row, 34, emp.remarks or '', remarks_fmt(row_bg))
+            curr_row += 1
+
+    # ─── SIGNATURE FOOTER ───────────────────────────────────────────────────
+    # Spacer row
+    sheet.set_row(curr_row, 10)
+    curr_row += 1
+
+    # Divider line row
+    divider_fmt = fmt({
+        'bg_color': C_NAVY, 'top': 5, 'top_color': C_NAVY,
+        'bottom': 0, 'left': 0, 'right': 0,
+    })
+    sheet.merge_range(curr_row, 0, curr_row, 34, '', divider_fmt)
+    sheet.set_row(curr_row, 3)
+    curr_row += 1
+
+    # Label row
+    lbl_fmt = fmt({
+        'font_size': 8, 'bold': False, 'align': 'center',
+        'font_color': '#94A3B8', 'italic': True,
+    })
+    sheet.merge_range(curr_row, 0, curr_row, 34,
+        f"Prepared on: {req.submission_date}   |   Metro Railway Signal Department   |   {req.section_name}",
+        lbl_fmt)
+    sheet.set_row(curr_row, 14)
+    curr_row += 1
+
+    # Signature row
+    sig_row = curr_row + 1
     sheet.set_row(sig_row, 40)
-    sig_left_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True, 'align': 'left', 'valign': 'top', 'text_wrap': True
-    })
-    sig_right_format = workbook.add_format({
-        'font_name': 'Segoe UI', 'font_size': 10, 'bold': True, 'align': 'right', 'valign': 'top', 'text_wrap': True
-    })
-    sheet.merge_range(sig_row, 1, sig_row, 3, req.signatory_left, sig_left_format)
-    sheet.merge_range(sig_row, 28, sig_row, 34, f"For {req.signatory_right}", sig_right_format)
+    sheet.merge_range(sig_row, 1, sig_row, 8,
+        f"{req.signatory_left}\n(Prepared & Submitted by)", sig_left_fmt)
+    sheet.merge_range(sig_row, 24, sig_row, 34,
+        f"For {req.signatory_right}\n(Verified / Countersigned)", sig_right_fmt)
 
     workbook.close()
     output.seek(0)
-    
+
     filename = f"Attendance_Sheet_{req.section_code}_{req.period_start}_{req.period_end}.xlsx"
     return StreamingResponse(
         output,
