@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Save,
   Sparkles,
@@ -15,7 +15,8 @@ import {
   RotateCcw,
   Check,
   AlertCircle,
-  Settings
+  Settings,
+  Pencil
 } from 'lucide-react';
 import {
   getEmployees,
@@ -327,6 +328,7 @@ const RosterRow: React.FC<RosterRowProps> = React.memo(({
 RosterRow.displayName = 'RosterRow';
 
 export default function AttendanceGrid() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -1166,8 +1168,12 @@ export default function AttendanceGrid() {
     return { backgroundColor: '#F1F5F9', color: '#1E293B' };
   }, [allCodes]);
 
+  const containerRect = containerRef.current?.getBoundingClientRect();
+  const leftOffset = containerRect ? containerRect.left : 0;
+  const topOffset = containerRect ? containerRect.top : 0;
+
   return (
-    <div className="p-6 space-y-6 flex flex-col h-full min-h-screen">      {/* Title & Toolbar */}
+    <div ref={containerRef} className="p-6 space-y-6 flex flex-col h-full min-h-screen">      {/* Title & Toolbar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-850 flex items-center gap-2">
@@ -2104,8 +2110,8 @@ export default function AttendanceGrid() {
             <div 
               className="fixed bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-100 flex flex-col text-left overflow-hidden select-none"
               style={{ 
-                top: `${dropdownPos.top + 4}px`, 
-                left: `${dropdownPos.left}px`,
+                top: `${dropdownPos.top - topOffset + 4}px`, 
+                left: `${dropdownPos.left - leftOffset}px`,
                 transform: 'translateX(-50%)',
                 width: '85px'
               }}
@@ -2167,8 +2173,8 @@ export default function AttendanceGrid() {
                 }}
                 className="w-full px-2 py-1 flex items-center gap-1.5 hover:bg-blue-50 text-[10px] font-black text-blue-600 transition cursor-pointer"
               >
-                <Sparkles size={10} className="text-blue-500 shrink-0" />
-                <span>Custom...</span>
+                <Pencil size={10} className="text-blue-500 shrink-0" />
+                <span>Custom</span>
               </button>
               <button
                 type="button"
@@ -2192,8 +2198,8 @@ export default function AttendanceGrid() {
         <div 
           className="fixed z-50 pointer-events-none bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl p-4 flex flex-col gap-2 text-white animate-in fade-in zoom-in-95 duration-100 max-w-xs"
           style={{ 
-            top: `${mousePos.y + 15}px`, 
-            left: `${typeof window !== 'undefined' && mousePos.x + 220 > window.innerWidth ? mousePos.x - 220 : mousePos.x + 15}px`,
+            top: `${mousePos.y - topOffset + 15}px`, 
+            left: `${typeof window !== 'undefined' && mousePos.x + 220 > window.innerWidth ? mousePos.x - leftOffset - 220 : mousePos.x - leftOffset + 15}px`,
           }}
         >
           {/* Employee Info */}
