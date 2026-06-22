@@ -1366,7 +1366,7 @@ export default function AttendanceGrid() {
       </div>
 
       {/* Grid Container */}
-      <div className="flex-1 glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden max-h-[60vh] bg-white shadow-sm">
+      <div className="glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden h-fit max-h-[calc(100vh-310px)] bg-white shadow-sm">
         {loading ? (
           <div className="flex-1 flex flex-col overflow-hidden animate-pulse">
             <div className="border-b border-slate-200 bg-slate-50 flex">
