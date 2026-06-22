@@ -46,6 +46,8 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
   const [paletteSearch, setPaletteSearch] = useState('');
   const [backupStatusText, setBackupStatusText] = useState('');
   const paletteRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const sidebarTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Notifications states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -234,6 +236,22 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     }
   };
 
+  // Toggle sidebar with main-content width freeze to prevent table reflow during animation.
+  // The sidebar animates smoothly via CSS transition, while <main> is locked at a fixed
+  // pixel width so tables/grids inside never recalculate layout. After the transition
+  // finishes, the lock is released and content adjusts in a single reflow.
+  const handleToggleSidebar = (open: boolean) => {
+    clearTimeout(sidebarTimerRef.current);
+    const mainEl = mainRef.current;
+    if (mainEl) {
+      mainEl.style.width = `${mainEl.offsetWidth}px`;
+    }
+    setIsSidebarOpen(open);
+    sidebarTimerRef.current = setTimeout(() => {
+      if (mainEl) mainEl.style.width = '';
+    }, 220);
+  };
+
   const toggleJoinSection = (secCode: string) => {
     let updated = [...selectedJoinSections];
     if (updated.includes(secCode)) {
@@ -326,7 +344,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } shrink-0 overflow-hidden bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
+        } shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9] overflow-hidden">
@@ -344,7 +362,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 </div>
               </div>
               <button 
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => handleToggleSidebar(false)}
                 className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-850 transition cursor-pointer shrink-0 ml-1"
               >
                 <Menu size={18} />
@@ -352,7 +370,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             </>
           ) : (
             <button 
-              onClick={() => setIsSidebarOpen(true)}
+              onClick={() => handleToggleSidebar(true)}
               className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-800 transition cursor-pointer mx-auto animate-in fade-in duration-200"
             >
               <Menu size={18} />
@@ -764,7 +782,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         )}
 
         {/* Child Router Content */}
-        <main className="flex-1 overflow-auto bg-[#F8FAFC] relative">
+        <main ref={mainRef} className="flex-1 overflow-auto bg-[#F8FAFC] relative">
           <div key={pathname} className="page-transition min-h-full">
             {children}
           </div>
