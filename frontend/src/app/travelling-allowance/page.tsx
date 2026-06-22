@@ -30,6 +30,69 @@ import {
   TAEntry 
 } from '../../lib/api';
 
+function LatexRenderer({ math }: { math: string }) {
+  const containerRef = React.useRef<HTMLSpanElement>(null);
+  
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const loadKatex = async () => {
+      const cssId = 'katex-css';
+      if (!document.getElementById(cssId)) {
+        const link = document.createElement('link');
+        link.id = cssId;
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css';
+        document.head.appendChild(link);
+      }
+      
+      const renderMath = (katexInstance: any) => {
+        if (containerRef.current) {
+          try {
+            katexInstance.render(math, containerRef.current, {
+              throwOnError: false,
+              displayMode: false
+            });
+          } catch (e) {
+            console.error("Katex error", e);
+            if (containerRef.current) containerRef.current.textContent = math;
+          }
+        }
+      };
+      
+      if ((window as any).katex) {
+        renderMath((window as any).katex);
+        return;
+      }
+      
+      const scriptId = 'katex-js';
+      let script = document.getElementById(scriptId) as HTMLScriptElement;
+      if (!script) {
+        script = document.createElement('script');
+        script.id = scriptId;
+        script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+      
+      const onScriptLoad = () => {
+        if ((window as any).katex) {
+          renderMath((window as any).katex);
+        }
+      };
+      
+      script.addEventListener('load', onScriptLoad);
+      return () => {
+        script.removeEventListener('load', onScriptLoad);
+      };
+    };
+    
+    loadKatex();
+  }, [math]);
+  
+  return <span ref={containerRef} className="font-serif italic text-indigo-650">{math}</span>;
+}
+
 export default function TravellingAllowancePage() {
   // Metadata state
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1005,301 +1068,415 @@ export default function TravellingAllowancePage() {
                 <p className="text-xs text-slate-400 mt-0.5">Please select an employee and add entries using the action buttons above.</p>
               </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="min-w-full divide-y divide-slate-200 text-xs table-fixed">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-[100px]">Date</th>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[120px]">
-                      {journeyType === 'NORMAL' ? 'Leg type' : 'Details / Mode'}
-                    </th>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-[80px]">Dep. Time</th>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-[80px]">Arr. Time</th>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">From</th>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">To</th>
-                    <th className="px-3 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-[70px]">Absence</th>
-                    <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[140px]">Object of Journey</th>
-                    <th className="px-3 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider w-[70px]">Rate (Rs)</th>
-                    <th className="px-3 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider w-[70px]">Amount (Rs)</th>
-                    <th className="px-2 py-3 text-center w-[40px]"></th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-slate-100">
-                  {entries.map((entry, idx) => {
-                    const isEvenRow = idx % 2 === 0;
-                    
-                    if (journeyType === 'NORMAL') {
-                      return (
-                        <tr key={idx} className={`${isEvenRow ? 'bg-white' : 'bg-slate-50/30'} border-b border-slate-100 hover:bg-indigo-50/20 transition-colors`}>
-                          {/* Date (Merge visually) */}
-                          <td className="px-3 py-2">
-                            {isEvenRow ? (
-                              <input
-                                type="date"
-                                value={entry.entry_date}
-                                onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                                className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all cursor-pointer"
-                              />
-                            ) : (
-                              <div className="text-slate-400 font-bold text-center italic text-[10px] tracking-wider uppercase">Inward Leg</div>
-                            )}
-                          </td>
-                          
-                          {/* Mode/Train */}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={entry.train_no || ''}
-                              onChange={(e) => handleEntryChange(idx, 'train_no', e.target.value)}
-                              placeholder="e.g. By Metro"
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                            />
-                          </td>
-                          
-                          {/* Departure time */}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={entry.time_left || ''}
-                              onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
-                              placeholder="11:10"
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
-                            />
-                          </td>
-                          
-                          {/* Arrival time */}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={entry.time_arrived || ''}
-                              onChange={(e) => handleEntryChange(idx, 'time_arrived', e.target.value)}
-                              placeholder="12:00"
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
-                            />
-                          </td>
-                          
-                          {/* From station */}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={entry.station_from || ''}
-                              onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
-                              placeholder="KKVS"
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                            />
-                          </td>
-                          
-                          {/* To station */}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={entry.station_to || ''}
-                              onChange={(e) => handleEntryChange(idx, 'station_to', e.target.value)}
-                              placeholder="M.Bhavan"
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                            />
-                          </td>
-                          
-                          {/* Absence Multiplier (only display on outward leg row) */}
-                          <td className="px-3 py-2 text-center font-bold text-slate-700">
-                            {isEvenRow ? entry.days_nights : ''}
-                          </td>
-                          
-                          {/* Object (only display on outward leg row) */}
-                          <td className="px-3 py-2">
-                            {isEvenRow ? (
-                              <input
-                                type="text"
-                                value={entry.object_journey || ''}
-                                onChange={(e) => handleEntryChange(idx, 'object_journey', e.target.value)}
-                                placeholder="Object of journey details"
-                                className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                              />
-                            ) : null}
-                          </td>
-                          
-                          {/* Rate (only display on outward leg row) */}
-                          <td className="px-3 py-2 text-right font-bold text-slate-600">
-                            {isEvenRow ? `Rs. ${entry.rate}` : ''}
-                          </td>
-                          
-                          {/* Amount (only display on outward leg row) */}
-                          <td className="px-3 py-2 text-right font-bold text-slate-800">
-                            {isEvenRow ? `Rs. ${entry.amount}` : ''}
-                          </td>
-                          
-                          {/* Delete (shows on outward row for pair) */}
-                          <td className="px-2 py-2 text-center">
-                            {isEvenRow ? (
-                              <button
-                                type="button"
-                                onClick={() => removeEntry(idx)}
-                                className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    } else {
-                      // TRAINING Ledger Render (Journey Leg or Stay Block)
-                      const isStay = entry.is_stay === 1;
-                      
-                      return (
-                        <tr key={idx} className={`border-b border-slate-100 hover:bg-indigo-50/20 transition-colors ${
-                          isStay ? 'bg-amber-50/10' : 'bg-white'
-                        }`}>
-                          {/* Date (Start Date for stay) */}
-                          <td className="px-3 py-2">
+          ) : journeyType === 'NORMAL' ? (
+            <div className="space-y-4">
+              {(() => {
+                const pairs = [];
+                const numPairs = entries.length / 2;
+                for (let i = 0; i < numPairs; i++) {
+                  const outIdx = 2 * i;
+                  const inIdx = 2 * i + 1;
+                  const legOut = entries[outIdx];
+                  const legIn = entries[inIdx];
+                  if (!legOut) continue;
+                  
+                  pairs.push(
+                    <div key={i} className="bg-indigo-50/5 border border-indigo-200/40 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
+                      {/* Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-indigo-100/30 gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <Calendar className="w-4 h-4" />
+                          </span>
+                          <span className="text-xs font-black uppercase tracking-wider text-indigo-750">Local Duty Day #{i + 1}</span>
+                        </div>
+                        
+                        {/* Shared Date Input */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Duty Date:</span>
                             <input
                               type="date"
-                              value={entry.entry_date}
-                              onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all cursor-pointer"
+                              value={legOut.entry_date}
+                              onChange={(e) => handleEntryChange(outIdx, 'entry_date', e.target.value)}
+                              className="bg-white border border-slate-200 focus:border-indigo-550 focus:ring-1 focus:ring-indigo-550 outline-none rounded-xl px-3 py-1 text-xs font-bold text-slate-800 transition-all cursor-pointer"
                             />
-                            {isStay && <span className="text-[10px] text-amber-600 block mt-0.5 font-bold uppercase tracking-wider">Stay Start</span>}
-                          </td>
+                          </div>
                           
-                          {/* Mode/Train details or Stay Campus Details */}
-                          <td className="px-3 py-2" colSpan={isStay ? 5 : 1}>
-                            {isStay ? (
-                              <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] font-bold text-slate-400">Campus:</span>
-                                  <input
-                                    type="text"
-                                    value={entry.station_from || ''}
-                                    onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
-                                    placeholder="e.g. IRISET hostel campus at SCR"
-                                    className="flex-1 bg-amber-50/30 border border-amber-250/60 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-900 outline-none focus:bg-white focus:border-amber-500 transition-all"
-                                  />
-                                </div>
-                                <div className="text-[10px] text-slate-400 font-semibold italic truncate">
-                                  {entry.train_no}
-                                </div>
-                              </div>
-                            ) : (
+                          <button
+                            type="button"
+                            onClick={() => removeEntry(outIdx)}
+                            className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Outward & Inward Legs Container */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        {/* Outward Leg */}
+                        <div className="space-y-3 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Outward Leg (to work)
+                          </h4>
+                          
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mode</label>
                               <input
                                 type="text"
-                                value={entry.train_no || ''}
-                                onChange={(e) => handleEntryChange(idx, 'train_no', e.target.value)}
-                                placeholder="Train/Metro Mode"
-                                className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                                value={legOut.train_no || ''}
+                                onChange={(e) => handleEntryChange(outIdx, 'train_no', e.target.value)}
+                                placeholder="By Metro"
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                               />
-                            )}
-                          </td>
-                          
-                          {/* Departure time / Stay End Date */}
-                          {!isStay ? (
-                            <>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={entry.time_left || ''}
-                                  onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
-                                  placeholder="07:25"
-                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={entry.time_arrived || ''}
-                                  onChange={(e) => handleEntryChange(idx, 'time_arrived', e.target.value)}
-                                  placeholder="10:30"
-                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={entry.station_from || ''}
-                                  onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
-                                  placeholder="KKVS"
-                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={entry.station_to || ''}
-                                  onChange={(e) => handleEntryChange(idx, 'station_to', e.target.value)}
-                                  placeholder="IRISET"
-                                  className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                                />
-                              </td>
-                            </>
-                          ) : (
-                            <td className="px-3 py-2" colSpan={4}>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">Stay End Date:</span>
-                                <input
-                                  type="date"
-                                  value={entry.time_left || ''}
-                                  onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
-                                  className="bg-amber-50/30 border border-amber-200/60 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-900 outline-none focus:bg-white focus:border-amber-500 transition-all cursor-pointer"
-                                />
-                              </div>
-                            </td>
-                          )}
-                          
-                          {/* Days/Nights display multiplier */}
-                          <td className="px-3 py-2 text-center font-bold text-slate-700">
-                            {isStay ? (
-                              <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
-                                {entry.days_nights}
-                              </span>
-                            ) : (
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dep. Time</label>
                               <input
                                 type="text"
-                                value={entry.days_nights || ''}
-                                onChange={(e) => handleEntryChange(idx, 'days_nights', e.target.value)}
-                                placeholder="1.0"
-                                className="w-16 bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all text-center"
+                                value={legOut.time_left || ''}
+                                onChange={(e) => handleEntryChange(outIdx, 'time_left', e.target.value)}
+                                placeholder="11:10"
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
                               />
-                            )}
-                          </td>
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Arr. Time</label>
+                              <input
+                                type="text"
+                                value={legOut.time_arrived || ''}
+                                onChange={(e) => handleEntryChange(outIdx, 'time_arrived', e.target.value)}
+                                placeholder="12:00"
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                              />
+                            </div>
+                          </div>
                           
-                          {/* Object of journey */}
-                          <td className="px-3 py-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">From Station</label>
+                              <input
+                                type="text"
+                                value={legOut.station_from || ''}
+                                onChange={(e) => handleEntryChange(outIdx, 'station_from', e.target.value)}
+                                placeholder="KKVS"
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">To Station</label>
+                              <input
+                                type="text"
+                                value={legOut.station_to || ''}
+                                onChange={(e) => handleEntryChange(outIdx, 'station_to', e.target.value)}
+                                placeholder="M.Bhavan"
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-805"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Duty / Object of Journey</label>
                             <input
                               type="text"
-                              value={entry.object_journey || ''}
-                              onChange={(e) => handleEntryChange(idx, 'object_journey', e.target.value)}
-                              placeholder="Object / Training letter reference details"
-                              className="w-full bg-slate-50/70 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                              disabled={isStay}
+                              value={legOut.object_journey || ''}
+                              onChange={(e) => handleEntryChange(outIdx, 'object_journey', e.target.value)}
+                              placeholder="Attended Metro Bhavan as per instruction..."
+                              className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                             />
-                          </td>
+                          </div>
+                        </div>
+                        
+                        {/* Inward Leg */}
+                        <div className="space-y-3 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Inward Leg (back to base)
+                          </h4>
                           
-                          {/* Rate */}
-                          <td className="px-3 py-2 text-right font-bold text-slate-600">
-                            Rs. {entry.rate}
-                          </td>
-                          
-                          {/* Amount */}
-                          <td className="px-3 py-2 text-right font-bold text-slate-800">
-                            Rs. {entry.amount}
-                          </td>
-                          
-                          {/* Delete */}
-                          <td className="px-2 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeEntry(idx)}
-                              className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }
-                  })}
-                </tbody>
-              </table>
+                          {legIn ? (
+                            <>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mode</label>
+                                  <input
+                                    type="text"
+                                    value={legIn.train_no || ''}
+                                    onChange={(e) => handleEntryChange(inIdx, 'train_no', e.target.value)}
+                                    placeholder="By Metro"
+                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dep. Time</label>
+                                  <input
+                                    type="text"
+                                    value={legIn.time_left || ''}
+                                    onChange={(e) => handleEntryChange(inIdx, 'time_left', e.target.value)}
+                                    placeholder="19:20"
+                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Arr. Time</label>
+                                  <input
+                                    type="text"
+                                    value={legIn.time_arrived || ''}
+                                    onChange={(e) => handleEntryChange(inIdx, 'time_arrived', e.target.value)}
+                                    placeholder="20:20"
+                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">From Station</label>
+                                  <input
+                                    type="text"
+                                    value={legIn.station_from || ''}
+                                    onChange={(e) => handleEntryChange(inIdx, 'station_from', e.target.value)}
+                                    placeholder="M.Bhavan"
+                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">To Station</label>
+                                  <input
+                                    type="text"
+                                    value={legIn.station_to || ''}
+                                    onChange={(e) => handleEntryChange(inIdx, 'station_to', e.target.value)}
+                                    placeholder="KKVS"
+                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-805"
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center py-6 text-slate-400 italic text-[11px]">Inward leg details missing</div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Calculations Summary Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-indigo-100/30 text-xs font-semibold text-slate-500 gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span>Absence Multiplier:</span>
+                          <span className="text-indigo-700 font-extrabold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{legOut.days_nights || '0.0'}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-right">
+                          <div>Rate: <span className="font-bold text-slate-700">Rs. {legOut.rate}</span></div>
+                          <div>Amount: <span className="font-extrabold text-indigo-750">Rs. {legOut.amount}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return pairs;
+              })()}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {entries.map((entry, idx) => {
+                const isStay = entry.is_stay === 1;
+                if (isStay) {
+                  return (
+                    <div key={idx} className="bg-amber-50/10 border border-amber-200/50 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
+                      <div className="flex items-center justify-between pb-3 border-b border-amber-100/60">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                            <Clock className="w-4 h-4" />
+                          </span>
+                          <span className="text-xs font-black uppercase tracking-wider text-amber-700">Stay Block (100% Rate)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeEntry(idx)}
+                          className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Campus/Location */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Campus / Location</label>
+                          <input
+                            type="text"
+                            value={entry.station_from || ''}
+                            onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
+                            placeholder="e.g. IRISET hostel campus at SCR"
+                            className="w-full bg-white border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all"
+                          />
+                        </div>
+                        
+                        {/* Stay Start Date */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stay Start Date</label>
+                          <input
+                            type="date"
+                            value={entry.entry_date}
+                            onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
+                            className="w-full bg-white border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                          />
+                        </div>
+                        
+                        {/* Stay End Date */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stay End Date</label>
+                          <input
+                            type="date"
+                            value={entry.time_left || ''}
+                            onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
+                            className="w-full bg-white border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-amber-100/40 text-xs font-semibold text-slate-500 gap-2">
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <span>Absence Duration:</span>
+                          <span className="text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{entry.days_nights || '0 days'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-semibold italic max-w-[300px] md:max-w-md truncate">
+                          {entry.train_no}
+                        </div>
+                        <div className="flex items-center gap-4 text-right">
+                          <div>Rate: <span className="font-bold text-slate-700">Rs. {entry.rate}</span></div>
+                          <div>Amount: <span className="font-extrabold text-indigo-700">Rs. {entry.amount}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div key={idx} className="bg-indigo-50/5 border border-indigo-200/40 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
+                      <div className="flex items-center justify-between pb-3 border-b border-indigo-100/30">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <MapPin className="w-4 h-4" />
+                          </span>
+                          <span className="text-xs font-black uppercase tracking-wider text-indigo-700">Journey/Travel Leg</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeEntry(idx)}
+                          className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        {/* Travel Date */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Travel Date</label>
+                          <input
+                            type="date"
+                            value={entry.entry_date}
+                            onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                          />
+                        </div>
+                        
+                        {/* Train No / Mode */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Train / Mode</label>
+                          <input
+                            type="text"
+                            value={entry.train_no || ''}
+                            onChange={(e) => handleEntryChange(idx, 'train_no', e.target.value)}
+                            placeholder="e.g. 12703 or By Metro"
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                          />
+                        </div>
+                        
+                        {/* Departure Time */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Departure Time</label>
+                          <input
+                            type="text"
+                            value={entry.time_left || ''}
+                            onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
+                            placeholder="e.g. 07:25"
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all text-center"
+                          />
+                        </div>
+                        
+                        {/* Arrival Time */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Arrival Time</label>
+                          <input
+                            type="text"
+                            value={entry.time_arrived || ''}
+                            onChange={(e) => handleEntryChange(idx, 'time_arrived', e.target.value)}
+                            placeholder="e.g. 10:30"
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all text-center"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        {/* Station From */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">From Station</label>
+                          <input
+                            type="text"
+                            value={entry.station_from || ''}
+                            onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
+                            placeholder="e.g. KKVS"
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                          />
+                        </div>
+                        
+                        {/* Station To */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">To Station</label>
+                          <input
+                            type="text"
+                            value={entry.station_to || ''}
+                            onChange={(e) => handleEntryChange(idx, 'station_to', e.target.value)}
+                            placeholder="e.g. IRISET"
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                          />
+                        </div>
+
+                        {/* Absence Multiplier */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 tracking-wider uppercase">Multiplier</label>
+                          <input
+                            type="text"
+                            value={entry.days_nights || ''}
+                            onChange={(e) => handleEntryChange(idx, 'days_nights', e.target.value)}
+                            placeholder="e.g. 1.0"
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all text-center"
+                          />
+                        </div>
+                        
+                        {/* Object of Journey */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Object of Journey</label>
+                          <input
+                            type="text"
+                            value={entry.object_journey || ''}
+                            onChange={(e) => handleEntryChange(idx, 'object_journey', e.target.value)}
+                            placeholder="e.g. Refresher course course letter..."
+                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-6 pt-3 border-t border-indigo-100/30 text-xs font-semibold text-slate-500">
+                        <div>Rate: <span className="font-bold text-slate-700">Rs. {entry.rate}</span></div>
+                        <div>Amount: <span className="font-extrabold text-indigo-700">Rs. {entry.amount}</span></div>
+                      </div>
+                    </div>
+                  );
+                }
+              })}
             </div>
           )}
 
@@ -1311,9 +1488,15 @@ export default function TravellingAllowancePage() {
                   <span className="font-semibold text-slate-600">Total Entries:</span> 
                   <span>{entries.length} rows ({journeyType === 'NORMAL' ? `${entries.length / 2} pairs` : 'training/stays'})</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-slate-600">Absence Rule:</span>
-                  <span>Absence &gt;12h (100%), 6-12h (70%), &lt;=6h (30%). Stays computed at 100% daily rate.</span>
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-700">
+                    <LatexRenderer math="\Delta t > 12\text{h} \Rightarrow 100\%" />,
+                    <LatexRenderer math="6\text{h} < \Delta t \le 12\text{h} \Rightarrow 70\%" />,
+                    <LatexRenderer math="\Delta t \le 6\text{h} \Rightarrow 30\%" />
+                    <span className="text-slate-300">|</span>
+                    <LatexRenderer math="\text{Stays} \Rightarrow 100\%" />
+                  </span>
                 </div>
               </div>
               

@@ -3220,6 +3220,21 @@ def export_ta_bill_excel(id: int):
         
     ws = wb[sheet_to_keep]
     
+    # Fix any invalid crossing merged ranges or template merged cells in the data area (row 9 onwards)
+    for r in list(ws.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = r.bounds
+        if max_row >= 9:
+            try:
+                ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+            except Exception:
+                pass
+            if min_row <= 8:
+                new_max_row = min(8, max_row)
+                try:
+                    ws.merge_cells(start_row=min_row, start_column=min_col, end_row=new_max_row, end_column=max_col)
+                except Exception:
+                    pass
+    
     emp_name = (bill.get("emp_name", "") or "").strip()
     if not emp_name:
         emp_name = "[Enter Employee Name]"
