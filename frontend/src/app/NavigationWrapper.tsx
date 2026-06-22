@@ -326,13 +326,13 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } transition-[width] duration-300 cubic-bezier(0.16, 1, 0.3, 1) will-change-[width] bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
+        } shrink-0 overflow-hidden bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9] overflow-hidden">
           {isSidebarOpen ? (
             <>
-              <div className="flex items-center gap-2.5 min-w-0 animate-in fade-in duration-300">
+              <div className="flex items-center gap-2.5 min-w-0 animate-in fade-in duration-200">
                 <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
                 </svg>
@@ -353,7 +353,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
           ) : (
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-850 transition cursor-pointer mx-auto animate-in fade-in duration-300"
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-800 transition cursor-pointer mx-auto animate-in fade-in duration-200"
             >
               <Menu size={18} />
             </button>
@@ -368,7 +368,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
               <Link
                 key={item.path}
                 href={item.path}
-                className={`flex items-center p-2 rounded-xl text-sm font-extrabold transition-all duration-200 group cursor-pointer select-none relative ${
+                className={`flex items-center p-2 rounded-xl text-sm font-extrabold transition-colors duration-200 group cursor-pointer select-none relative ${
                   isActive 
                     ? 'bg-blue-50/40 text-blue-750 shadow-2xs' 
                     : 'text-slate-655 hover:bg-[#EFEDE6]/70 hover:text-slate-900'
@@ -381,14 +381,18 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 }`}>
                   <item.icon size={16} className="transition-transform duration-250 group-hover:scale-105" />
                 </div>
-                <span className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${
-                  isSidebarOpen ? 'opacity-100 max-w-[155px] ml-3.5' : 'opacity-0 max-w-0 ml-0'
+                <span className={`overflow-hidden whitespace-nowrap ${
+                  isSidebarOpen 
+                    ? 'opacity-100 max-w-[155px] ml-3.5 transition-all duration-200 ease-in-out delay-75' 
+                    : 'opacity-0 max-w-0 ml-0 transition-none'
                 }`}>
                   {getTranslation(lang, item.name)}
                 </span>
                 {isActive && (
-                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse transition-opacity duration-300 ${
-                    isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse ${
+                    isSidebarOpen 
+                      ? 'opacity-100 transition-opacity duration-200 delay-75' 
+                      : 'opacity-0 pointer-events-none transition-none'
                   }`}></span>
                 )}
               </Link>

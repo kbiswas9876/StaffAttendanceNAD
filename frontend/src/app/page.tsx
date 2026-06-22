@@ -259,14 +259,14 @@ export default function Dashboard() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse table-fixed">
               <thead>
                 <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50">
-                  <th className="py-3 px-5">PF Number</th>
-                  <th className="py-3 px-5">Name</th>
-                  <th className="py-3 px-5">Designation</th>
-                  <th className="py-3 px-5">Level</th>
-                  <th className="py-3 px-5">Rest Day</th>
+                  <th className="py-3 px-5 w-[25%]">PF Number</th>
+                  <th className="py-3 px-5 w-[35%]">Name</th>
+                  <th className="py-3 px-5 w-[20%]">Designation</th>
+                  <th className="py-3 px-5 w-[10%]">Level</th>
+                  <th className="py-3 px-5 w-[10%]">Rest Day</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">

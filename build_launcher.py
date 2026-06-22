@@ -34,8 +34,8 @@ def get_version():
     version_file = "version.txt"
     if not os.path.exists(version_file):
         with open(version_file, "w") as f:
-            f.write("1.2.0")
-        return "1.2.0"
+            f.write("1.2.2")
+        return "1.2.2"
     with open(version_file, "r") as f:
         return f.read().strip().replace("v", "")
 

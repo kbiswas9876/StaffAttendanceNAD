@@ -991,14 +991,14 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               Transfer & Posting History
             </h3>
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs table-fixed">
                 <thead>
                   <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                    <th className="py-2.5 px-4">Transfer Date</th>
-                    <th className="py-2.5 px-4">From Section</th>
-                    <th className="py-2.5 px-4">To Section</th>
-                    <th className="py-2.5 px-4">Order Number</th>
-                    <th className="py-2.5 px-4">Approved Signatory</th>
+                    <th className="py-2.5 px-4 w-[20%]">Transfer Date</th>
+                    <th className="py-2.5 px-4 w-[20%]">From Section</th>
+                    <th className="py-2.5 px-4 w-[20%]">To Section</th>
+                    <th className="py-2.5 px-4 w-[20%]">Order Number</th>
+                    <th className="py-2.5 px-4 w-[20%]">Approved Signatory</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -1044,12 +1044,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               Detailed Leave Logs Ledger
             </h3>
             <div className="overflow-x-auto max-h-[300px]">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs table-fixed">
                 <thead>
                   <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                    <th className="py-2.5 px-4">Leave Date</th>
-                    <th className="py-2.5 px-4">Leave Type</th>
-                    <th className="py-2.5 px-4">Remarks</th>
+                    <th className="py-2.5 px-4 w-[30%]">Leave Date</th>
+                    <th className="py-2.5 px-4 w-[20%]">Leave Type</th>
+                    <th className="py-2.5 px-4 w-[50%]">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -1697,17 +1697,17 @@ function StaffDirectory() {
 
       <div className="glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50">
-                <th className="py-3 px-3 w-10 text-center no-print"></th>
-                <th className="py-3 px-5">{getTranslation(lang, 'PF Number')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Name')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Designation')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Pay Level')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Rest Day')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Joining Date')}</th>
-                <th className="py-3 px-5 text-center no-print">{getTranslation(lang, 'Actions')}</th>
+                <th className="py-3 px-3 w-[5%] text-center no-print"></th>
+                <th className="py-3 px-5 w-[15%]">{getTranslation(lang, 'PF Number')}</th>
+                <th className="py-3 px-5 w-[25%]">{getTranslation(lang, 'Name')}</th>
+                <th className="py-3 px-5 w-[15%]">{getTranslation(lang, 'Designation')}</th>
+                <th className="py-3 px-5 w-[10%]">{getTranslation(lang, 'Pay Level')}</th>
+                <th className="py-3 px-5 w-[10%]">{getTranslation(lang, 'Rest Day')}</th>
+                <th className="py-3 px-5 w-[10%]">{getTranslation(lang, 'Joining Date')}</th>
+                <th className="py-3 px-5 text-center no-print w-[10%]">{getTranslation(lang, 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">

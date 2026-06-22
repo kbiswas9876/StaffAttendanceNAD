@@ -847,7 +847,7 @@ class NumberedCanvas(canvas.Canvas):
 try:
     from version import VERSION
 except ImportError:
-    VERSION = "1.2.0"
+    VERSION = "1.2.2"
 
 @app.get("/api/version")
 def get_version():

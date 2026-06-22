@@ -1007,7 +1007,7 @@ export default function TravellingAllowancePage() {
             </div>
           ) : (
             <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="min-w-full divide-y divide-slate-200 text-xs">
+              <table className="min-w-full divide-y divide-slate-200 text-xs table-fixed">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-3 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-[100px]">Date</th>

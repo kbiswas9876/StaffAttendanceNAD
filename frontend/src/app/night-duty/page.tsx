@@ -634,18 +634,18 @@ export default function NightDutyNDA() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50">
-                <th className="py-3 px-5 w-[60px] text-center">{getTranslation(lang, 'SL')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'P.F. No.')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Name of Staff')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Desig')}</th>
-                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Level')}</th>
-                <th className="py-3 px-5">{getTranslation(lang, 'Night Duty Dates')}</th>
-                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Total Days')}</th>
-                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Total Hours')}</th>
-                <th className="py-3 px-5 text-center">{getTranslation(lang, 'Weightage')}</th>
+                <th className="py-3 px-5 w-[5%] text-center">{getTranslation(lang, 'SL')}</th>
+                <th className="py-3 px-5 w-[15%]">{getTranslation(lang, 'P.F. No.')}</th>
+                <th className="py-3 px-5 w-[20%]">{getTranslation(lang, 'Name of Staff')}</th>
+                <th className="py-3 px-5 w-[15%]">{getTranslation(lang, 'Desig')}</th>
+                <th className="py-3 px-5 text-center w-[8%]">{getTranslation(lang, 'Level')}</th>
+                <th className="py-3 px-5 w-[15%]">{getTranslation(lang, 'Night Duty Dates')}</th>
+                <th className="py-3 px-5 text-center w-[8%]">{getTranslation(lang, 'Total Days')}</th>
+                <th className="py-3 px-5 text-center w-[8%]">{getTranslation(lang, 'Total Hours')}</th>
+                <th className="py-3 px-5 text-center w-[11%]">{getTranslation(lang, 'Weightage')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
