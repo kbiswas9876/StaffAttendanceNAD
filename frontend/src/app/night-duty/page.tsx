@@ -209,13 +209,15 @@ export default function NightDutyNDA() {
       let activeSectionsList: string[] = [];
       if (section === 'ALL' && typeof window !== 'undefined') {
         const lineId = localStorage.getItem('erp_active_line_id') || '1';
-        const stored = localStorage.getItem(`erp_join_sections_${lineId}`);
+        const stored = localStorage.getItem('erp_join_sections');
+        let hasStored = false;
         if (stored) {
+          hasStored = true;
           try {
             activeSectionsList = JSON.parse(stored);
           } catch (e) {}
         }
-        if (activeSectionsList.length === 0) {
+        if (!hasStored) {
           activeSectionsList = currentSections.filter(s => s.line_id === Number(lineId)).map(s => s.section_code);
         }
       }
