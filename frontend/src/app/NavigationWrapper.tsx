@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -24,6 +24,18 @@ import {
 import { getLines, getSections, getEmployees, createBackup, getAuditLogs, MetroLine, Section, Employee, AuditLog } from '../lib/api';
 import { getTranslation, translations } from '../lib/translations';
 
+interface ThemeColors {
+  activeBg: string;
+  activeText: string;
+  iconBg: string;
+  iconGlow: string;
+  logoBg: string;
+  dotColor: string;
+  accentText: string;
+  accentRing: string;
+  activeBorder: string;
+}
+
 interface NavigationWrapperProps {
   children: React.ReactNode;
 }
@@ -40,6 +52,90 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<number>(1); // Blue Line default
   const [selectedJoinSections, setSelectedJoinSections] = useState<string[]>([]);
+
+  // Compute theme dynamically based on active section's Metro Line
+  const theme = useMemo<ThemeColors>(() => {
+    if (activeSection === 'ALL') {
+      return {
+        activeBg: 'bg-indigo-50/90',
+        activeText: 'text-indigo-700',
+        iconBg: 'bg-indigo-600',
+        iconGlow: 'shadow-indigo-500/20',
+        logoBg: 'from-indigo-600 to-violet-600',
+        dotColor: 'bg-indigo-600',
+        accentText: 'text-indigo-650',
+        accentRing: 'ring-indigo-100',
+        activeBorder: 'border-indigo-600'
+      };
+    }
+    const currentSectionObj = sections.find(s => s.section_code === activeSection);
+    const currentLineObj = lines.find(l => l.id === currentSectionObj?.line_id);
+    const lineName = (currentLineObj?.line_name || '').toLowerCase();
+
+    if (lineName.includes('yellow')) {
+      return {
+        activeBg: 'bg-amber-50/90',
+        activeText: 'text-amber-800',
+        iconBg: 'bg-amber-500',
+        iconGlow: 'shadow-amber-500/25',
+        logoBg: 'from-amber-500 to-yellow-500',
+        dotColor: 'bg-amber-600',
+        accentText: 'text-amber-650',
+        accentRing: 'ring-amber-100',
+        activeBorder: 'border-amber-500'
+      };
+    } else if (lineName.includes('green')) {
+      return {
+        activeBg: 'bg-emerald-50/90',
+        activeText: 'text-emerald-700',
+        iconBg: 'bg-emerald-600',
+        iconGlow: 'shadow-emerald-500/20',
+        logoBg: 'from-emerald-600 to-teal-600',
+        dotColor: 'bg-emerald-600',
+        accentText: 'text-emerald-650',
+        accentRing: 'ring-emerald-100',
+        activeBorder: 'border-emerald-600'
+      };
+    } else if (lineName.includes('purple')) {
+      return {
+        activeBg: 'bg-purple-50/90',
+        activeText: 'text-purple-700',
+        iconBg: 'bg-purple-600',
+        iconGlow: 'shadow-purple-500/20',
+        logoBg: 'from-purple-600 to-fuchsia-600',
+        dotColor: 'bg-purple-600',
+        accentText: 'text-purple-650',
+        accentRing: 'ring-purple-100',
+        activeBorder: 'border-purple-600'
+      };
+    } else if (lineName.includes('noapara') || lineName.includes('car shed')) {
+      return {
+        activeBg: 'bg-slate-100/90',
+        activeText: 'text-slate-800',
+        iconBg: 'bg-slate-600',
+        iconGlow: 'shadow-slate-500/20',
+        logoBg: 'from-slate-600 to-slate-705',
+        dotColor: 'bg-slate-600',
+        accentText: 'text-slate-650',
+        accentRing: 'ring-slate-100',
+        activeBorder: 'border-slate-600'
+      };
+    } else {
+      // Default to Blue Line theme
+      return {
+        activeBg: 'bg-blue-50/90',
+        activeText: 'text-blue-700',
+        iconBg: 'bg-blue-600',
+        iconGlow: 'shadow-blue-500/20',
+        logoBg: 'from-blue-600 to-indigo-600',
+        dotColor: 'bg-blue-600',
+        accentText: 'text-blue-650',
+        accentRing: 'ring-blue-100',
+        activeBorder: 'border-blue-600'
+      };
+    }
+  }, [activeSection, sections, lines]);
+
 
   // Command Palette states
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -175,7 +271,115 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       const savedLang = (localStorage.getItem('erp_lang') || 'en') as 'en' | 'bn' | 'hi';
       setLang(savedLang);
     }
+
+    const handleMetadataChange = () => {
+      fetchMetadata();
+      loadNotifications();
+    };
+
+    window.addEventListener('erp_metadata_changed', handleMetadataChange);
+    return () => {
+      window.removeEventListener('erp_metadata_changed', handleMetadataChange);
+    };
   }, []);
+
+  // Inject theme variables into document.documentElement dynamically
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const root = document.documentElement;
+      
+      const themeColorsMap: { [key: string]: { activeBg: string; activeText: string; iconBg: string; iconGlow: string; dotColor: string; accentText: string; activeBorder: string } } = {
+        indigo: {
+          activeBg: '#f5f7ff',
+          activeText: '#4338ca',
+          iconBg: '#4f46e5',
+          iconGlow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)',
+          dotColor: '#4f46e5',
+          accentText: '#4f46e5',
+          activeBorder: '#4f46e5'
+        },
+        amber: {
+          activeBg: '#fffbeb',
+          activeText: '#92400e',
+          iconBg: '#f59e0b',
+          iconGlow: '0 4px 6px -1px rgba(245, 158, 11, 0.25)',
+          dotColor: '#d97706',
+          accentText: '#b45309',
+          activeBorder: '#f59e0b'
+        },
+        emerald: {
+          activeBg: '#ecfdf5',
+          activeText: '#047857',
+          iconBg: '#059669',
+          iconGlow: '0 4px 6px -1px rgba(5, 150, 105, 0.2)',
+          dotColor: '#059669',
+          accentText: '#059669',
+          activeBorder: '#059669'
+        },
+        purple: {
+          activeBg: '#faf5ff',
+          activeText: '#7e22ce',
+          iconBg: '#9333ea',
+          iconGlow: '0 4px 6px -1px rgba(147, 51, 234, 0.2)',
+          dotColor: '#9333ea',
+          accentText: '#9333ea',
+          activeBorder: '#9333ea'
+        },
+        slate: {
+          activeBg: '#f8fafc',
+          activeText: '#1e293b',
+          iconBg: '#475569',
+          iconGlow: '0 4px 6px -1px rgba(71, 85, 105, 0.2)',
+          dotColor: '#475569',
+          accentText: '#475569',
+          activeBorder: '#475569'
+        },
+        blue: {
+          activeBg: '#eff6ff',
+          activeText: '#1d4ed8',
+          iconBg: '#2563eb',
+          iconGlow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)',
+          dotColor: '#2563eb',
+          accentText: '#2563eb',
+          activeBorder: '#2563eb'
+        }
+      };
+
+      // Determine color key based on the Tailwind classes in the active theme
+      let colorKey = 'blue';
+      if (theme.activeBg.includes('indigo')) colorKey = 'indigo';
+      else if (theme.activeBg.includes('amber')) colorKey = 'amber';
+      else if (theme.activeBg.includes('emerald')) colorKey = 'emerald';
+      else if (theme.activeBg.includes('purple')) colorKey = 'purple';
+      else if (theme.activeBg.includes('slate')) colorKey = 'slate';
+
+      const selected = themeColorsMap[colorKey];
+      
+      // Fallback/Dynamic generator logic for custom line colors from DB
+      const currentSectionObj = sections.find(s => s.section_code === activeSection);
+      const currentLineObj = lines.find(l => l.id === currentSectionObj?.line_id);
+      const dbColor = currentLineObj?.color_code;
+
+      if (dbColor && !['indigo', 'amber', 'emerald', 'purple', 'slate', 'blue'].includes(colorKey)) {
+        // Build styling dynamic variables for newly added lines
+        root.style.setProperty('--theme-icon-bg', dbColor);
+        root.style.setProperty('--theme-icon-glow', `0 4px 6px -1px ${dbColor}35`);
+        root.style.setProperty('--theme-active-bg', `${dbColor}12`); // ~7% opacity
+        root.style.setProperty('--theme-active-text', dbColor);
+        root.style.setProperty('--theme-accent-text', dbColor);
+        root.style.setProperty('--theme-accent-ring', `0 0 0 2px ${dbColor}20`);
+        root.style.setProperty('--theme-active-border', dbColor);
+      } else {
+        root.style.setProperty('--theme-icon-bg', selected.iconBg);
+        root.style.setProperty('--theme-icon-glow', selected.iconGlow);
+        root.style.setProperty('--theme-active-bg', selected.activeBg);
+        root.style.setProperty('--theme-active-text', selected.activeText);
+        root.style.setProperty('--theme-accent-text', selected.accentText);
+        root.style.setProperty('--theme-accent-ring', colorKey === 'amber' ? '0 0 0 2px #fde68a' : `0 0 0 2px ${selected.iconBg}20`);
+        root.style.setProperty('--theme-active-border', selected.activeBorder);
+      }
+    }
+  }, [theme, lines, sections, activeSection]);
 
   // Sync selected sections under Joint View when sections list changes
   useEffect(() => {
@@ -342,19 +546,20 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out bg-[#F9F8F5] text-slate-800 border-r border-[#E2E0D9] flex flex-col z-20 no-print shadow-xs`}
+        } shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out bg-white text-slate-800 border-r border-slate-200/50 flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E0D9] overflow-hidden">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 overflow-hidden">
           {isSidebarOpen ? (
             <>
               <div className="flex items-center gap-2.5 min-w-0 animate-in fade-in duration-200">
-                <svg className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 shadow-md shadow-blue-500/10 shrink-0 select-none ring-2 ring-blue-100" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 4.48 2 10v6c0 1.66 1.34 3 3 3h14c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10zm-5 13H5v-2h2v2zm10 0h-2v-2h2v2zm1-5H6V6h12v4zM8 17h8v1.5H8V17zm4 1.5l1.5 2.5h-3l1.5-2.5z" />
+                <svg className={`w-8 h-8 rounded-xl bg-gradient-to-br ${theme.logoBg} text-white p-1.5 shadow-md ${theme.iconGlow} shrink-0 select-none ring-2 ${theme.accentRing}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9h15M14 5l4 4-4 4" />
+                  <path d="M21 15H6M10 11l-4 4 4 4" />
                 </svg>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-black tracking-widest text-slate-850 font-sans truncate">{getTranslation(lang, 'SIGNAL DEPT.')}</span>
-                  <span className="text-[8px] font-extrabold text-blue-600 tracking-widest uppercase font-mono mt-0.5 truncate">
+                  <span className="text-[13px] font-black tracking-wider text-slate-900 font-sans truncate leading-none uppercase">{getTranslation(lang, 'SIGNAL DEPT.')}</span>
+                  <span className={`text-[9px] font-extrabold ${theme.accentText} tracking-widest uppercase font-mono mt-1 truncate leading-none`}>
                     {activeSection === 'ALL' ? getTranslation(lang, 'JOINT VIEW') : `${activeSection} ${getTranslation(lang, 'SEC.')}`}
                   </span>
                 </div>
@@ -386,13 +591,13 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 href={item.path}
                 className={`flex items-center p-2 rounded-xl text-sm font-extrabold transition-colors duration-200 group cursor-pointer select-none relative ${
                   isActive 
-                    ? 'bg-blue-50/40 text-blue-750 shadow-2xs' 
+                    ? `${theme.activeBg} ${theme.activeText} shadow-xs` 
                     : 'text-slate-655 hover:bg-[#EFEDE6]/70 hover:text-slate-900'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-250 ${
                   isActive 
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20' 
+                    ? `${theme.iconBg} text-white shadow-sm ${theme.iconGlow}` 
                     : 'bg-slate-200/50 text-slate-500 group-hover:bg-slate-300/60 group-hover:text-slate-800'
                 }`}>
                   <item.icon size={16} className="transition-transform duration-250 group-hover:scale-105" />
@@ -405,7 +610,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   {getTranslation(lang, item.name)}
                 </span>
                 {isActive && (
-                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse ${
+                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full ${theme.dotColor} animate-pulse ${
                     isSidebarOpen 
                       ? 'opacity-100 transition-opacity duration-200 delay-75' 
                       : 'opacity-0 pointer-events-none transition-none'
@@ -463,7 +668,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                       onClick={() => handleSectionChange(sec.section_code)}
                       className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${
                         activeSection === sec.section_code 
-                          ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/10' 
+                          ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}` 
                           : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
                       }`}
                     >
@@ -474,13 +679,14 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   onClick={() => handleSectionChange('ALL')}
                   className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${
                     activeSection === 'ALL' 
-                      ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/10' 
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
+                      ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}` 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-205/35'
                   }`}
                 >
                   {getTranslation(lang, 'Joint View')}
                 </button>
               </div>
+
 
               {/* Inline Checklist for selecting active sections under Joint View */}
               {activeSection === 'ALL' && (
@@ -595,7 +801,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                     <span className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">{getTranslation(lang, 'Operational Alerts')}</span>
                     <button 
                       onClick={() => setNotifications([])} 
-                      className="text-[9px] font-bold text-blue-600 hover:underline cursor-pointer"
+                      className={`text-[9px] font-bold ${theme.accentText} hover:underline cursor-pointer`}
                     >
                       {getTranslation(lang, 'Clear All')}
                     </button>
@@ -609,7 +815,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                       notifications.map(log => (
                         <div key={log.id} className="p-3 hover:bg-slate-50 transition-colors">
                           <div className="flex justify-between items-center mb-1 text-[9px] font-bold">
-                            <span className="text-blue-600 uppercase tracking-wide">{log.module}</span>
+                            <span className={`uppercase tracking-wide ${theme.accentText}`}>{log.module}</span>
                             <span className="text-slate-400">{log.timestamp.split(' ')[1] || log.timestamp}</span>
                           </div>
                           <p className="text-slate-600 font-semibold leading-relaxed">{log.details}</p>
@@ -637,13 +843,13 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 onClick={() => setIsProfileDropdownOpen(prev => !prev)}
                 className="flex items-center gap-2.5 text-left hover:opacity-85 transition focus:outline-none cursor-pointer animate-in fade-in duration-200"
               >
-                <div className="relative w-8.5 h-8.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-black shadow-sm select-none shrink-0">
+                <div className={`relative w-8.5 h-8.5 rounded-full ${theme.iconBg} text-white flex items-center justify-center text-xs font-black shadow-sm select-none shrink-0`}>
                   {initials}
                   <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full"></span>
                 </div>
                 <div className="hidden lg:flex flex-col">
                   <span className="text-xs font-black text-slate-800 leading-none">{displayedName}</span>
-                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-0.5 leading-none">{displayedDesig}</span>
+                  <span className={`text-[9px] font-black ${theme.accentText} uppercase tracking-widest mt-0.5 leading-none`}>{displayedDesig}</span>
                 </div>
               </button>
 
@@ -665,7 +871,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                           key={emp.emp_id}
                           onClick={() => selectInCharge(emp)}
                           className={`w-full text-left px-4 py-2 hover:bg-slate-50 transition text-xs flex flex-col gap-0.5 cursor-pointer ${
-                            activeInCharge?.emp_id === emp.emp_id ? 'bg-blue-50/50 text-blue-600 border-l-2 border-blue-600' : 'text-slate-750 hover:text-slate-900'
+                            activeInCharge?.emp_id === emp.emp_id ? `${theme.activeBg} ${theme.activeText} border-l-2 ${theme.activeBorder}` : 'text-slate-750 hover:text-slate-900'
                           }`}
                         >
                           <span className="font-extrabold">{emp.name}</span>

@@ -149,7 +149,7 @@ export default function Dashboard() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             Dashboard Overview
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-semibold uppercase tracking-wider">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active/30 font-semibold uppercase tracking-wider">
               {activeSection === 'ALL' ? 'Joint View' : `${activeSection} Section`}
             </span>
           </h2>
@@ -159,7 +159,7 @@ export default function Dashboard() {
         </div>
         
         <div className="text-xs text-slate-600 font-bold bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
-          Current Roster Period: <span className="text-blue-600 font-extrabold">{new Date(DASHBOARD_START).toLocaleDateString('en-GB').replace(/\//g, '.')} to {new Date(DASHBOARD_END).toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
+          Current Roster Period: <span className="text-theme-primary font-extrabold">{new Date(DASHBOARD_START).toLocaleDateString('en-GB').replace(/\//g, '.')} to {new Date(DASHBOARD_END).toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
         </div>
       </div>
 
@@ -167,9 +167,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         
         {/* Card 1: Total Staff */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/10 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-5 pl-6 flex items-center gap-4 hover-lift cursor-pointer group">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-blue-500 to-indigo-500 opacity-85"></div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-inner transition-transform duration-300 group-hover:scale-105">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-[var(--theme-active-bg)]/20 border border-slate-200/80 hover:border-theme-active rounded-2xl p-5 pl-6 flex items-center gap-4 hover-lift cursor-pointer group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-theme-primary opacity-85"></div>
+          <div className="w-12 h-12 rounded-xl bg-theme-active border border-theme-active/40 flex items-center justify-center text-theme-primary shadow-inner transition-transform duration-300 group-hover:scale-105">
             <Users size={22} className="stroke-[2.5]" />
           </div>
           <div className="flex-1">
@@ -249,8 +249,8 @@ export default function Dashboard() {
         {/* Section List (Left 2 cols) */}
         <div className="lg:col-span-2 glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden bg-white">
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h4 className="font-bold text-slate-850 flex items-center gap-2">
-              <Award size={18} className="text-blue-600" />
+            <h4 className="font-bold text-slate-855 flex items-center gap-2">
+              <Award size={18} className="text-theme-primary" />
               S&T Staff Designations & Roster
             </h4>
             <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
@@ -297,7 +297,7 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td className="py-3 px-5">
-                        <span className="text-xs font-extrabold text-blue-700">Lvl {emp.level}</span>
+                        <span className="text-xs font-extrabold text-theme-active">Lvl {emp.level}</span>
                       </td>
                       <td className="py-3 px-5">
                         <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
@@ -315,7 +315,7 @@ export default function Dashboard() {
         {/* Sidebar events & activities (Right 1 col) */}
         <div className="glass-panel rounded-xl border border-slate-200 flex flex-col p-5 space-y-5 bg-white">
           <h4 className="font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-3">
-            <TrendingUp size={18} className="text-blue-600" />
+            <TrendingUp size={18} className="text-theme-primary" />
             Special Events & Orders
           </h4>
 
@@ -340,7 +340,7 @@ export default function Dashboard() {
               specialEvents.map((evt) => (
                 <div key={evt.id} className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-theme-accent uppercase tracking-wider">
                       {evt.event_type}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">
@@ -368,7 +368,7 @@ export default function Dashboard() {
           <div className="pt-2 border-t border-slate-200">
             <Link 
               href="/attendance"
-              className="flex items-center justify-between p-2.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-md shadow-blue-500/10 cursor-pointer"
+              className="flex items-center justify-between p-2.5 rounded bg-theme-primary hover-opacity-85 text-white font-bold text-xs tracking-wider uppercase transition shadow-md cursor-pointer"
             >
               Go to Smart Attendance Grid
               <ArrowRight size={14} />

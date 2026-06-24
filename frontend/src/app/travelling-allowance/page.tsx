@@ -90,7 +90,7 @@ function LatexRenderer({ math }: { math: string }) {
     loadKatex();
   }, [math]);
   
-  return <span ref={containerRef} className="font-serif italic text-indigo-650">{math}</span>;
+  return <span ref={containerRef} className="font-serif italic text-theme-primary">{math}</span>;
 }
 
 export default function TravellingAllowancePage() {
@@ -607,7 +607,7 @@ export default function TravellingAllowancePage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between border border-slate-200 bg-white/70 backdrop-blur-md rounded-2xl p-6 shadow-sm gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-            <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+            <span className="p-2 bg-theme-active text-theme-primary rounded-xl">
               <TrendingUp className="w-6 h-6" />
             </span>
             Travelling Allowance (TA) Calculation & Export
@@ -653,12 +653,12 @@ export default function TravellingAllowancePage() {
       {/* Premium History Dialog Modal */}
       {showHistory && (
         <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4 animate-fade-in">
-          <div className="bg-white w-full max-w-5xl max-h-[88vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up" style={{border: '1px solid #e2e8f0', boxShadow: '0 25px 60px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(99,102,241,0.08)'}}>
+          <div className="bg-white w-full max-w-5xl max-h-[88vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up" style={{border: '1px solid #e2e8f0', boxShadow: '0 25px 60px -12px rgba(0,0,0,0.25), 0 0 0 1px var(--theme-active-border)'}}>
             
             {/* Premium Gradient Modal Header */}
-            <div className="px-7 py-5 flex items-center justify-between" style={{background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)', borderBottom: '1px solid #e0e7ff'}}>
+            <div className="px-7 py-5 flex items-center justify-between" style={{background: 'linear-gradient(135deg, #f8fafc 0%, var(--theme-active-bg) 100%)', borderBottom: '1px solid var(--theme-active-border)'}}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md">
+                <div className="w-8 h-8 rounded-xl bg-theme-primary flex items-center justify-center shadow-md">
                   <BookOpen className="w-4 h-4 text-white" />
                 </div>
                 <div>
@@ -683,7 +683,7 @@ export default function TravellingAllowancePage() {
                   placeholder="Search by Employee Name or PF Number..."
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-all placeholder:font-normal placeholder:text-slate-400"
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--theme-active-border)] focus:border-[var(--theme-icon-bg)] transition-all placeholder:font-normal placeholder:text-slate-400"
                 />
               </div>
             </div>
@@ -713,7 +713,7 @@ export default function TravellingAllowancePage() {
                     {filteredTaBills.map((bill, idx) => (
                       <div
                         key={bill.id}
-                        className="grid items-center px-5 py-3.5 gap-3 hover:bg-indigo-50/40 transition-all group"
+                        className="grid items-center px-5 py-3.5 gap-3 hover:bg-[var(--theme-active-bg)]/45 transition-all group"
                         style={{
                           gridTemplateColumns: '1.6fr 1.4fr 1fr 0.9fr 0.9fr 1.8fr',
                           borderTop: idx === 0 ? '1px solid #e8ecf0' : '1px solid #f1f5f9',
@@ -743,12 +743,12 @@ export default function TravellingAllowancePage() {
                             {bill.journey_type === 'NORMAL' ? 'Local Duties' : 'Training'}
                           </span>
                         </div>
-                        <div className="font-black text-indigo-700 text-xs">Rs. {bill.total_amount}</div>
+                        <div className="font-black text-theme-active text-xs">Rs. {bill.total_amount}</div>
                         {/* Actions — right-aligned with overflow-visible so nothing clips */}
                         <div className="flex items-center justify-end gap-1.5 min-w-0">
                           <button
                             onClick={() => { handleLoadBill(bill.id!); setHistorySearch(''); }}
-                            className="flex-shrink-0 inline-flex items-center px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap"
+                            className="flex-shrink-0 inline-flex items-center px-2.5 py-1.5 bg-theme-active hover:opacity-90 active:opacity-100 text-theme-active border border-theme-active/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap"
                           >
                             View / Edit
                           </button>
@@ -794,7 +794,7 @@ export default function TravellingAllowancePage() {
         {/* Sidebar: Details Form */}
         <div className="xl:col-span-1 border border-slate-200 bg-white rounded-2xl p-6 shadow-sm space-y-6">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
-            <FileText className="w-5 h-5 text-indigo-600" />
+            <FileText className="w-5 h-5 text-theme-primary" />
             Bill Master Details
           </h2>
           
@@ -805,7 +805,7 @@ export default function TravellingAllowancePage() {
               <select
                 value={selectedEmpId}
                 onChange={(e) => setSelectedEmpId(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all appearance-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 transition-all appearance-none"
               >
                 <option value="">-- Choose Employee --</option>
                 {employees.map(emp => (
@@ -822,8 +822,8 @@ export default function TravellingAllowancePage() {
 
           {/* Dynamic staff details panel */}
           {selectedEmp && (
-            <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-2.5">
-              <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Employee Profile Metadata</h3>
+            <div className="p-4 bg-[var(--theme-active-bg)]/50 border border-[var(--theme-active-border)]/30 rounded-xl space-y-2.5">
+              <h3 className="text-xs font-bold text-theme-active uppercase tracking-wider">Employee Profile Metadata</h3>
               <div className="grid grid-cols-2 gap-y-2 text-xs text-slate-600">
                 <div>PF Number:</div>
                 <div className="font-semibold text-slate-800 text-right">{selectedEmp.pf_number}</div>
@@ -837,8 +837,8 @@ export default function TravellingAllowancePage() {
                 <div className="font-semibold text-slate-800 text-right">{selectedEmp.joining_date || 'N/A'}</div>
               </div>
               
-              <div className="pt-2 border-t border-indigo-100/70 space-y-1.5">
-                <label className="block text-xs font-semibold text-indigo-900">
+              <div className="pt-2 border-t border-[var(--theme-active-border)]/40 space-y-1.5">
+                <label className="block text-xs font-semibold text-theme-active">
                   Basic Pay (Rs.) <span className="text-slate-400 font-normal">(Syncs to profile)</span>
                 </label>
                 <input
@@ -846,7 +846,7 @@ export default function TravellingAllowancePage() {
                   value={basicPay || ''}
                   onChange={(e) => setBasicPay(Number(e.target.value))}
                   placeholder="Enter Basic Pay"
-                  className="w-full bg-white border border-indigo-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                  className="w-full bg-white border border-[var(--theme-active-border)]/60 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 outline-none focus:border-[var(--theme-icon-bg)] transition-all"
                 />
               </div>
             </div>
@@ -862,7 +862,7 @@ export default function TravellingAllowancePage() {
                   onChange={(e) => {
                     handleMonthChange(e.target.value);
                   }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer appearance-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 transition-all cursor-pointer appearance-none"
                 >
                   <option value="">Month</option>
                   <option value="01">January</option>
@@ -888,7 +888,7 @@ export default function TravellingAllowancePage() {
                   onChange={(e) => {
                     handleYearChange(e.target.value);
                   }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer appearance-none font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 transition-all cursor-pointer appearance-none font-mono"
                 >
                   <option value="">Year</option>
                   <option value="2024">2024</option>
@@ -916,7 +916,7 @@ export default function TravellingAllowancePage() {
                 onClick={() => { setJourneyType('NORMAL'); setEntries([]); }}
                 className={`py-2 text-xs font-bold rounded-xl border transition-all ${
                   journeyType === 'NORMAL'
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                    ? 'bg-theme-primary border-theme-active text-white shadow-md'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -927,7 +927,7 @@ export default function TravellingAllowancePage() {
                 onClick={() => { setJourneyType('TRAINING'); setEntries([]); }}
                 className={`py-2 text-xs font-bold rounded-xl border transition-all ${
                   journeyType === 'TRAINING'
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                    ? 'bg-theme-primary border-theme-active text-white shadow-md'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -1003,7 +1003,7 @@ export default function TravellingAllowancePage() {
             type="button"
             disabled={isLoading || !selectedEmpId || !monthYear}
             onClick={handleSaveBill}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3 rounded-xl shadow-md disabled:shadow-none hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-theme-primary hover-bg-theme-primary disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3 rounded-xl shadow-md disabled:shadow-none hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
           >
             <Save className="w-5 h-5" />
             {billId ? "Update Saved Bill" : "Save Journal Bill"}
@@ -1015,7 +1015,7 @@ export default function TravellingAllowancePage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-indigo-600" />
+                <Calendar className="w-5 h-5 text-theme-primary" />
                 Journal Entry Ledger
               </h2>
               <p className="text-slate-500 text-xs mt-0.5">
@@ -1032,7 +1032,7 @@ export default function TravellingAllowancePage() {
                   type="button"
                   onClick={addNormalEntry}
                   disabled={!selectedEmp}
-                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 disabled:bg-slate-50 disabled:text-slate-400 text-indigo-700 font-bold border border-indigo-200 rounded-xl text-xs transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 bg-theme-active hover:opacity-90 disabled:bg-slate-50 disabled:text-slate-400 text-theme-active font-bold border border-theme-active/30 rounded-xl text-xs transition-all flex items-center gap-1.5"
                 >
                   <PlusCircle className="w-4 h-4" /> Add Local Journey
                 </button>
@@ -1042,7 +1042,7 @@ export default function TravellingAllowancePage() {
                     type="button"
                     onClick={() => addTrainingEntry('LEG')}
                     disabled={!selectedEmp}
-                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 disabled:bg-slate-50 disabled:text-slate-400 text-indigo-700 font-bold border border-indigo-200 rounded-xl text-xs transition-colors flex items-center gap-1"
+                    className="px-3 py-2 bg-theme-active hover:opacity-90 disabled:bg-slate-50 disabled:text-slate-400 text-theme-active font-bold border border-theme-active/30 rounded-xl text-xs transition-all flex items-center gap-1"
                   >
                     <Plus className="w-4 h-4" /> Add Travel Leg
                   </button>
@@ -1081,14 +1081,14 @@ export default function TravellingAllowancePage() {
                   if (!legOut) continue;
                   
                   pairs.push(
-                    <div key={i} className="bg-indigo-50/5 border border-indigo-200/40 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
+                    <div key={i} className="bg-[var(--theme-active-bg)]/5 border border-[var(--theme-active-border)]/40 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
                       {/* Card Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-indigo-100/30 gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[var(--theme-active-border)]/35 gap-3">
                         <div className="flex items-center gap-2">
-                          <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                          <span className="p-1.5 bg-theme-active text-theme-primary rounded-lg">
                             <Calendar className="w-4 h-4" />
                           </span>
-                          <span className="text-xs font-black uppercase tracking-wider text-indigo-750">Local Duty Day #{i + 1}</span>
+                          <span className="text-xs font-black uppercase tracking-wider text-theme-active">Local Duty Day #{i + 1}</span>
                         </div>
                         
                         {/* Shared Date Input */}
@@ -1099,7 +1099,7 @@ export default function TravellingAllowancePage() {
                               type="date"
                               value={legOut.entry_date}
                               onChange={(e) => handleEntryChange(outIdx, 'entry_date', e.target.value)}
-                              className="bg-white border border-slate-200 focus:border-indigo-550 focus:ring-1 focus:ring-indigo-550 outline-none rounded-xl px-3 py-1 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                              className="bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3 py-1 text-xs font-bold text-slate-800 transition-all cursor-pointer"
                             />
                           </div>
                           
@@ -1130,7 +1130,7 @@ export default function TravellingAllowancePage() {
                                 value={legOut.train_no || ''}
                                 onChange={(e) => handleEntryChange(outIdx, 'train_no', e.target.value)}
                                 placeholder="By Metro"
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                                className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                               />
                             </div>
                             <div>
@@ -1140,7 +1140,7 @@ export default function TravellingAllowancePage() {
                                 value={legOut.time_left || ''}
                                 onChange={(e) => handleEntryChange(outIdx, 'time_left', e.target.value)}
                                 placeholder="11:10"
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                                className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
                               />
                             </div>
                             <div>
@@ -1150,7 +1150,7 @@ export default function TravellingAllowancePage() {
                                 value={legOut.time_arrived || ''}
                                 onChange={(e) => handleEntryChange(outIdx, 'time_arrived', e.target.value)}
                                 placeholder="12:00"
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                                className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
                               />
                             </div>
                           </div>
@@ -1163,7 +1163,7 @@ export default function TravellingAllowancePage() {
                                 value={legOut.station_from || ''}
                                 onChange={(e) => handleEntryChange(outIdx, 'station_from', e.target.value)}
                                 placeholder="KKVS"
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                                className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                               />
                             </div>
                             <div>
@@ -1173,7 +1173,7 @@ export default function TravellingAllowancePage() {
                                 value={legOut.station_to || ''}
                                 onChange={(e) => handleEntryChange(outIdx, 'station_to', e.target.value)}
                                 placeholder="M.Bhavan"
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-805"
+                                className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                               />
                             </div>
                           </div>
@@ -1185,7 +1185,7 @@ export default function TravellingAllowancePage() {
                               value={legOut.object_journey || ''}
                               onChange={(e) => handleEntryChange(outIdx, 'object_journey', e.target.value)}
                               placeholder="Attended Metro Bhavan as per instruction..."
-                              className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                              className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                             />
                           </div>
                         </div>
@@ -1193,7 +1193,7 @@ export default function TravellingAllowancePage() {
                         {/* Inward Leg */}
                         <div className="space-y-3 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Inward Leg (back to base)
+                            <span className="w-1.5 h-1.5 rounded-full bg-theme-primary"></span> Inward Leg (back to base)
                           </h4>
                           
                           {legIn ? (
@@ -1206,7 +1206,7 @@ export default function TravellingAllowancePage() {
                                     value={legIn.train_no || ''}
                                     onChange={(e) => handleEntryChange(inIdx, 'train_no', e.target.value)}
                                     placeholder="By Metro"
-                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                                    className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                                   />
                                 </div>
                                 <div>
@@ -1216,7 +1216,7 @@ export default function TravellingAllowancePage() {
                                     value={legIn.time_left || ''}
                                     onChange={(e) => handleEntryChange(inIdx, 'time_left', e.target.value)}
                                     placeholder="19:20"
-                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                                    className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
                                   />
                                 </div>
                                 <div>
@@ -1226,7 +1226,7 @@ export default function TravellingAllowancePage() {
                                     value={legIn.time_arrived || ''}
                                     onChange={(e) => handleEntryChange(inIdx, 'time_arrived', e.target.value)}
                                     placeholder="20:20"
-                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
+                                    className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 text-center font-mono"
                                   />
                                 </div>
                               </div>
@@ -1239,7 +1239,7 @@ export default function TravellingAllowancePage() {
                                     value={legIn.station_from || ''}
                                     onChange={(e) => handleEntryChange(inIdx, 'station_from', e.target.value)}
                                     placeholder="M.Bhavan"
-                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+                                    className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                                   />
                                 </div>
                                 <div>
@@ -1249,7 +1249,7 @@ export default function TravellingAllowancePage() {
                                     value={legIn.station_to || ''}
                                     onChange={(e) => handleEntryChange(inIdx, 'station_to', e.target.value)}
                                     placeholder="KKVS"
-                                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-805"
+                                    className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] outline-none rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
                                   />
                                 </div>
                               </div>
@@ -1261,14 +1261,14 @@ export default function TravellingAllowancePage() {
                       </div>
                       
                       {/* Calculations Summary Row */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-indigo-100/30 text-xs font-semibold text-slate-500 gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-[var(--theme-active-border)]/30 text-xs font-semibold text-slate-500 gap-2">
                         <div className="flex items-center gap-1.5">
                           <span>Absence Multiplier:</span>
-                          <span className="text-indigo-700 font-extrabold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{legOut.days_nights || '0.0'}</span>
+                          <span className="text-theme-active font-extrabold bg-theme-active px-2 py-0.5 rounded border border-[var(--theme-active-border)]/40">{legOut.days_nights || '0.0'}</span>
                         </div>
                         <div className="flex items-center gap-4 text-right">
                           <div>Rate: <span className="font-bold text-slate-700">Rs. {legOut.rate}</span></div>
-                          <div>Amount: <span className="font-extrabold text-indigo-750">Rs. {legOut.amount}</span></div>
+                          <div>Amount: <span className="font-extrabold text-theme-active">Rs. {legOut.amount}</span></div>
                         </div>
                       </div>
                     </div>
@@ -1346,20 +1346,20 @@ export default function TravellingAllowancePage() {
                         </div>
                         <div className="flex items-center gap-4 text-right">
                           <div>Rate: <span className="font-bold text-slate-700">Rs. {entry.rate}</span></div>
-                          <div>Amount: <span className="font-extrabold text-indigo-700">Rs. {entry.amount}</span></div>
+                          <div>Amount: <span className="font-extrabold text-theme-active">Rs. {entry.amount}</span></div>
                         </div>
                       </div>
                     </div>
                   );
                 } else {
                   return (
-                    <div key={idx} className="bg-indigo-50/5 border border-indigo-200/40 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
-                      <div className="flex items-center justify-between pb-3 border-b border-indigo-100/30">
+                    <div key={idx} className="bg-[var(--theme-active-bg)]/5 border border-[var(--theme-active-border)]/40 rounded-2xl p-5 space-y-4 hover:shadow-md transition-all duration-200">
+                      <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-active-border)]/35">
                         <div className="flex items-center gap-2">
-                          <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                          <span className="p-1.5 bg-theme-active text-theme-primary rounded-lg">
                             <MapPin className="w-4 h-4" />
                           </span>
-                          <span className="text-xs font-black uppercase tracking-wider text-indigo-700">Journey/Travel Leg</span>
+                          <span className="text-xs font-black uppercase tracking-wider text-theme-active">Journey/Travel Leg</span>
                         </div>
                         <button
                           type="button"
@@ -1369,8 +1369,7 @@ export default function TravellingAllowancePage() {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         {/* Travel Date */}
                         <div className="space-y-1">
                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Travel Date</label>
@@ -1378,7 +1377,7 @@ export default function TravellingAllowancePage() {
                             type="date"
                             value={entry.entry_date}
                             onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
                           />
                         </div>
                         
@@ -1390,7 +1389,7 @@ export default function TravellingAllowancePage() {
                             value={entry.train_no || ''}
                             onChange={(e) => handleEntryChange(idx, 'train_no', e.target.value)}
                             placeholder="e.g. 12703 or By Metro"
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
                           />
                         </div>
                         
@@ -1402,7 +1401,7 @@ export default function TravellingAllowancePage() {
                             value={entry.time_left || ''}
                             onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
                             placeholder="e.g. 07:25"
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all text-center"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all text-center"
                           />
                         </div>
                         
@@ -1414,7 +1413,7 @@ export default function TravellingAllowancePage() {
                             value={entry.time_arrived || ''}
                             onChange={(e) => handleEntryChange(idx, 'time_arrived', e.target.value)}
                             placeholder="e.g. 10:30"
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all text-center"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all text-center"
                           />
                         </div>
                       </div>
@@ -1428,7 +1427,7 @@ export default function TravellingAllowancePage() {
                             value={entry.station_from || ''}
                             onChange={(e) => handleEntryChange(idx, 'station_from', e.target.value)}
                             placeholder="e.g. KKVS"
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
                           />
                         </div>
                         
@@ -1440,7 +1439,7 @@ export default function TravellingAllowancePage() {
                             value={entry.station_to || ''}
                             onChange={(e) => handleEntryChange(idx, 'station_to', e.target.value)}
                             placeholder="e.g. IRISET"
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
                           />
                         </div>
 
@@ -1452,7 +1451,7 @@ export default function TravellingAllowancePage() {
                             value={entry.days_nights || ''}
                             onChange={(e) => handleEntryChange(idx, 'days_nights', e.target.value)}
                             placeholder="e.g. 1.0"
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all text-center"
+                            className="w-full bg-white border border-[var(--theme-active-border)]/70 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all text-center"
                           />
                         </div>
                         
@@ -1464,14 +1463,14 @@ export default function TravellingAllowancePage() {
                             value={entry.object_journey || ''}
                             onChange={(e) => handleEntryChange(idx, 'object_journey', e.target.value)}
                             placeholder="e.g. Refresher course course letter..."
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
+                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 transition-all"
                           />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-end gap-6 pt-3 border-t border-indigo-100/30 text-xs font-semibold text-slate-500">
+                      <div className="flex items-center justify-end gap-6 pt-3 border-t border-[var(--theme-active-border)]/30 text-xs font-semibold text-slate-500">
                         <div>Rate: <span className="font-bold text-slate-700">Rs. {entry.rate}</span></div>
-                        <div>Amount: <span className="font-extrabold text-indigo-700">Rs. {entry.amount}</span></div>
+                        <div>Amount: <span className="font-extrabold text-theme-active">Rs. {entry.amount}</span></div>
                       </div>
                     </div>
                   );
@@ -1502,7 +1501,7 @@ export default function TravellingAllowancePage() {
               
               <div className="text-right">
                 <div className="text-xs font-semibold text-slate-500">Gross Allowance Claim:</div>
-                <div className="text-xl font-black text-indigo-700">Rs. {calculateTotalAmount()}</div>
+                <div className="text-xl font-black text-theme-active">Rs. {calculateTotalAmount()}</div>
               </div>
             </div>
           )}

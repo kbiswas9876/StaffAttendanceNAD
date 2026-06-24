@@ -428,7 +428,7 @@ export default function NightDutyNDA() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             {getTranslation(lang, 'Night Duty Allowance (NDA) Calculator')}
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-bold uppercase tracking-wider">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active font-bold uppercase tracking-wider">
               {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
@@ -473,7 +473,7 @@ export default function NightDutyNDA() {
           {/* Signatories Config Toggle */}
           <button
             onClick={() => setShowSigConfig(!showSigConfig)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer ${showSigConfig ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 border-slate-250 text-slate-700 hover:bg-slate-200'}`}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer ${showSigConfig ? 'bg-theme-active text-theme-active border-theme-active' : 'bg-slate-100 border-slate-250 text-slate-700 hover:bg-slate-200'}`}
           >
             <Settings size={14} />
             {getTranslation(lang, 'Signatories')}
@@ -483,7 +483,7 @@ export default function NightDutyNDA() {
           <button
             onClick={() => handleExport('excel')}
             disabled={exporting !== null}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs tracking-wider uppercase transition shadow-sm cursor-pointer"
           >
             <FileSpreadsheet size={14} />
             {exporting === 'excel' ? 'Exporting...' : getTranslation(lang, 'Export Excel')}
@@ -517,7 +517,7 @@ export default function NightDutyNDA() {
               value={signatoryLeftName}
               onChange={(e) => setSignatoryLeftName(e.target.value)}
               placeholder="Type Manual Name..."
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)]"
             />
           </div>
           <div>
@@ -527,7 +527,7 @@ export default function NightDutyNDA() {
               value={signatoryLeftTitle}
               onChange={(e) => setSignatoryLeftTitle(e.target.value)}
               placeholder="e.g. SSE/Sig/KKVS/IC"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)]"
             />
           </div>
           <div>
@@ -537,7 +537,7 @@ export default function NightDutyNDA() {
               value={signatoryRight}
               onChange={(e) => setSignatoryRight(e.target.value)}
               placeholder="e.g. Dy. CPO"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)]"
             />
           </div>
           <div>
@@ -547,7 +547,7 @@ export default function NightDutyNDA() {
               value={billUnit}
               onChange={(e) => setBillUnit(e.target.value)}
               placeholder="e.g. 2201-806"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500 font-semibold"
+              className="w-full border border-slate-250 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
             />
           </div>
           <div>
@@ -557,7 +557,7 @@ export default function NightDutyNDA() {
                 type="button"
                 onClick={() => setDatesFormat('simple')}
                 className={`flex-1 text-center py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
-                  datesFormat === 'simple' ? 'bg-white shadow-xs text-blue-600' : 'hover:bg-slate-50'
+                  datesFormat === 'simple' ? 'bg-white shadow-xs text-theme-primary' : 'hover:bg-slate-50'
                 }`}
               >
                 Simple
@@ -566,7 +566,7 @@ export default function NightDutyNDA() {
                 type="button"
                 onClick={() => setDatesFormat('full')}
                 className={`flex-1 text-center py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
-                  datesFormat === 'full' ? 'bg-white shadow-xs text-blue-600' : 'hover:bg-slate-50'
+                  datesFormat === 'full' ? 'bg-white shadow-xs text-theme-primary' : 'hover:bg-slate-50'
                 }`}
               >
                 Full
@@ -593,27 +593,27 @@ export default function NightDutyNDA() {
       )}
 
       {/* NDA Weightage Guide Card */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-50/70 to-indigo-50/30 border border-blue-200/60 rounded-2xl p-5 flex items-start gap-4 shadow-xs select-none">
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600 opacity-80"></div>
-        <div className="w-9 h-9 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+      <div className="relative overflow-hidden bg-gradient-to-r from-[var(--theme-active-bg)]/75 to-[var(--theme-active-bg)]/35 border border-theme-active/60 rounded-2xl p-5 flex items-start gap-4 shadow-xs select-none">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-theme-primary opacity-80"></div>
+        <div className="w-9 h-9 rounded-xl bg-theme-active border border-theme-active flex items-center justify-center text-theme-primary shadow-sm shrink-0">
           <Info size={18} className="stroke-[2.5]" />
         </div>
         <div className="text-xs text-slate-700 space-y-2 flex-1 font-semibold">
-          <h4 className="font-black text-slate-850 text-xs uppercase tracking-wider">{getTranslation(lang, 'NDA Weightage Algorithm Calculation')}</h4>
+          <h4 className="font-black text-slate-855 text-xs uppercase tracking-wider">{getTranslation(lang, 'NDA Weightage Algorithm Calculation')}</h4>
           <p className="leading-relaxed">
-            The system extracts shift data matching the code <strong className="text-blue-600 bg-blue-100/50 px-1.5 py-0.5 rounded font-mono">P/N</strong> (Present with Night Duty) and applies the following computations:
+            The system extracts shift data matching the code <strong className="text-theme-primary bg-theme-active px-1.5 py-0.5 rounded font-mono">P/N</strong> (Present with Night Duty) and applies the following computations:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-            <div className="bg-white/80 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
+            <div className="bg-white/80 border border-theme-active/60 rounded-xl p-3 flex flex-col gap-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Working Hours</span>
               <span className="text-xs font-black text-slate-800">
-                Total Shifts <span className="text-blue-600 font-extrabold">×</span> 8 Hours
+                Total Shifts <span className="text-theme-primary font-extrabold">×</span> 8 Hours
               </span>
             </div>
-            <div className="bg-white/80 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
+            <div className="bg-white/80 border border-theme-active/60 rounded-xl p-3 flex flex-col gap-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Weightage Allowance</span>
               <span className="text-xs font-black text-slate-800">
-                Total Shifts <span className="text-blue-600 font-extrabold">×</span> 80 Minutes <span className="text-slate-400 font-bold">(1h 20m per shift)</span>
+                Total Shifts <span className="text-theme-primary font-extrabold">×</span> 80 Minutes <span className="text-slate-400 font-bold">(1h 20m per shift)</span>
               </span>
             </div>
           </div>
@@ -627,7 +627,7 @@ export default function NightDutyNDA() {
       <div className="glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden bg-white shadow-sm">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <Moon size={18} className="text-blue-600" />
+            <Moon size={18} className="text-theme-primary" />
             {getTranslation(lang, 'Night Duty Allowance Statement Preview')}
           </h3>
           <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-650">
@@ -676,7 +676,7 @@ export default function NightDutyNDA() {
                       rows.push(
                         <tr key={`sec-header-${row.section_code}`} className="bg-slate-100 font-extrabold text-[11px] tracking-wider text-slate-700 uppercase no-print select-none">
                           <td colSpan={9} className="py-2 px-5 text-left border-y border-slate-200 bg-slate-150">
-                            <span className="bg-blue-600 text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
+                            <span className="bg-theme-primary text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
                             <span className="font-black text-slate-800">
                               {getSectionDisplayName(row.section_code || '')}
                             </span>
@@ -695,14 +695,14 @@ export default function NightDutyNDA() {
                           </span>
                         </td>
                         <td className="py-3 px-5 text-center">
-                          <span className="text-xs font-extrabold text-blue-600">Lvl {row.level}</span>
+                          <span className="text-xs font-extrabold text-theme-active">Lvl {row.level}</span>
                         </td>
                         <td className="py-3 px-5 text-xs text-slate-655 max-w-[200px] truncate" title={formatDates(row)}>
                           {formatDates(row)}
                         </td>
                         <td className="py-3 px-5 text-center font-bold text-slate-800">{row.total_days}</td>
                         <td className="py-3 px-5 text-center font-mono text-slate-550 text-xs">{row.total_hours} Hrs</td>
-                        <td className="py-3 px-5 text-center font-bold text-blue-600">{row.weightage}</td>
+                        <td className="py-3 px-5 text-center font-bold text-theme-active">{row.weightage}</td>
                       </tr>
                     );
                     return rows;

@@ -698,6 +698,9 @@ export default function AdminPanel() {
         week4: getWeeklyScheduleDefault('Wednesday'),
       });
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to save employee. Check duplicate PF.", "error");
       console.error(err);
@@ -799,13 +802,18 @@ export default function AdminPanel() {
   };
 
   const handleDeleteEmployeeClick = async (empId: number) => {
-    if (!window.confirm("Are you sure you want to remove this employee from the roster? This will delete all their leave balances and attendance directories.")) {
+    const emp = employees.find(e => e.emp_id === empId);
+    const empName = emp ? emp.name : "this employee";
+    if (!window.confirm(`Are you sure you want to remove ${empName} from the roster? This will delete all their leave balances and attendance logs.`)) {
       return;
     }
     try {
       await deleteEmployee(empId);
       showToast("Employee deleted successfully.", "success");
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to delete employee.", "error");
       console.error(err);
@@ -895,6 +903,9 @@ export default function AdminPanel() {
       setTransferSignatoryName('');
       setTransferSignatoryDesig('');
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to complete employee transfer.", "error");
       console.error(err);
@@ -924,6 +935,9 @@ export default function AdminPanel() {
       }
       setLineName('');
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to save Metro Line.", "error");
       console.error(err);
@@ -943,11 +957,22 @@ export default function AdminPanel() {
   };
 
   const handleDeleteLineClick = async (lineId: number) => {
-    if (!window.confirm("Are you sure you want to delete this Metro Line?")) return;
+    const line = lines.find(l => l.id === lineId);
+    const lineName = line ? line.line_name : "this Line";
+    const confirmInput = window.prompt(
+      `WARNING: Deleting Metro Line "${lineName}" will permanently delete ALL sections, shift rules, signallers, and attendance records associated with it!\n\nTo confirm deletion, please type the line name "${lineName}" exactly:`
+    );
+    if (confirmInput !== lineName) {
+      showToast("Deletion cancelled. Line name did not match.", "error");
+      return;
+    }
     try {
       await deleteLine(lineId);
       showToast("Metro Line deleted successfully.", "success");
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to delete line.", "error");
     }
@@ -981,6 +1006,9 @@ export default function AdminPanel() {
       setSecName('');
       setSecBase('');
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to save section.", "error");
     }
@@ -1002,11 +1030,22 @@ export default function AdminPanel() {
   };
 
   const handleDeleteSectionClick = async (secId: number) => {
-    if (!window.confirm("Are you sure you want to delete this section?")) return;
+    const sec = sections.find(s => s.id === secId);
+    const secCode = sec ? sec.section_code : "this section";
+    const confirmInput = window.prompt(
+      `WARNING: Deleting Section "${secCode}" will permanently delete ALL signallers, shift rules, and attendance logs associated with it!\n\nTo confirm deletion, please type the section code "${secCode}" exactly:`
+    );
+    if (confirmInput !== secCode) {
+      showToast("Deletion cancelled. Section code did not match.", "error");
+      return;
+    }
     try {
       await deleteSection(secId);
       showToast("Section deleted successfully.", "success");
       loadAdminData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp_metadata_changed'));
+      }
     } catch (err) {
       showToast("Failed to delete section.", "error");
     }
@@ -1423,7 +1462,7 @@ export default function AdminPanel() {
             Configure calendar events, database copies, transaction audit trails, metro lines, roster sections, and signaller profiles.
           </p>
         </div>
-        <div className="no-print bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-blue-200 shadow-sm animate-pulse">
+        <div className="no-print bg-theme-active text-theme-active px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-theme-active shadow-sm animate-pulse">
           Super Admin Mode
         </div>
       </div>
@@ -1433,15 +1472,15 @@ export default function AdminPanel() {
         {[
           { id: 'employees', label: 'Enroll & Transfer', icon: Users },
           { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
+          { id: 'settings', label: getTranslation(lang, 'My Section'), icon: Settings },
+          { id: 'roster-rules', label: 'Roster Settings', icon: Sliders },
           { id: 'shifts', label: 'Shift Rules', icon: Clock },
           { id: 'roster', label: 'Roster Planner', icon: Calendar },
           { id: 'codes', label: 'Roster Codes', icon: Sliders },
           { id: 'holidays', label: 'Holidays Master', icon: CalendarDays },
-          { id: 'backups', label: 'DB Backups', icon: Database },
-          { id: 'audit', label: 'Audit Logs', icon: History },
           { id: 'updates', label: 'System Update', icon: RefreshCw },
-          { id: 'settings', label: getTranslation(lang, 'My Section'), icon: Settings },
-          { id: 'roster-rules', label: 'Roster Settings', icon: Sliders }
+          { id: 'audit', label: 'Audit Logs', icon: History },
+          { id: 'backups', label: 'DB Backups', icon: Database }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1455,7 +1494,7 @@ export default function AdminPanel() {
             }}
             className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition cursor-pointer select-none duration-150 ${
               activeTab === tab.id
-                ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/10'
+                ? 'tab-theme-active'
                 : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'
             }`}
           >
@@ -1517,7 +1556,7 @@ export default function AdminPanel() {
                 {/* Employee Form */}
                 <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                   <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b">
-                    <PlusCircle size={15} className="text-blue-600" />
+                    <PlusCircle size={15} className="text-theme-primary" />
                     {editingEmployeeId !== null ? "Update Staff Details" : "Enroll Signalling Staff"}
                   </h3>
                   <form onSubmit={handleAddEmployee} className="space-y-4 text-xs font-bold text-slate-600">
@@ -1528,7 +1567,7 @@ export default function AdminPanel() {
                         value={empPF}
                         onChange={(e) => setEmpPF(e.target.value)}
                         placeholder="e.g. 22177721093"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme font-mono"
                         required
                       />
                     </div>
@@ -1563,13 +1602,13 @@ export default function AdminPanel() {
                         </select>
                         {isCustomDesig && (
                           <div className="mt-2 animate-fade-in">
-                            <label className="block mb-1 uppercase tracking-wider text-[10px] text-blue-600">Custom Name</label>
+                            <label className="block mb-1 uppercase tracking-wider text-[10px] text-theme-primary">Custom Name</label>
                             <input 
                               type="text" 
                               value={customDesigText}
                               onChange={(e) => setCustomDesigText(e.target.value)}
                               placeholder="e.g. Helper"
-                              className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500 font-semibold"
+                              className="w-full border border-theme-active rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme font-semibold"
                               required
                             />
                           </div>
@@ -1620,7 +1659,7 @@ export default function AdminPanel() {
                         <button
                           type="button"
                           onClick={() => setIsScheduleModalOpen(true)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-extrabold py-1.5 px-3 uppercase tracking-wider transition-colors cursor-pointer shadow-sm"
+                          className="bg-theme-primary hover-opacity-85 text-white rounded-lg text-[10px] font-extrabold py-1.5 px-3 uppercase tracking-wider transition-colors cursor-pointer shadow-sm"
                         >
                           Configure
                         </button>
@@ -1655,7 +1694,7 @@ export default function AdminPanel() {
                       )}
                       <button 
                         type="submit" 
-                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                        className="px-4 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white uppercase text-[10px] font-bold"
                       >
                         {editingEmployeeId !== null ? "Save Updates" : "Enroll Signaller"}
                       </button>
@@ -1666,7 +1705,7 @@ export default function AdminPanel() {
                 {/* Transfer Form */}
                 <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                   <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b">
-                    <ArrowLeftRight size={15} className="text-blue-600" />
+                    <ArrowLeftRight size={15} className="text-theme-primary" />
                     Transfer Staff Section
                   </h3>
                   <form onSubmit={handleTransferEmployee} className="space-y-4 text-xs font-bold text-slate-600">
@@ -1687,7 +1726,7 @@ export default function AdminPanel() {
                     {transferEmpId && (
                       <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg animate-fade-in flex justify-between items-center text-xs">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">From Section (Current):</span>
-                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold border border-blue-200 uppercase">
+                        <span className="px-2 py-0.5 rounded bg-theme-active text-theme-active font-extrabold border border-theme-active uppercase">
                           {employees.find(e => e.emp_id === Number(transferEmpId))?.section_code || 'Unassigned'}
                         </span>
                       </div>
@@ -1724,7 +1763,7 @@ export default function AdminPanel() {
                           value={transferOrderNo}
                           onChange={(e) => setTransferOrderNo(e.target.value)}
                           placeholder="e.g. SSE/T/2026/04"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme"
                           required
                         />
                       </div>
@@ -1737,7 +1776,7 @@ export default function AdminPanel() {
                           value={transferSignatoryName}
                           onChange={(e) => setTransferSignatoryName(e.target.value)}
                           placeholder="e.g. Koushik Saha"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme"
                           required
                         />
                       </div>
@@ -1748,7 +1787,7 @@ export default function AdminPanel() {
                           value={transferSignatoryDesig}
                           onChange={(e) => setTransferSignatoryDesig(e.target.value)}
                           placeholder="e.g. SSE/Sig/IC"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme"
                           required
                         />
                       </div>
@@ -1836,14 +1875,14 @@ export default function AdminPanel() {
                             <td className="py-3 px-5 font-mono text-slate-500">{emp.pf_number}</td>
                             <td className="py-3 px-5 font-bold text-slate-855">{emp.name}</td>
                             <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100 text-slate-655">{emp.designation}</span></td>
-                            <td className="py-3 px-5 text-blue-600 font-extrabold">Level {emp.level}</td>
+                            <td className="py-3 px-5 text-theme-primary font-extrabold">Level {emp.level}</td>
                             <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold uppercase">{emp.section_code || "Unassigned"}</span></td>
                             <td className="py-3 px-5">{emp.default_rest_day}</td>
                             <td className="py-3 px-5 text-center flex items-center justify-center gap-1.5">
                               <button 
                                 onClick={() => handleEditEmployeeClick(emp)} 
                                 title="Edit Employee"
-                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-1.5 rounded-lg bg-theme-active text-theme-active hover:opacity-85 border border-theme-active/30 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
                               >
                                 <Edit size={11} />
                               </button>
@@ -2407,7 +2446,7 @@ export default function AdminPanel() {
                     <button 
                       type="button" 
                       onClick={handleApplyRangeShift}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer rounded-lg h-[34px] shadow-sm shadow-blue-500/10"
+                      className="px-4 py-2 bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer rounded-lg h-[34px] shadow-sm"
                     >
                       Apply Range
                     </button>
@@ -2462,7 +2501,7 @@ export default function AdminPanel() {
               {/* Add form */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
-                  <PlusCircle size={15} className="text-blue-600" />
+                  <PlusCircle size={15} className="text-theme-primary" />
                   {editingCode ? "Edit Code Details" : "Register Roster Status Code"}
                 </h3>
                 <form onSubmit={handleSaveCode} className="space-y-4 text-xs font-bold text-slate-605">
@@ -2475,7 +2514,7 @@ export default function AdminPanel() {
                       placeholder="e.g. TRG"
                       disabled={editingCode !== null}
                       maxLength={10}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 uppercase focus:outline-none focus:border-blue-500 font-extrabold"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 uppercase focus:outline-none focus-border-theme font-extrabold"
                       required
                     />
                   </div>
@@ -2551,7 +2590,7 @@ export default function AdminPanel() {
                     )}
                     <button 
                       type="submit" 
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                      className="px-4 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white uppercase text-[10px] font-bold"
                     >
                       {editingCode ? "Save Updates" : "Register Code"}
                     </button>
@@ -2598,7 +2637,7 @@ export default function AdminPanel() {
                             <button 
                               onClick={() => handleEditCodeClick(code)} 
                               title="Edit Code"
-                              className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer font-bold"
+                              className="p-1.5 rounded-lg bg-theme-active text-theme-active hover:opacity-85 border border-theme-active/30 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer font-bold"
                             >
                               <Edit size={11} />
                             </button>
@@ -2625,7 +2664,7 @@ export default function AdminPanel() {
               {/* Form */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b">
-                  <PlusCircle size={15} className="text-blue-600" />
+                  <PlusCircle size={15} className="text-theme-primary" />
                   {editingHolidayId ? "Edit Holiday Date" : "Add Official Holiday"}
                 </h3>
                 <form onSubmit={handleSaveHoliday} className="space-y-4 text-xs font-bold text-slate-600">
@@ -2688,7 +2727,7 @@ export default function AdminPanel() {
                     )}
                     <button 
                       type="submit" 
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                      className="px-4 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white uppercase text-[10px] font-bold"
                     >
                       {editingHolidayId ? "Save Updates" : "Register Holiday"}
                     </button>
@@ -2726,12 +2765,12 @@ export default function AdminPanel() {
                             <td className="py-3 px-5 font-mono">{h.holiday_date}</td>
                             <td className="py-3 px-5 font-bold text-slate-800">{h.name}</td>
                             <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100">{h.holiday_type}</span></td>
-                            <td className="py-3 px-5 font-bold text-blue-600">{h.applicability || 'ALL'}</td>
+                            <td className="py-3 px-5 font-bold text-theme-primary">{h.applicability || 'ALL'}</td>
                             <td className="py-3 px-5 text-center flex justify-center items-center gap-1.5">
                               <button 
                                 onClick={() => handleEditHoliday(h)} 
                                 title="Edit Holiday"
-                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-1.5 rounded-lg bg-theme-active text-theme-active hover:opacity-85 border border-theme-active/30 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
                               >
                                 <Edit size={11} />
                               </button>
@@ -2759,7 +2798,7 @@ export default function AdminPanel() {
               {/* SQLite Health metrics check */}
               <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
-                  <Database size={15} className="text-blue-600" />
+                  <Database size={15} className="text-theme-primary" />
                   Database Health Check
                 </h3>
                 {backupStatus ? (

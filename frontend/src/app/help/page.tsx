@@ -274,8 +274,8 @@ export default function HelpCenter() {
       </div>
 
       {/* Guide Panel */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+      <div className="bg-theme-active border border-theme-active/30 rounded-xl p-4 flex items-start gap-3">
+        <Info size={16} className="text-theme-primary shrink-0 mt-0.5" />
         <p className="text-xs text-slate-650 font-bold leading-relaxed">
           {currentHelp.guideText}
         </p>
@@ -292,7 +292,7 @@ export default function HelpCenter() {
           filteredSections.map(section => (
             <div key={section.id} className="glass-panel p-6 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
-                <section.icon size={18} className="text-blue-600" />
+                <section.icon size={18} className="text-theme-primary" />
                 {section.title}
               </h3>
               

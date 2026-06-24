@@ -382,7 +382,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   if (!employee) {
     return (
       <div className="space-y-4">
-        <button onClick={onClose} className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-600 transition cursor-pointer">
+        <button onClick={onClose} className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-[var(--theme-icon-bg)] transition cursor-pointer">
           <ArrowLeft size={14} /> Back to Directory
         </button>
         <div className="glass-panel p-12 text-center rounded-xl bg-white border border-slate-200">
@@ -867,18 +867,18 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       <div className="glass-panel p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-5">
         <div className="flex justify-between items-center border-b border-slate-200 pb-3">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-            <CalendarDays size={18} className="text-blue-600" />
+            <CalendarDays size={18} className="text-theme-primary" />
             Roster & Shift Schedule Pattern
           </h3>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={openScheduleEditModal}
-              className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold uppercase transition shadow-sm cursor-pointer"
+              className="px-2.5 py-1 rounded bg-theme-primary hover-bg-theme-primary text-white text-[10px] font-extrabold uppercase transition shadow-sm cursor-pointer"
             >
               Edit Pattern
             </button>
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 text-[9px] font-black uppercase tracking-wider">
+            <span className="px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active text-[9px] font-black uppercase tracking-wider">
               {isFlexible ? 'Flexible' : isSimple ? 'Simple Weekly' : isCustomRotation ? 'Rule Cycle' : isRotating3Week ? '3-Week Cycle' : '4-Week Cycle'}
             </span>
           </div>
@@ -901,9 +901,9 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs font-semibold text-slate-500">
               <div>
                 {type === 'custom-rotation' ? (
-                  <span>Roster Rule: <span className="font-extrabold text-blue-605">{sched.rule_name}</span></span>
+                  <span>Roster Rule: <span className="font-extrabold text-theme-accent">{sched.rule_name}</span></span>
                 ) : (
-                  <span>Roster Cycle: <span className="font-extrabold text-blue-605">{
+                  <span>Roster Cycle: <span className="font-extrabold text-theme-accent">{
                     type === 'simple' ? 'Simple Weekly' : type === 'rotating-3week' ? '3-Week Rotating (21-Day HOER)' : '4-Week Rotating (28-Day HOER)'
                   }</span></span>
                 )}
@@ -926,13 +926,13 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 
                 return (
                   <div key={wkIdx} className="border border-slate-200 rounded-2xl p-4.5 bg-white flex flex-col space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group hover:border-[#00c2b2]/40">
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#00c2b2] to-blue-500 opacity-80"></div>
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#00c2b2] to-[var(--theme-icon-bg)] opacity-80"></div>
                     <div className="text-xs font-black text-slate-800 border-b border-slate-100 pb-2.5 flex justify-between items-center pl-1.5">
                       <span className="flex items-center gap-1.5 text-[13px] font-black text-slate-850">
                         <CalendarDays size={14} className="text-[#00c2b2]" />
                         Week {wkIdx + 1}
                       </span>
-                      <span className="text-[9px] font-black text-blue-650 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      <span className="text-[9px] font-black text-theme-accent bg-theme-active border border-theme-active px-2 py-0.5 rounded-full uppercase tracking-wider">
                         {weekRangeStr}
                       </span>
                     </div>
@@ -998,7 +998,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
               {employee.name}
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-bold uppercase tracking-wider">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active font-bold uppercase tracking-wider">
                 PF: {employee.pf_number}
               </span>
             </h2>
@@ -1036,7 +1036,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           <div className="text-xs font-bold text-slate-700">
             {lastDuty ? (
               <span className="flex items-center gap-1.5">
-                <span className="font-extrabold text-blue-600">{new Date(lastDuty.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <span className="font-extrabold text-theme-primary">{new Date(lastDuty.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 <span>—</span>
                 {(() => {
                   const details = getLastWorkedShiftLabel(lastDuty.status, lastDuty.date);
@@ -1064,7 +1064,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </h3>
           <button
             onClick={openEditModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-theme-primary hover-bg-theme-primary text-white text-xs font-bold transition shadow-sm cursor-pointer"
           >
             <Edit size={13} />
             Edit Leave Balances
@@ -1126,9 +1126,9 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Compensatory Rest Balance (CR)</span>
               <h3 className="text-2xl font-black text-slate-800">{leaveBank.accrued_cr} <span className="text-xs font-semibold text-slate-400">Accrued Balance</span></h3>
-              <p className="text-[11px] text-slate-500 font-bold">Earned on Rest Day duties and manual credits</p>
+              <p className="text-[11px] text-slate-500 font-bold">Used: earned on Rest Day duties and manual credits</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shadow-inner">
+            <div className="w-12 h-12 rounded-xl bg-theme-active text-theme-primary flex items-center justify-center font-bold text-sm shadow-inner">
               CR
             </div>
           </div>
@@ -1139,7 +1139,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         <div className="lg:col-span-2 space-y-4">
           <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
-              <Calendar size={18} className="text-blue-600" />
+              <Calendar size={18} className="text-theme-primary" />
               Attendance Ledger Calendar Heatmap ({selectedYear})
             </h3>
             {renderHeatmap()}
@@ -1158,7 +1158,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
         <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
-            <Milestone size={18} className="text-blue-600" />
+            <Milestone size={18} className="text-theme-primary" />
             Timeline Journey & Milestones
           </h3>
           <div className="flex-1 overflow-y-auto max-h-[500px] space-y-5 pr-2">
@@ -1169,7 +1169,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 {timelineJourney.map((item, idx) => (
                   <div key={idx} className="relative">
                     <span className={`absolute -left-[30px] top-0.5 w-3 h-3 rounded-full border-2 ${item.type === 'milestone'
-                        ? 'bg-blue-600 border-white ring-2 ring-blue-100'
+                        ? 'bg-theme-primary border-white ring-2 ring-[var(--theme-active-bg)]'
                         : item.type === 'event'
                           ? 'bg-purple-600 border-white ring-2 ring-purple-100'
                           : 'bg-amber-600 border-white ring-2 ring-amber-100'
@@ -1191,7 +1191,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           {/* Transfer History Card */}
           <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
-              <ArrowLeftRight size={18} className="text-blue-600 font-bold" />
+              <ArrowLeftRight size={18} className="text-theme-primary font-bold" />
               Transfer & Posting History
             </h3>
             <div className="overflow-x-auto">
@@ -1244,7 +1244,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           {/* Leave Logs Card */}
           <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
-              <CalendarDays size={18} className="text-blue-600 font-bold" />
+              <CalendarDays size={18} className="text-theme-primary font-bold" />
               Detailed Leave Logs Ledger
             </h3>
             <div className="overflow-x-auto max-h-[300px]">
@@ -1290,7 +1290,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         {/* CR Ledger Card */}
         <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-3">
-            <TrendingUp size={18} className="text-blue-600 font-bold" />
+            <TrendingUp size={18} className="text-theme-primary font-bold" />
             CR Balance Credit/Debit Log
           </h3>
           <div className="overflow-y-auto max-h-[500px] space-y-3 pr-1">
@@ -1327,14 +1327,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         </div>
       </div>
-
-
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="font-black text-slate-800 text-sm flex items-center gap-2">
-                <Database size={16} className="text-blue-600" />
+                <Database size={16} className="text-theme-primary" />
                 Edit Leave Balances ({selectedYear})
               </h3>
               <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm transition">✕</button>
@@ -1348,7 +1346,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     min="0"
                     value={editTotalCl}
                     onChange={(e) => setEditTotalCl(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
                     required
                   />
                 </div>
@@ -1359,7 +1357,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     min="0"
                     value={editUsedCl}
                     onChange={(e) => setEditUsedCl(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
                     required
                   />
                 </div>
@@ -1372,7 +1370,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     min="0"
                     value={editTotalLap}
                     onChange={(e) => setEditTotalLap(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
                     required
                   />
                 </div>
@@ -1383,7 +1381,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     min="0"
                     value={editUsedLap}
                     onChange={(e) => setEditUsedLap(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
                     required
                   />
                 </div>
@@ -1395,13 +1393,13 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                   min="0"
                   value={editAccruedCr}
                   onChange={(e) => setEditAccruedCr(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
                   required
                 />
               </div>
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-2 text-xs">
-                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 font-bold transition" disabled={isSaving}>Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm" disabled={isSaving}>
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-slate-200 rounded-lg text-slate-655 hover:bg-slate-50 font-bold transition" disabled={isSaving}>Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-theme-primary hover-bg-theme-primary text-white rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm" disabled={isSaving}>
                   {isSaving ? "Saving..." : "Save Balances"}
                 </button>
               </div>
@@ -1409,13 +1407,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         </div>
       )}
-
       {isScheduleEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
             <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                <CalendarDays size={16} className="text-blue-600" />
+                <CalendarDays size={16} className="text-theme-primary" />
                 Roster Schedule Configuration
               </h3>
               <button
@@ -1441,7 +1438,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                           setActiveRotatingWeek('week1');
                         }
                       }}
-                      className={`py-1.5 rounded text-[8px] font-extrabold uppercase transition-all duration-200 text-center ${scheduleType === type ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-800'}`}
+                      className={`py-1.5 rounded text-[8px] font-extrabold uppercase transition-all duration-200 text-center ${scheduleType === type ? 'bg-theme-primary text-white shadow' : 'text-slate-500 hover:text-slate-800'}`}
                     >
                       {type === 'simple' && '1-Week'}
                       {type === 'rotating-3week' && '3-Week'}
@@ -1454,7 +1451,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               </div>
 
               {scheduleType === 'flexible' && (
-                <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg text-slate-655 text-[10px] font-semibold leading-relaxed">
+                <div className="p-4 bg-theme-active border border-theme-active rounded-lg text-slate-655 text-[10px] font-semibold leading-relaxed">
                   <strong>Flexible / No Fixed Roster Mode:</strong> This employee (e.g. SSE/JE/IC) does not follow a strict weekly or rotating duty cycle. Shift rules will be left blank by default in the attendance sheet and can be manually inputted.
                 </div>
               )}
@@ -1467,7 +1464,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       <select
                         value={selectedRuleId || ''}
                         onChange={(e) => setSelectedRuleId(e.target.value ? Number(e.target.value) : null)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
                         required
                       >
                         <option value="">-- Select Rule --</option>
@@ -1482,7 +1479,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                         type="date"
                         value={empAnchorDate}
                         onChange={(e) => setEmpAnchorDate(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
                         required
                       />
                     </div>
@@ -1491,10 +1488,10 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     const r = rosterRules.find(rule => rule.id === Number(selectedRuleId));
                     if (!r) return null;
                     return (
-                      <div className="p-3.5 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 text-[10px]">
+                      <div className="p-3.5 bg-theme-active border border-theme-active rounded-xl space-y-1.5 text-[10px]">
                         <div className="flex justify-between items-center text-slate-500 font-bold uppercase tracking-wider">
                           <span>Rule Pattern Details</span>
-                          <span className="text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
+                          <span className="text-theme-primary bg-theme-active px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
                             {r.pattern.split(',').length} Days Cycle
                           </span>
                         </div>
@@ -1515,7 +1512,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       type="date"
                       value={empAnchorDate}
                       onChange={(e) => setEmpAnchorDate(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-855 cursor-pointer focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
                       required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
                     />
                   </div>
@@ -1561,7 +1558,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                             key={wk}
                             type="button"
                             onClick={() => setActiveRotatingWeek(wk as any)}
-                            className={`px-3 py-1 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
+                            className={`px-3 py-1 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-theme-primary text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
                           >
                             {wk.replace('week', 'W')}
                           </button>
@@ -1607,7 +1604,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       type="date"
                       value={overrideFrom}
                       onChange={(e) => setOverrideFrom(e.target.value)}
-                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
+                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-[var(--theme-icon-bg)]"
                     />
                   </div>
                   <div>
@@ -1616,7 +1613,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       type="date"
                       value={overrideTo}
                       onChange={(e) => setOverrideTo(e.target.value)}
-                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
+                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-[var(--theme-icon-bg)]"
                     />
                   </div>
                   <div>
@@ -1624,7 +1621,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     <select
                       value={overrideShift}
                       onChange={(e) => setOverrideShift(e.target.value)}
-                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
+                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold cursor-pointer"
                     >
                       <option value="N">N (Night)</option>
                       <option value="E">E (Eve)</option>
@@ -1648,7 +1645,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       setOverrideTo('');
                       setOverrideShift('N');
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer"
+                    className="bg-theme-primary hover-bg-theme-primary text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer"
                   >
                     Add Override
                   </button>
@@ -1689,7 +1686,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                         week4: getWeeklyScheduleDefault(newRest),
                       });
                     }}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
                   >
                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible'].map(d => (
                       <option key={d} value={d}>{d}</option>
@@ -1702,13 +1699,13 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 <button
                   type="button"
                   onClick={() => setIsScheduleEditOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 font-bold transition cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-655 hover:bg-slate-50 font-bold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition cursor-pointer shadow-sm"
+                  className="px-4 py-2 bg-theme-primary hover-bg-theme-primary text-white rounded-lg font-bold transition cursor-pointer shadow-sm"
                   disabled={isSaving}
                 >
                   {isSaving ? "Saving..." : "Save Updates"}
@@ -1930,7 +1927,7 @@ function StaffDirectory() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             {getTranslation(lang, 'Staff Directory')}
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-bold uppercase tracking-wider">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active font-bold uppercase tracking-wider">
               {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
@@ -1941,7 +1938,7 @@ function StaffDirectory() {
 
         <button
           onClick={openAddModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-md shadow-blue-500/10 cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs tracking-wider uppercase transition shadow-md shadow-[var(--theme-icon-bg)]/10 cursor-pointer"
         >
           <UserPlus size={14} />
           {getTranslation(lang, 'Enroll Employee')}
@@ -1992,7 +1989,7 @@ function StaffDirectory() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnter={(e) => handleDragEnter(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`hover:bg-slate-50/50 transition-colors select-none ${draggedIndex === index ? 'opacity-40 bg-blue-50/20' : ''
+                    className={`hover:bg-slate-50/50 transition-colors select-none ${draggedIndex === index ? 'opacity-40 bg-[var(--theme-active-bg)]/20' : ''
                       }`}
                   >
                     <td
@@ -2006,7 +2003,7 @@ function StaffDirectory() {
                     <td className="py-3.5 px-5 font-bold text-slate-800">
                       <button
                         onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
-                        className="hover:text-blue-600 hover:underline font-bold text-slate-850 cursor-pointer text-left bg-transparent border-none"
+                        className="hover:text-[var(--theme-icon-bg)] hover:underline font-bold text-slate-850 cursor-pointer text-left bg-transparent border-none"
                       >
                         {emp.name}
                       </button>
@@ -2016,7 +2013,7 @@ function StaffDirectory() {
                         {emp.designation}
                       </span>
                     </td>
-                    <td className="py-3.5 px-5 font-bold text-blue-700">Level {emp.level}</td>
+                    <td className="py-3.5 px-5 font-bold text-theme-active">Level {emp.level}</td>
                     <td className="py-3.5 px-5 font-semibold text-slate-700">{emp.default_rest_day}</td>
                     <td className="py-3.5 px-5 font-mono text-slate-600">{emp.joining_date || "—"}</td>
                     <td className="py-3.5 px-5 text-center space-x-2 no-print">
@@ -2048,7 +2045,7 @@ function StaffDirectory() {
           <div className="bg-white border border-[#E2E0D9] w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                <User size={16} className="text-blue-600" />
+                <User size={16} className="text-theme-primary" />
                 {editingEmp ? getTranslation(lang, 'Edit Employee') : getTranslation(lang, 'Add New Employee')}
               </h3>
               <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer">✕</button>
@@ -2139,7 +2136,7 @@ function StaffDirectory() {
               </div>
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase cursor-pointer">{getTranslation(lang, 'Cancel')}</button>
-                <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase cursor-pointer">{editingEmp ? getTranslation(lang, 'Update Employee') : getTranslation(lang, 'Save Employee')}</button>
+                <button type="submit" className="px-4 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs uppercase cursor-pointer">{editingEmp ? getTranslation(lang, 'Update Employee') : getTranslation(lang, 'Save Employee')}</button>
               </div>
             </form>
           </div>

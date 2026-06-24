@@ -1240,7 +1240,7 @@ export default function AttendanceGrid() {
 
           <button
             onClick={handleAutoFill}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 font-bold text-xs tracking-wider uppercase transition no-print cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-theme-active border border-theme-active/30 hover:opacity-85 text-theme-primary font-bold text-xs tracking-wider uppercase transition no-print cursor-pointer"
           >
             <Sparkles size={14} />
             {getTranslation(lang, 'Auto-Fill')}
@@ -1281,7 +1281,7 @@ export default function AttendanceGrid() {
           {/* Signatories Config Toggle */}
           <button
             onClick={() => setShowSigConfig(!showSigConfig)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer ${showSigConfig ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 border-slate-250 text-slate-700 hover:bg-slate-200'}`}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer ${showSigConfig ? 'bg-theme-active text-theme-active border-theme-active' : 'bg-slate-100 border-slate-250 text-slate-700 hover:bg-slate-200'}`}
           >
             <Settings size={14} />
             {getTranslation(lang, 'Signatories')}
@@ -1290,7 +1290,7 @@ export default function AttendanceGrid() {
           <button
             onClick={() => handleAttendanceExport('excel')}
             disabled={exporting !== null}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs tracking-wider uppercase transition shadow-sm no-print cursor-pointer"
           >
             <FileSpreadsheet size={14} />
             {exporting === 'excel' ? 'Excel...' : getTranslation(lang, 'Export Excel')}
@@ -1337,7 +1337,7 @@ export default function AttendanceGrid() {
                 value={signatoryLeftName}
                 onChange={(e) => setSignatoryLeftName(e.target.value)}
                 placeholder="Type Name..."
-                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus-border-theme"
               />
             </div>
           </div>
@@ -1348,7 +1348,7 @@ export default function AttendanceGrid() {
               value={signatoryLeftTitle}
               onChange={(e) => setSignatoryLeftTitle(e.target.value)}
               placeholder="e.g. SSE/Sig/KKVS/IC"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus-border-theme"
             />
           </div>
           <div>
@@ -1358,7 +1358,7 @@ export default function AttendanceGrid() {
               value={signatoryRight}
               onChange={(e) => setSignatoryRight(e.target.value)}
               placeholder="e.g. Dy. CPO"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-blue-500"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus-border-theme"
             />
           </div>
         </div>
@@ -1367,14 +1367,14 @@ export default function AttendanceGrid() {
       {/* Roster Guide Panel */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 text-xs text-slate-600 items-center justify-between shadow-sm no-print">
         <div className="flex items-center gap-1.5">
-          <Info size={14} className="text-blue-600" />
-          <span><strong>Roster Code Key:</strong></span>
+          <Info size={14} className="text-theme-primary" />
+          <span><strong>Roster Guide Key:</strong></span>
         </div>
         <div className="flex flex-wrap gap-3.5">
           <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-slate-100 border border-slate-200 font-bold block text-[9px] leading-4 text-slate-700">P</span> Present</span>
           <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-purple-50 border border-purple-200 font-bold block text-[9px] leading-4 text-purple-700">P/N</span> Night Shift</span>
           <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-slate-200 font-bold block text-[9px] leading-4 text-slate-500">R</span> Rest Day</span>
-          <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-blue-50 border border-blue-200 font-bold block text-[9px] leading-4 text-blue-700">CR</span> Comp. Rest</span>
+          <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-theme-active border border-theme-active/30 font-bold block text-[9px] leading-4 text-theme-active">CR</span> Comp. Rest</span>
           <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-amber-50 border border-amber-200 font-bold block text-[9px] leading-4 text-amber-700">CL</span> Casual Leave</span>
           <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-orange-50 border border-orange-200 font-bold block text-[9px] leading-4 text-orange-700">LAP</span> LAP Leave</span>
           <span className="flex items-center gap-1"><span className="w-5 h-4 rounded text-center bg-red-100 font-bold block text-[9px] leading-4 text-red-700">Sick</span> Sick Leave</span>
