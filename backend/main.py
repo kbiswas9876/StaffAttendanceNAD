@@ -3151,12 +3151,12 @@ def export_ta_bill_excel(id: int):
         max_col = 10 if journey_type == "NORMAL" else 11
         
         # Row Heights
-        ws.row_dimensions[1].height = 24
-        ws.row_dimensions[2].height = 24
-        ws.row_dimensions[4].height = 24
-        ws.row_dimensions[5].height = 24
-        ws.row_dimensions[7].height = 28
-        ws.row_dimensions[8].height = 20
+        ws.row_dimensions[1].height = 26
+        ws.row_dimensions[2].height = 26
+        ws.row_dimensions[4].height = 26
+        ws.row_dimensions[5].height = 26
+        ws.row_dimensions[7].height = 30
+        ws.row_dimensions[8].height = 22
 
         # Helper to check if a cell is merged across columns
         def is_merged_across_columns(ws, row, col):
@@ -3198,45 +3198,47 @@ def export_ta_bill_excel(id: int):
                 lines.append(current_line)
             num_lines = max(1, len(lines))
             line_height = font_size * 1.35
-            return num_lines * line_height + 10  # height in points with padding
+            return num_lines * line_height + 16  # increased padding for breathing space
 
-        # Base/minimum widths for all columns to keep it balanced and prevent header clipping
+        # Base/minimum widths and max limits for all columns to keep it balanced and fit on A4 landscape
         if journey_type == "NORMAL":
-            base_widths = {
-                1: 13,  # Month & Date
-                2: 18,  # No. of Train / Steamer / Plain
-                3: 13,  # Time left (Hrs.)
-                4: 13,  # Time arrived (Hrs.)
-                5: 15,  # Station From
-                6: 15,  # Station To
-                7: 13,  # Days / Nights
-                8: 45,  # Object of journey
-                9: 14,  # Rate in Rs.
-                10: 16  # Amount in Rs.
+            column_specs = {
+                # col_index: (base_width, max_width)
+                1: (11, 13),   # Month & Date
+                2: (13, 16),   # No. of Train / Steamer / Plain
+                3: (10, 11),   # Time left (Hrs.)
+                4: (10, 11),   # Time arrived (Hrs.)
+                5: (14, 20),   # Station From (expanded for IRISET)
+                6: (14, 20),   # Station To (expanded for IRISET)
+                7: (8, 9),     # Days / Nights
+                8: (35, 55),   # Object of journey (expanded to prevent clipping of Total)
+                9: (10, 11),   # Rate in Rs.
+                10: (11, 13)   # Amount in Rs.
             }
         else:
-            base_widths = {
-                1: 13,  # Month & Date
-                2: 18,  # No. of Train / Steamer / Plain
-                3: 13,  # Time left (Hrs.)
-                4: 13,  # Time arrived (Hrs.)
-                5: 15,  # Station From
-                6: 15,  # Station To
-                7: 14,  # More than 8 KMs
-                8: 13,  # Days / Nights
-                9: 45,  # Object of journey
-                10: 14, # Rate in Rs.
-                11: 16  # Amount in Rs.
+            column_specs = {
+                1: (11, 13),   # Month & Date
+                2: (13, 16),   # No. of Train / Steamer / Plain
+                3: (10, 11),   # Time left (Hrs.)
+                4: (10, 11),   # Time arrived (Hrs.)
+                5: (14, 20),   # Station From (expanded for IRISET)
+                6: (14, 20),   # Station To (expanded for IRISET)
+                7: (10, 12),   # More than 8 KMs
+                8: (8, 9),     # Days / Nights
+                9: (35, 55),   # Object of journey (expanded to prevent clipping of Total)
+                10: (10, 11),  # Rate in Rs.
+                11: (11, 13)   # Amount in Rs.
             }
             
         data_start = 9
         data_end = 8 + required_rows
         total_row = 9 + required_rows
 
-        # Calculate optimal width for columns 1 to max_col based on rows 7 to total_row (table area)
+        # Calculate optimal width for columns 1 to max_col based on data rows (9 to total_row), excluding headers
         for c in range(1, max_col + 1):
-            max_len = base_widths.get(c, 12)
-            for r in range(7, total_row + 1):
+            base_w, max_w = column_specs.get(c, (12, 35))
+            max_len = base_w
+            for r in range(9, total_row + 1):
                 if is_merged_across_columns(ws, r, c):
                     continue
                 val = ws.cell(row=r, column=c).value
@@ -3244,10 +3246,26 @@ def export_ta_bill_excel(id: int):
                     val_str = str(val)
                     lines = val_str.split("\n")
                     for line in lines:
-                        max_len = max(max_len, len(line) + 3)
+                        # Add extra padding for bold text or total label
+                        padding = 5 if ("Total :Rupees" in val_str or r == total_row) else 3
+                        max_len = max(max_len, len(line) + padding)
             
-            limit = 55 if c == (8 if journey_type == "NORMAL" else 9) else 35
-            ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = min(max_len, limit)
+            ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = min(max_len, max_w)
+
+
+        # Set print settings to fit onto A4 Landscape
+        ws.page_setup.orientation = 'landscape'
+        ws.page_setup.paperSize = 9 # A4
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+
+        # Adjust margins to maximize printable width and make it look clean
+        ws.page_margins.left = 0.4
+        ws.page_margins.right = 0.4
+        ws.page_margins.top = 0.4
+        ws.page_margins.bottom = 0.4
+
 
         # 2. Format Headers (Rows 7 and 8)
         for r in [7, 8]:
@@ -3331,21 +3349,28 @@ def export_ta_bill_excel(id: int):
                     stay_height = calculate_needed_row_height(stay_text, combined_width, font_size=9.5, bold=True)
                     needed_height = max(needed_height, stay_height)
                     
-            pair_height = max(44, needed_height)
+            pair_height = max(50, needed_height)
             row_height = pair_height / 2
             ws.row_dimensions[r1].height = row_height
             ws.row_dimensions[r2].height = row_height
 
         # 4. Format Total Row
-        ws.row_dimensions[total_row].height = 26
+        ws.row_dimensions[total_row].height = 30
+
         
         for c in range(1, max_col + 1):
             cell = ws.cell(row=total_row, column=c)
             cell.fill = total_fill
             cell.border = total_border
-            if cell.value:
-                cell.font = total_font
+            cell.font = total_font
+            if c == max_col:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = '#,##0'
+            elif c == max_col - 1:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+            else:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
+
                 
         # 5. Format Bottom Certification and Signature block
         cert_start = total_row + 1
@@ -3686,8 +3711,10 @@ def export_ta_bill_excel(id: int):
             ws.merge_cells(start_row=r1_idx, start_column=10, end_row=r2_idx, end_column=10)
             
         total_row_idx = 9 + required_rows
-        ws.cell(row=total_row_idx, column=8).value = f"Total :Rupees {num_to_words(total_amount)} only                     Rs.              {total_amount}"
-        ws.merge_cells(start_row=total_row_idx, start_column=8, end_row=total_row_idx, end_column=10)
+        ws.cell(row=total_row_idx, column=8).value = f"Total :Rupees {num_to_words(total_amount)} only"
+        ws.cell(row=total_row_idx, column=9).value = "Rs."
+        ws.cell(row=total_row_idx, column=10).value = total_amount
+
 
     else:
         N = len(entries)
@@ -3770,8 +3797,10 @@ def export_ta_bill_excel(id: int):
                 ws.merge_cells(start_row=r1_idx, start_column=6, end_row=r2_idx, end_column=6)
                 
         total_row_idx = 9 + required_rows
-        ws.cell(row=total_row_idx, column=9).value = f"Total :Rupees {num_to_words(total_amount)} only                     Rs.              {total_amount}"
-        ws.merge_cells(start_row=total_row_idx, start_column=9, end_row=total_row_idx, end_column=11)
+        ws.cell(row=total_row_idx, column=9).value = f"Total :Rupees {num_to_words(total_amount)} only"
+        ws.cell(row=total_row_idx, column=10).value = "Rs."
+        ws.cell(row=total_row_idx, column=11).value = total_amount
+
 
     for r in range(1, ws.max_row + 1):
         for c in range(1, ws.max_column + 1):
