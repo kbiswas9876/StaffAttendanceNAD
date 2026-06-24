@@ -3091,6 +3091,97 @@ def export_ta_bill_excel(id: int):
         ws.row_dimensions[7].height = 28
         ws.row_dimensions[8].height = 20
 
+        # Helper to check if a cell is merged across columns
+        def is_merged_across_columns(ws, row, col):
+            for r_range in ws.merged_cells.ranges:
+                min_col, min_row, max_col, max_row = r_range.bounds
+                if min_row <= row <= max_row and min_col <= col <= max_col:
+                    if min_col != max_col:
+                        return True
+            return False
+
+        # Helper to estimate needed height for wrapped text
+        def calculate_needed_row_height(text, col_width, font_size=9.5, bold=False):
+            if not text:
+                return 20
+            char_width = 0.85 if not bold else 0.95
+            words = str(text).split(" ")
+            lines = []
+            current_line = ""
+            for word in words:
+                if "\n" in word:
+                    parts = word.split("\n")
+                    for idx, part in enumerate(parts):
+                        if idx == 0:
+                            if len(current_line + " " + part) * char_width <= col_width:
+                                current_line = (current_line + " " + part).strip()
+                            else:
+                                lines.append(current_line)
+                                current_line = part.strip()
+                        else:
+                            lines.append(current_line)
+                            current_line = part.strip()
+                else:
+                    if len(current_line + " " + word) * char_width <= col_width:
+                        current_line = (current_line + " " + word).strip()
+                    else:
+                        lines.append(current_line)
+                        current_line = word.strip()
+            if current_line:
+                lines.append(current_line)
+            num_lines = max(1, len(lines))
+            line_height = font_size * 1.35
+            return num_lines * line_height + 10  # height in points with padding
+
+        # Base/minimum widths for all columns to keep it balanced and prevent header clipping
+        if journey_type == "NORMAL":
+            base_widths = {
+                1: 13,  # Month & Date
+                2: 18,  # No. of Train / Steamer / Plain
+                3: 13,  # Time left (Hrs.)
+                4: 13,  # Time arrived (Hrs.)
+                5: 15,  # Station From
+                6: 15,  # Station To
+                7: 13,  # Days / Nights
+                8: 45,  # Object of journey
+                9: 14,  # Rate in Rs.
+                10: 16  # Amount in Rs.
+            }
+        else:
+            base_widths = {
+                1: 13,  # Month & Date
+                2: 18,  # No. of Train / Steamer / Plain
+                3: 13,  # Time left (Hrs.)
+                4: 13,  # Time arrived (Hrs.)
+                5: 15,  # Station From
+                6: 15,  # Station To
+                7: 14,  # More than 8 KMs
+                8: 13,  # Days / Nights
+                9: 45,  # Object of journey
+                10: 14, # Rate in Rs.
+                11: 16  # Amount in Rs.
+            }
+            
+        data_start = 9
+        data_end = 8 + required_rows
+        total_row = 9 + required_rows
+
+        # Calculate optimal width for columns 1 to max_col based on rows 7 to total_row (table area)
+        for c in range(1, max_col + 1):
+            max_len = base_widths.get(c, 12)
+            for r in range(7, total_row + 1):
+                if is_merged_across_columns(ws, r, c):
+                    continue
+                val = ws.cell(row=r, column=c).value
+                if val is not None:
+                    val_str = str(val)
+                    lines = val_str.split("\n")
+                    for line in lines:
+                        max_len = max(max_len, len(line) + 3)
+            
+            limit = 55 if c == (8 if journey_type == "NORMAL" else 9) else 35
+            ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = min(max_len, limit)
+
         # 2. Format Headers (Rows 7 and 8)
         for r in [7, 8]:
             for c in range(1, max_col + 1):
@@ -3101,11 +3192,7 @@ def export_ta_bill_excel(id: int):
                 cell.border = header_border
 
         # 3. Format Data Rows (Row 9 to 8+required_rows)
-        data_start = 9
-        data_end = 8 + required_rows
-        
         for r in range(data_start, data_end + 1):
-            ws.row_dimensions[r].height = 22
             if journey_type == "NORMAL":
                 pair_idx = (r - data_start) // 2
                 fill_to_use = alt_fill if pair_idx % 2 == 1 else white_fill
@@ -3144,14 +3231,45 @@ def export_ta_bill_excel(id: int):
                     else:
                         cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
                 elif c == 10:
-                    cell.alignment = Alignment(horizontal="right", vertical="center")
-                    cell.number_format = '#,##0'
+                    if journey_type == "NORMAL":
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                        cell.number_format = '#,##0'
+                    else:
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                        cell.number_format = '#,##0'
                 elif c == 11:
                     cell.alignment = Alignment(horizontal="right", vertical="center")
                     cell.number_format = '#,##0'
 
+        # Row height auto-adjustment for data rows in pairs
+        num_pairs = required_rows // 2
+        for i in range(num_pairs):
+            r1 = 9 + 2 * i
+            r2 = 10 + 2 * i
+            
+            if journey_type == "NORMAL":
+                obj_width = ws.column_dimensions['H'].width or 45
+                obj_text = ws.cell(row=r1, column=8).value or ""
+                needed_height = calculate_needed_row_height(obj_text, obj_width, font_size=9.5)
+            else:
+                obj_width = ws.column_dimensions['I'].width or 45
+                obj_text = ws.cell(row=r1, column=9).value or ""
+                needed_height = calculate_needed_row_height(obj_text, obj_width, font_size=9.5)
+                
+                # Check for stay details in training sheet (merged B-F, columns 2-6)
+                stay_cell = ws.cell(row=r1, column=2)
+                if is_merged_across_columns(ws, r1, 2):
+                    combined_width = sum(ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width or 12 for col_idx in range(2, 7))
+                    stay_text = stay_cell.value or ""
+                    stay_height = calculate_needed_row_height(stay_text, combined_width, font_size=9.5, bold=True)
+                    needed_height = max(needed_height, stay_height)
+                    
+            pair_height = max(44, needed_height)
+            row_height = pair_height / 2
+            ws.row_dimensions[r1].height = row_height
+            ws.row_dimensions[r2].height = row_height
+
         # 4. Format Total Row
-        total_row = 9 + required_rows
         ws.row_dimensions[total_row].height = 26
         
         for c in range(1, max_col + 1):
@@ -3165,20 +3283,41 @@ def export_ta_bill_excel(id: int):
         # 5. Format Bottom Certification and Signature block
         cert_start = total_row + 1
         for r in range(cert_start, ws.max_row + 1):
-            # Check if row has text to shrink empty spacing rows
             row_has_text = any(ws.cell(row=r, column=c).value is not None for c in range(1, max_col + 1))
             if row_has_text:
-                ws.row_dimensions[r].height = 18
+                has_signature_keywords = any(
+                    isinstance(ws.cell(row=r, column=c).value, str) and 
+                    any(k in ws.cell(row=r, column=c).value for k in ["Countersigned", "Signature of Officer", "Controlling Officer", "Head of Office"])
+                    for c in range(1, max_col + 1)
+                )
+                has_cert_keywords = any(
+                    isinstance(ws.cell(row=r, column=c).value, str) and 
+                    "I hereby certify that" in ws.cell(row=r, column=c).value
+                    for c in range(1, max_col + 1)
+                )
+                
+                if has_signature_keywords:
+                    ws.row_dimensions[r].height = 28
+                elif has_cert_keywords:
+                    ws.row_dimensions[r].height = 24
+                else:
+                    ws.row_dimensions[r].height = 18
             else:
                 ws.row_dimensions[r].height = 10
+
             for c in range(1, max_col + 1):
                 cell = ws.cell(row=r, column=c)
                 if cell.value and isinstance(cell.value, str):
                     if "I hereby certify that" in cell.value:
+                        cell.value = cell.value.strip()  # Remove leading spaces
                         cell.font = Font(name="Segoe UI", size=9, italic=True, color="475569")
                         cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
                     elif any(k in cell.value for k in ["Countersigned", "Signature of Officer", "Controlling Officer", "Head of Office"]):
                         cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
+                        if "Signature of Officer" in cell.value:
+                            cell.alignment = Alignment(horizontal="right", vertical="center")
+                        else:
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
                     elif "Note:" in cell.value:
                         cell.font = Font(name="Segoe UI", size=8, italic=True, color="64748B")
                         cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
@@ -3220,10 +3359,11 @@ def export_ta_bill_excel(id: int):
         
     ws = wb[sheet_to_keep]
     
+    limit_row = 27 if journey_type == "NORMAL" else 19
     # Fix any invalid crossing merged ranges or template merged cells in the data area (row 9 onwards)
     for r in list(ws.merged_cells.ranges):
         min_col, min_row, max_col, max_row = r.bounds
-        if max_row >= 9:
+        if max_row >= 9 and min_row <= limit_row:
             try:
                 ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
             except Exception:
