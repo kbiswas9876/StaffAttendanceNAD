@@ -634,6 +634,23 @@ export default function AdminPanel() {
       return;
     }
 
+    let detectedRestDay = empRestDay;
+    if (scheduleType === 'simple') {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const foundRest = days.find(d => empWeeklySchedule[d] === 'R');
+      if (foundRest) {
+        detectedRestDay = foundRest;
+      }
+    } else if (scheduleType === 'rotating' || scheduleType === 'rotating-3week') {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const foundRest = days.find(d => rotatingSchedule.week1[d] === 'R');
+      if (foundRest) {
+        detectedRestDay = foundRest;
+      }
+    } else if (scheduleType === 'flexible' || scheduleType === 'custom-rotation') {
+      detectedRestDay = 'Flexible';
+    }
+
     const payload = {
       pf_number: empPF.trim(),
       name: empName.trim(),
@@ -641,7 +658,7 @@ export default function AdminPanel() {
       level: Number(empLevel),
       primary_section_id: sectionObj?.id || null,
       section_code: empSection || null,
-      default_rest_day: empRestDay,
+      default_rest_day: detectedRestDay,
       weekly_schedule: weeklySchedulePayload as any,
       joining_date: empJoiningDate || undefined
     };
@@ -1586,36 +1603,14 @@ export default function AdminPanel() {
                         </select>
                       </div>
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Weekly Rest Day</label>
-                        <select 
-                          value={empRestDay}
-                          onChange={(e) => {
-                            const newRest = e.target.value;
-                            setEmpRestDay(newRest);
-                            setEmpWeeklySchedule(getWeeklyScheduleDefault(newRest));
-                            setRotatingSchedule({
-                              week1: getWeeklyScheduleDefault(newRest),
-                              week2: getWeeklyScheduleDefault(newRest),
-                              week3: getWeeklyScheduleDefault(newRest),
-                              week4: getWeeklyScheduleDefault(newRest),
-                            });
-                          }}
+                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Joining Date (Optional)</label>
+                        <input 
+                          type="date" 
+                          value={empJoiningDate}
+                          onChange={(e) => setEmpJoiningDate(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                        >
-                          {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday','Flexible'].map(d => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
+                        />
                       </div>
-                    </div>
-                    <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Joining Date (Optional)</label>
-                      <input 
-                        type="date" 
-                        value={empJoiningDate}
-                        onChange={(e) => setEmpJoiningDate(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                      />
                     </div>
 
                     {/* Weekly Schedule template button & summary */}
@@ -1630,11 +1625,16 @@ export default function AdminPanel() {
                           Configure
                         </button>
                       </div>
-                      <div className="text-[11px] font-semibold text-slate-700">
-                        {scheduleType === 'simple' && `Single Week (Rest: ${empRestDay})`}
+                       <div className="text-[11px] font-semibold text-slate-700">
+                        {scheduleType === 'simple' && (() => {
+                          const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                          const rDay = days.find(d => empWeeklySchedule[d] === 'R') || empRestDay;
+                          return `Single Week (Rest: ${rDay})`;
+                        })()}
                         {scheduleType === 'flexible' && `Flexible / No Fixed Roster`}
                         {scheduleType === 'rotating-3week' && `3-Week Rotating (Anchor: ${empAnchorDate})`}
                         {scheduleType === 'rotating' && `4-Week Rotating (Anchor: ${empAnchorDate})`}
+                        {scheduleType === 'custom-rotation' && `Rule: ${rosterRules.find(r => r.id === selectedRuleId)?.name || 'Custom Rotation'} (Anchor: ${empAnchorDate})`}
                       </div>
                       {customNightWeeks.length > 0 && (
                         <div className="text-[9px] text-slate-500 italic">

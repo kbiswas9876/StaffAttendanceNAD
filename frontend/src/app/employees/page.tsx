@@ -295,10 +295,27 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               custom_night_weeks: customNightWeeks
             };
 
+    let detectedRestDay = empRestDay;
+    if (scheduleType === 'simple') {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const foundRest = days.find(d => empWeeklySchedule[d] === 'R');
+      if (foundRest) {
+        detectedRestDay = foundRest;
+      }
+    } else if (scheduleType === 'rotating' || scheduleType === 'rotating-3week') {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const foundRest = days.find(d => rotatingSchedule.week1[d] === 'R');
+      if (foundRest) {
+        detectedRestDay = foundRest;
+      }
+    } else if (scheduleType === 'flexible' || scheduleType === 'custom-rotation') {
+      detectedRestDay = 'Flexible';
+    }
+
     try {
       await updateEmployee({
         ...employee,
-        default_rest_day: empRestDay,
+        default_rest_day: detectedRestDay,
         weekly_schedule: weeklySchedulePayload as any
       });
       alert("Roster Schedule Pattern updated successfully!");
@@ -478,6 +495,90 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       </div>
     );
   };
+  // Dynamic shift calculation helpers (accessible by calculations and rendering)
+  const getBaseRotatingShiftForDate = (dateStr: string) => {
+    const s = employee?.weekly_schedule as any;
+    if (!s) return null;
+    if (s.type === 'flexible') return null;
+
+    if (s.type === 'custom-rotation') {
+      const pattern = s.pattern || [];
+      if (pattern.length === 0) return null;
+      const anchorStr = s.anchor_date || '2026-06-01';
+      const anchor = new Date(anchorStr);
+      const target = new Date(dateStr);
+      anchor.setHours(0,0,0,0);
+      target.setHours(0,0,0,0);
+      const diffTime = target.getTime() - anchor.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      
+      const cycleLength = pattern.length;
+      const cycleDay = ((diffDays % cycleLength) + cycleLength) % cycleLength;
+      return pattern[cycleDay] || null;
+    }
+
+    if (s.type !== 'rotating' && s.type !== 'rotating-3week') {
+      const date = new Date(dateStr);
+      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+      return s[dayOfWeek] || null;
+    }
+
+    const anchorStr = s.anchor_date || '2026-06-01';
+    const anchor = new Date(anchorStr);
+    const target = new Date(dateStr);
+
+    anchor.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+
+    const diffTime = target.getTime() - anchor.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (s.type === 'rotating-3week') {
+      const cycleDay = ((diffDays % 21) + 21) % 21;
+      const weekNum = Math.floor(cycleDay / 7) + 1;
+      const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+      const wk = `week${weekNum}`;
+      return s[wk]?.[dayOfWeek] || null;
+    } else {
+      const cycleDay = ((diffDays % 28) + 28) % 28;
+      const weekNum = Math.floor(cycleDay / 7) + 1;
+      const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+      const wk = `week${weekNum}`;
+      return s[wk]?.[dayOfWeek] || null;
+    }
+  };
+
+  const getShiftForDate = (dateStr: string) => {
+    const s = employee?.weekly_schedule as any;
+    if (!s) return null;
+    const overrides = s.custom_night_weeks;
+    if (Array.isArray(overrides)) {
+      const override = overrides.find(w => dateStr >= w.from_date && dateStr <= w.to_date);
+      if (override) {
+        const baseShift = getBaseRotatingShiftForDate(dateStr);
+        if (baseShift === 'R') return 'R';
+        return override.shift || 'N';
+      }
+    }
+    return getBaseRotatingShiftForDate(dateStr);
+  };
+
+  const getLastWorkedShiftLabel = (status: string, dateStr: string) => {
+    if (status === 'P/N') {
+      return { label: 'Night Shift (P/N)', bg: 'bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-extrabold px-2 py-0.5 rounded border' };
+    }
+    const schedShift = getShiftForDate(dateStr) || 'G';
+    const code = schedShift.toUpperCase();
+    if (code === 'M') {
+      return { label: 'Morning Shift (M)', bg: 'bg-sky-50 text-sky-700 border-sky-200 text-[10px] font-extrabold px-2 py-0.5 rounded border' };
+    } else if (code === 'E') {
+      return { label: 'Evening Shift (E)', bg: 'bg-orange-50 text-orange-700 border-orange-200 text-[10px] font-extrabold px-2 py-0.5 rounded border' };
+    } else if (code === 'N') {
+      return { label: 'Night Shift (N)', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-extrabold px-2 py-0.5 rounded border' };
+    } else {
+      return { label: 'General Shift (P)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded border' };
+    }
+  };
 
   // Presence & Duty Status Calculations
   const todayObjForDash = new Date();
@@ -494,32 +595,66 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const leaveLogs = attendance.filter(log => ['CL', 'LAP', 'Sick', 'SCL'].includes(log.status));
   leaveLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const getDutyBadgeDetails = (status: string) => {
+  const getDutyBadgeDetails = (status: string, dateStr: string) => {
     switch (status) {
-      case 'P':
-        return { label: 'ON DUTY (General Shift)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-250 font-bold' };
+      case 'P': {
+        const scheduledShift = getShiftForDate(dateStr) || 'G';
+        const code = scheduledShift.toUpperCase();
+        if (code === 'M') {
+          return { label: 'ON DUTY (Morning Shift - M)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold' };
+        } else if (code === 'E') {
+          return { label: 'ON DUTY (Evening Shift - E)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold' };
+        } else if (code === 'N' || code === 'P/N') {
+          return { label: 'ON DUTY (Night Shift - N)', bg: 'bg-purple-50 text-purple-700 border-purple-200 font-bold' };
+        } else {
+          return { label: 'ON DUTY (General Shift - G)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold' };
+        }
+      }
       case 'P/N':
-        return { label: 'ON DUTY (Night Shift)', bg: 'bg-purple-50 text-purple-700 border-purple-250 font-bold' };
+        return { label: 'ON DUTY (Night Shift)', bg: 'bg-purple-50 text-purple-700 border-purple-200 font-bold' };
       case 'R':
-        return { label: 'WEEKLY REST DAY', bg: 'bg-slate-100 text-slate-700 border-slate-250 font-bold' };
+        return { label: 'WEEKLY REST DAY', bg: 'bg-slate-100 text-slate-700 border-slate-200 font-bold' };
       case 'CR':
-        return { label: 'COMPENSATORY REST', bg: 'bg-blue-50 text-blue-700 border-blue-250 font-bold' };
+        return { label: 'COMPENSATORY REST', bg: 'bg-blue-50 text-blue-700 border-blue-200 font-bold' };
       case 'CL':
-        return { label: 'ON CASUAL LEAVE', bg: 'bg-amber-50 text-amber-700 border-amber-250 font-bold' };
+        return { label: 'ON CASUAL LEAVE', bg: 'bg-amber-50 text-amber-700 border-amber-200 font-bold' };
       case 'LAP':
-        return { label: 'ON AVERAGE PAY LEAVE (LAP)', bg: 'bg-orange-50 text-orange-700 border-orange-250 font-bold' };
+        return { label: 'ON AVERAGE PAY LEAVE (LAP)', bg: 'bg-orange-50 text-orange-700 border-orange-200 font-bold' };
       case 'Sick':
-        return { label: 'ON MEDICAL SICK LEAVE', bg: 'bg-red-50 text-red-700 border-red-250 font-bold' };
+        return { label: 'ON MEDICAL SICK LEAVE', bg: 'bg-red-50 text-red-700 border-red-200 font-bold' };
       case 'SCL':
-        return { label: 'ON SPECIAL CASUAL LEAVE', bg: 'bg-rose-50 text-rose-700 border-rose-250 font-bold' };
+        return { label: 'ON SPECIAL CASUAL LEAVE', bg: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
       case 'PH':
-        return { label: 'PUBLIC MASTER HOLIDAY', bg: 'bg-yellow-50 text-yellow-750 border-yellow-250 font-bold' };
+        return { label: 'PUBLIC MASTER HOLIDAY', bg: 'bg-yellow-50 text-yellow-750 border-yellow-200 font-bold' };
       default:
         return { label: 'NO ROSTER LOG FOR TODAY', bg: 'bg-slate-50 text-slate-500 border-slate-200' };
     }
   };
 
-  const todayBadge = getDutyBadgeDetails(todayStatus);
+  const getTodayBadge = () => {
+    const loggedStatus = attendanceMap[DASHBOARD_TODAY];
+    if (loggedStatus) {
+      return getDutyBadgeDetails(loggedStatus, DASHBOARD_TODAY);
+    }
+    const scheduledShift = getShiftForDate(DASHBOARD_TODAY) || 'R';
+    const code = scheduledShift.toUpperCase();
+    
+    if (code === 'R') {
+      return { label: 'WEEKLY REST DAY (R)', bg: 'bg-slate-100 text-slate-700 border-slate-200 font-bold' };
+    } else if (code === 'N' || code === 'P/N') {
+      return { label: 'ON DUTY (Night Shift - N)', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold' };
+    } else if (code === 'M') {
+      return { label: 'ON DUTY (Morning Shift - M)', bg: 'bg-sky-50 text-sky-700 border-sky-200 font-bold' };
+    } else if (code === 'E') {
+      return { label: 'ON DUTY (Evening Shift - E)', bg: 'bg-orange-50 text-orange-700 border-orange-200 font-bold' };
+    } else if (code === 'G' || code === 'P') {
+      return { label: 'ON DUTY (General Shift - G)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold' };
+    } else {
+      return { label: `ON DUTY (Shift: ${code})`, bg: 'bg-blue-50 text-blue-700 border-blue-200 font-bold' };
+    }
+  };
+
+  const todayBadge = getTodayBadge();
 
   const renderScheduleCard = () => {
     const sched = employee?.weekly_schedule as any;
@@ -529,84 +664,65 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     const isRotating4Week = type === 'rotating';
     const isRotating3Week = type === 'rotating-3week';
     const isFlexible = type === 'flexible';
-    const isSimple = !isRotating4Week && !isRotating3Week && !isFlexible;
+    const isCustomRotation = type === 'custom-rotation';
+    const isSimple = type === 'simple';
 
     const anchorDate = sched.anchor_date || '2026-06-01';
     const weekdays = getWeekdaysStartingFrom(anchorDate);
 
-    // Dynamic shift calculation helpers for preview
-    const getBaseRotatingShiftForDate = (s: any, dateStr: string) => {
-      if (!s) return null;
-      if (s.type === 'flexible') return null;
 
-      if (s.type === 'custom-rotation') {
-        const pattern = s.pattern || [];
-        if (pattern.length === 0) return null;
-        const anchorStr = s.anchor_date || '2026-06-01';
-        const anchor = new Date(anchorStr);
-        const target = new Date(dateStr);
-        anchor.setHours(0,0,0,0);
-        target.setHours(0,0,0,0);
-        const diffTime = target.getTime() - anchor.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-        
-        const cycleLength = pattern.length;
-        const cycleDay = ((diffDays % cycleLength) + cycleLength) % cycleLength;
-        return pattern[cycleDay] || null;
-      }
 
-      if (s.type !== 'rotating' && s.type !== 'rotating-3week') {
-        const date = new Date(dateStr);
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-        return s[dayOfWeek] || null;
-      }
+    // Cycle Start Date and Length Calculations
+    const todayObj = new Date(DASHBOARD_TODAY);
+    todayObj.setHours(0,0,0,0);
 
-      const anchorStr = s.anchor_date || '2026-06-01';
-      const anchor = new Date(anchorStr);
-      const target = new Date(dateStr);
-
-      anchor.setHours(0, 0, 0, 0);
-      target.setHours(0, 0, 0, 0);
-
-      const diffTime = target.getTime() - anchor.getTime();
+    let cycleStartDateStr = anchorDate;
+    let cycleLength = 7;
+    
+    if (type === 'rotating-3week') {
+      cycleLength = 21;
+    } else if (type === 'rotating') {
+      cycleLength = 28;
+    } else if (type === 'custom-rotation') {
+      cycleLength = sched.pattern?.length || 7;
+    }
+    
+    const anchor = new Date(anchorDate);
+    anchor.setHours(0,0,0,0);
+    
+    if (!isNaN(anchor.getTime()) && todayObj.getTime() >= anchor.getTime()) {
+      const diffTime = todayObj.getTime() - anchor.getTime();
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      const cycleNum = Math.floor(diffDays / cycleLength);
+      const cycleStart = new Date(anchor.getTime() + cycleNum * cycleLength * 24 * 60 * 60 * 1000);
+      cycleStartDateStr = `${cycleStart.getFullYear()}-${String(cycleStart.getMonth() + 1).padStart(2, '0')}-${String(cycleStart.getDate()).padStart(2, '0')}`;
+    } else if (type === 'simple') {
+      // Find current Monday
+      const currentMonday = new Date(todayObj);
+      const day = currentMonday.getDay();
+      const diff = currentMonday.getDate() - day + (day === 0 ? -6 : 1);
+      currentMonday.setDate(diff);
+      cycleStartDateStr = `${currentMonday.getFullYear()}-${String(currentMonday.getMonth() + 1).padStart(2, '0')}-${String(currentMonday.getDate()).padStart(2, '0')}`;
+    }
 
-      if (s.type === 'rotating-3week') {
-        const cycleDay = ((diffDays % 21) + 21) % 21;
-        const weekNum = Math.floor(cycleDay / 7) + 1;
-        const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-        const wk = `week${weekNum}`;
-        return s[wk]?.[dayOfWeek] || null;
-      } else {
-        const cycleDay = ((diffDays % 28) + 28) % 28;
-        const weekNum = Math.floor(cycleDay / 7) + 1;
-        const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-        const wk = `week${weekNum}`;
-        return s[wk]?.[dayOfWeek] || null;
-      }
-    };
+    const numWeeks = type === 'simple'
+      ? 1
+      : type === 'rotating-3week'
+      ? 3
+      : type === 'rotating'
+      ? 4
+      : type === 'custom-rotation'
+      ? Math.ceil(cycleLength / 7)
+      : 0;
 
-    const getShiftForDate = (dateStr: string) => {
-      if (!sched) return null;
-      const overrides = sched.custom_night_weeks;
-      if (Array.isArray(overrides)) {
-        const override = overrides.find(w => dateStr >= w.from_date && dateStr <= w.to_date);
-        if (override) {
-          const baseShift = getBaseRotatingShiftForDate(sched, dateStr);
-          if (baseShift === 'R') return 'R';
-          return override.shift || 'N';
-        }
-      }
-      return getBaseRotatingShiftForDate(sched, dateStr);
-    };
-
-    const renderDayPill = (dayName: string, shift: string) => {
+    const renderDayPillWithDate = (dayName: string, dateStr: string, shift: string, isToday: boolean) => {
       const code = (shift || 'R').toUpperCase();
       let bgClass = '';
       let icon = null;
       let shiftLabel = '';
       let textClass = 'text-white font-extrabold';
       let weekdayClass = 'text-white/90 font-black';
+      let dateClass = 'text-white/80 font-semibold text-[8px] mt-0.5';
       let iconColor = 'text-white';
 
       if (code === 'N' || code === 'P/N') {
@@ -635,13 +751,29 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         shiftLabel = code;
       }
 
+      const dateObj = new Date(dateStr);
+      const formattedDate = isNaN(dateObj.getTime()) ? '' : dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
       return (
-        <div key={dayName} className={`flex flex-col items-center justify-between py-2 px-1 rounded-xl border border-transparent text-center transition hover:scale-[1.06] hover:shadow-md select-none ${bgClass}`}>
-          <span className={`text-[8.5px] uppercase tracking-wider mb-1.5 ${weekdayClass}`}>{dayName.substring(0, 3)}</span>
-          <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center mb-1.5 shrink-0">
+        <div 
+          key={dateStr} 
+          className={`flex flex-col items-center justify-between py-2 px-1 rounded-xl border text-center transition hover:scale-[1.06] hover:shadow-md select-none relative ${bgClass} ${
+            isToday 
+              ? 'ring-4 ring-yellow-400 ring-offset-1 shadow-lg border-yellow-350 scale-[1.04]' 
+              : 'border-transparent'
+          }`}
+        >
+          {isToday && (
+            <span className="absolute -top-2.5 bg-yellow-400 text-slate-900 text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs animate-bounce">
+              Today
+            </span>
+          )}
+          <span className={`text-[8.5px] uppercase tracking-wider font-black ${weekdayClass}`}>{dayName.substring(0, 3)}</span>
+          <span className={dateClass}>{formattedDate}</span>
+          <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center my-1.5 shrink-0">
             {icon}
           </div>
-          <span className={`text-[9px] tracking-tight leading-none truncate w-full ${textClass}`} title={shiftLabel}>{shiftLabel}</span>
+          <span className={`text-[9.5px] tracking-tight leading-none truncate w-full ${textClass}`} title={shiftLabel}>{shiftLabel}</span>
         </div>
       );
     };
@@ -747,7 +879,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               Edit Pattern
             </button>
             <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 text-[9px] font-black uppercase tracking-wider">
-              {isFlexible ? 'Flexible' : isSimple ? 'Simple Weekly' : isRotating3Week ? '3-Week Cycle' : '4-Week Cycle'}
+              {isFlexible ? 'Flexible' : isSimple ? 'Simple Weekly' : isCustomRotation ? 'Rule Cycle' : isRotating3Week ? '3-Week Cycle' : '4-Week Cycle'}
             </span>
           </div>
         </div>
@@ -764,48 +896,57 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         )}
 
-        {isSimple && (
-          <div className="space-y-3">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Standard Weekly Roster</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                const shift = sched[day] || sched[day.toLowerCase()] || 'R';
-                return renderDayPill(day, shift);
-              })}
-            </div>
-          </div>
-        )}
-
-        {(isRotating4Week || isRotating3Week) && (
+        {!isFlexible && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs font-semibold text-slate-500">
               <div>
-                Roster Cycle: <span className="font-extrabold text-blue-600">{isRotating3Week ? '3-Week Rotating (21-Day HOER)' : '4-Week Rotating (28-Day HOER)'}</span>
+                {type === 'custom-rotation' ? (
+                  <span>Roster Rule: <span className="font-extrabold text-blue-605">{sched.rule_name}</span></span>
+                ) : (
+                  <span>Roster Cycle: <span className="font-extrabold text-blue-605">{
+                    type === 'simple' ? 'Simple Weekly' : type === 'rotating-3week' ? '3-Week Rotating (21-Day HOER)' : '4-Week Rotating (28-Day HOER)'
+                  }</span></span>
+                )}
               </div>
-              <div>
-                Anchor Date: <span className="font-mono font-extrabold text-slate-800">{new Date(anchorDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              </div>
+              {type !== 'simple' && (
+                <div>
+                  Anchor Date: <span className="font-mono font-extrabold text-slate-800">{new Date(anchorDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {['week1', 'week2', 'week3', ...(isRotating4Week ? ['week4'] : [])].map((wkKey, wkIdx) => {
-                const weekData = sched[wkKey] || {};
+              {Array.from({ length: numWeeks }).map((_, wkIdx) => {
+                const weekStart = new Date(cycleStartDateStr);
+                weekStart.setDate(weekStart.getDate() + wkIdx * 7);
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                
+                const weekRangeStr = `${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+                
                 return (
-                  <div key={wkKey} className="border border-slate-200 rounded-2xl p-4.5 bg-white flex flex-col space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group hover:border-[#00c2b2]/40">
+                  <div key={wkIdx} className="border border-slate-200 rounded-2xl p-4.5 bg-white flex flex-col space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group hover:border-[#00c2b2]/40">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#00c2b2] to-blue-500 opacity-80"></div>
                     <div className="text-xs font-black text-slate-800 border-b border-slate-100 pb-2.5 flex justify-between items-center pl-1.5">
                       <span className="flex items-center gap-1.5 text-[13px] font-black text-slate-850">
                         <CalendarDays size={14} className="text-[#00c2b2]" />
                         Week {wkIdx + 1}
                       </span>
-                      <span className="text-[8px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        Roster Phase {wkIdx + 1}
+                      <span className="text-[9px] font-black text-blue-650 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {weekRangeStr}
                       </span>
                     </div>
                     <div className="grid grid-cols-7 gap-1.5">
-                      {weekdays.map(day => {
-                        const shift = weekData[day] || weekData[day.toLowerCase()] || 'R';
-                        return renderDayPill(day, shift);
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((dayName, dayIdx) => {
+                        const dayDate = new Date(weekStart);
+                        dayDate.setDate(dayDate.getDate() + dayIdx);
+                        const dayDateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+                        
+                        // Get the shift for this date
+                        const shift = getShiftForDate(dayDateStr) || 'R';
+                        const isToday = dayDateStr === DASHBOARD_TODAY;
+                        
+                        return renderDayPillWithDate(dayName, dayDateStr, shift, isToday);
                       })}
                     </div>
                   </div>
@@ -897,9 +1038,14 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               <span className="flex items-center gap-1.5">
                 <span className="font-extrabold text-blue-600">{new Date(lastDuty.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 <span>—</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${lastDuty.status === 'P/N' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                  {lastDuty.status === 'P/N' ? 'Night Shift (P/N)' : 'General Shift (P)'}
-                </span>
+                {(() => {
+                  const details = getLastWorkedShiftLabel(lastDuty.status, lastDuty.date);
+                  return (
+                    <span className={details.bg}>
+                      {details.label}
+                    </span>
+                  );
+                })()}
               </span>
             ) : (
               <span className="text-slate-400 font-semibold italic">No previous duty logs in this period.</span>
