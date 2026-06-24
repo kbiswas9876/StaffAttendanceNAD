@@ -55,7 +55,9 @@ import {
   getWeeklyScheduleDefault,
   reorderEmployees,
   getCRLedger,
-  CRLedgerEntry
+  CRLedgerEntry,
+  getRosterRules,
+  RosterRule
 } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
 
@@ -119,7 +121,9 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
   // Edit schedule states
   const [isScheduleEditOpen, setIsScheduleEditOpen] = useState(false);
-  const [scheduleType, setScheduleType] = useState<'simple' | 'rotating' | 'rotating-3week' | 'flexible'>('simple');
+  const [scheduleType, setScheduleType] = useState<'simple' | 'rotating' | 'rotating-3week' | 'flexible' | 'custom-rotation'>('simple');
+  const [rosterRules, setRosterRules] = useState<RosterRule[]>([]);
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null);
   const [empRestDay, setEmpRestDay] = useState('Wednesday');
   const [empAnchorDate, setEmpAnchorDate] = useState('2026-06-01');
   const [empWeeklySchedule, setEmpWeeklySchedule] = useState<{ [day: string]: string }>({});
@@ -199,6 +203,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         week4: getWeeklyScheduleDefault(employee.default_rest_day),
       });
       setCustomNightWeeks(sched.custom_night_weeks || []);
+    } else if (sched && sched.type === 'custom-rotation') {
+      setScheduleType('custom-rotation');
+      setEmpAnchorDate(sched.anchor_date || '2026-06-01');
+      const matchedRule = rosterRules.find(r => r.name === sched.rule_name);
+      setSelectedRuleId(matchedRule ? matchedRule.id : null);
+      setCustomNightWeeks(sched.custom_night_weeks || []);
     } else if (sched && sched.type === 'flexible') {
       setScheduleType('flexible');
       setEmpAnchorDate('2026-06-01');
@@ -227,6 +237,18 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const handleUpdateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employee) return;
+
+    if (scheduleType === 'custom-rotation') {
+      if (!selectedRuleId) {
+        alert("Please select a roster rotation rule.");
+        return;
+      }
+      if (!empAnchorDate) {
+        alert("Please select an anchor date.");
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     const weeklySchedulePayload = scheduleType === 'simple'
@@ -249,15 +271,29 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             week3: rotatingSchedule.week3,
             custom_night_weeks: customNightWeeks
           }
-          : {
-            type: 'rotating',
-            anchor_date: empAnchorDate,
-            week1: rotatingSchedule.week1,
-            week2: rotatingSchedule.week2,
-            week3: rotatingSchedule.week3,
-            week4: rotatingSchedule.week4,
-            custom_night_weeks: customNightWeeks
-          };
+          : scheduleType === 'custom-rotation'
+            ? (() => {
+                const matchedRule = rosterRules.find(r => r.id === Number(selectedRuleId));
+                if (!matchedRule) {
+                  throw new Error("Selected roster rule not found.");
+                }
+                return {
+                  type: 'custom-rotation',
+                  rule_name: matchedRule.name,
+                  anchor_date: empAnchorDate,
+                  pattern: matchedRule.pattern.split(','),
+                  custom_night_weeks: customNightWeeks
+                };
+              })()
+            : {
+              type: 'rotating',
+              anchor_date: empAnchorDate,
+              week1: rotatingSchedule.week1,
+              week2: rotatingSchedule.week2,
+              week3: rotatingSchedule.week3,
+              week4: rotatingSchedule.week4,
+              custom_night_weeks: customNightWeeks
+            };
 
     try {
       await updateEmployee({
@@ -279,6 +315,12 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const loadProfileData = async () => {
     setLoading(true);
     try {
+      try {
+        const rules = await getRosterRules();
+        setRosterRules(rules);
+      } catch (ruleErr) {
+        console.error("Failed to load roster rules in profile view", ruleErr);
+      }
       const emp = await getEmployeeById(empId);
       if (!emp) {
         setEmployee(null);
@@ -496,6 +538,22 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     const getBaseRotatingShiftForDate = (s: any, dateStr: string) => {
       if (!s) return null;
       if (s.type === 'flexible') return null;
+
+      if (s.type === 'custom-rotation') {
+        const pattern = s.pattern || [];
+        if (pattern.length === 0) return null;
+        const anchorStr = s.anchor_date || '2026-06-01';
+        const anchor = new Date(anchorStr);
+        const target = new Date(dateStr);
+        anchor.setHours(0,0,0,0);
+        target.setHours(0,0,0,0);
+        const diffTime = target.getTime() - anchor.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        
+        const cycleLength = pattern.length;
+        const cycleDay = ((diffDays % cycleLength) + cycleLength) % cycleLength;
+        return pattern[cycleDay] || null;
+      }
 
       if (s.type !== 'rotating' && s.type !== 'rotating-3week') {
         const date = new Date(dateStr);
@@ -1226,8 +1284,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
             <form onSubmit={handleUpdateSchedule} className="p-5 space-y-4 text-xs font-bold text-slate-700">
               <div className="space-y-1">
                 <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Schedule Type</label>
-                <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
-                  {(['simple', 'rotating-3week', 'rotating', 'flexible'] as const).map(type => (
+                <div className="grid grid-cols-5 gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                  {([ 'simple', 'rotating-3week', 'rotating', 'flexible', 'custom-rotation' ] as const).map(type => (
                     <button
                       key={type}
                       type="button"
@@ -1243,14 +1301,63 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       {type === 'rotating-3week' && '3-Week'}
                       {type === 'rotating' && '4-Week'}
                       {type === 'flexible' && 'Flexible'}
+                      {type === 'custom-rotation' && 'Rule'}
                     </button>
                   ))}
                 </div>
               </div>
 
               {scheduleType === 'flexible' && (
-                <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg text-slate-600 text-[10px] font-semibold leading-relaxed">
+                <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg text-slate-655 text-[10px] font-semibold leading-relaxed">
                   <strong>Flexible / No Fixed Roster Mode:</strong> This employee (e.g. SSE/JE/IC) does not follow a strict weekly or rotating duty cycle. Shift rules will be left blank by default in the attendance sheet and can be manually inputted.
+                </div>
+              )}
+
+              {scheduleType === 'custom-rotation' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Rotation Rule</label>
+                      <select
+                        value={selectedRuleId || ''}
+                        onChange={(e) => setSelectedRuleId(e.target.value ? Number(e.target.value) : null)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                        required
+                      >
+                        <option value="">-- Select Rule --</option>
+                        {rosterRules.map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
+                      <input 
+                        type="date"
+                        value={empAnchorDate}
+                        onChange={(e) => setEmpAnchorDate(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                        required
+                      />
+                    </div>
+                  </div>
+                  {selectedRuleId && (() => {
+                    const r = rosterRules.find(rule => rule.id === Number(selectedRuleId));
+                    if (!r) return null;
+                    return (
+                      <div className="p-3.5 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 text-[10px]">
+                        <div className="flex justify-between items-center text-slate-500 font-bold uppercase tracking-wider">
+                          <span>Rule Pattern Details</span>
+                          <span className="text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
+                            {r.pattern.split(',').length} Days Cycle
+                          </span>
+                        </div>
+                        <p className="text-slate-700 font-bold leading-normal font-mono break-all bg-white/70 p-2 rounded-lg border border-slate-100">
+                          {r.pattern}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1262,7 +1369,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       type="date"
                       value={empAnchorDate}
                       onChange={(e) => setEmpAnchorDate(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
                       required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
                     />
                   </div>
@@ -1272,7 +1379,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 </div>
               )}
 
-              {scheduleType !== 'flexible' && (
+              {scheduleType !== 'flexible' && scheduleType !== 'custom-rotation' && (
                 <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   {scheduleType === 'simple' ? (
                     <div className="space-y-1">

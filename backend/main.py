@@ -666,6 +666,23 @@ def init_db():
         );
     """)
     conn.commit()
+
+    # Create roster_rules table and seed default KKVS rotation rule
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS roster_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            pattern TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    cursor.execute("SELECT COUNT(*) FROM roster_rules")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO roster_rules (name, pattern)
+            VALUES (?, ?)
+        """, ("3-Week Rotating (KKVS)", "E,E,E,E,E,E,E,R,M,M,M,M,N,N,N,N,N,N,N,R,R"))
+    conn.commit()
         
     conn.close()
 
@@ -705,6 +722,10 @@ class ShiftRuleSchema(BaseModel):
     working_days: List[str]
     is_night_duty: bool
     duty_type: Optional[str] = None
+
+class RosterRuleSchema(BaseModel):
+    name: str
+    pattern: str
 
 class AttendanceCodeSchema(BaseModel):
     code: str
@@ -1228,6 +1249,52 @@ def delete_shift_rule(rule_id: int):
         conn.commit()
         log_audit("Delete", "Shift Rules", f"Deleted shift rule {existing['shift_code']} (ID: {rule_id})")
         return {"status": "success"}
+    finally:
+        conn.close()
+
+# 4.5. Roster Rules
+@app.get("/api/roster-rules")
+def read_roster_rules():
+    conn = get_db()
+    try:
+        rules = [dict(row) for row in conn.execute("SELECT * FROM roster_rules ORDER BY name").fetchall()]
+        return rules
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.post("/api/roster-rules")
+def add_roster_rule(payload: RosterRuleSchema):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO roster_rules (name, pattern)
+            VALUES (?, ?)
+        """, (payload.name, payload.pattern))
+        conn.commit()
+        log_audit("Insert", "Roster Rules", f"Added roster rule {payload.name}")
+        return {"id": cursor.lastrowid, **payload.dict()}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Roster rule name already exists.")
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/roster-rules/{rule_id}")
+def delete_roster_rule(rule_id: int):
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM roster_rules WHERE id = ?", (rule_id,))
+        conn.commit()
+        log_audit("Delete", "Roster Rules", f"Deleted roster rule ID {rule_id}")
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 

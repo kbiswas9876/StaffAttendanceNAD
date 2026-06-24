@@ -35,6 +35,13 @@ export interface Employee {
         week4: { [day: string]: string };
         custom_night_weeks?: { from_date: string; to_date: string; shift?: string }[];
       }
+    | {
+        type: 'custom-rotation';
+        rule_name: string;
+        anchor_date: string;
+        pattern: string[];
+        custom_night_weeks?: { from_date: string; to_date: string; shift?: string }[];
+      }
     | { [day: string]: string };
   display_order?: number;
   basic_pay?: number;
@@ -549,6 +556,30 @@ export const saveTABill = async (bill: TABill): Promise<{ id: number; status: st
 
 export const deleteTABill = async (id: number): Promise<void> => {
   await apiFetch<any>(`/ta-bills/${id}`, {
+    method: "DELETE"
+  });
+};
+
+export interface RosterRule {
+  id: number;
+  name: string;
+  pattern: string;
+  created_at?: string;
+}
+
+export const getRosterRules = async (): Promise<RosterRule[]> => {
+  return apiFetch<RosterRule[]>("/roster-rules");
+};
+
+export const createRosterRule = async (rule: { name: string; pattern: string }): Promise<RosterRule> => {
+  return apiFetch<RosterRule>("/roster-rules", {
+    method: "POST",
+    body: JSON.stringify(rule)
+  });
+};
+
+export const deleteRosterRule = async (id: number): Promise<void> => {
+  await apiFetch<any>(`/roster-rules/${id}`, {
     method: "DELETE"
   });
 };

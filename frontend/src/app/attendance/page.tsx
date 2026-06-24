@@ -117,6 +117,22 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
   if (!sched) return null;
   if (sched.type === 'flexible') return null;
 
+  if (sched.type === 'custom-rotation') {
+    const pattern = sched.pattern || [];
+    if (pattern.length === 0) return null;
+    const anchorStr = sched.anchor_date || '2026-06-01';
+    const anchor = new Date(anchorStr);
+    const target = new Date(dateStr);
+    anchor.setHours(0,0,0,0);
+    target.setHours(0,0,0,0);
+    const diffTime = target.getTime() - anchor.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    const cycleLength = pattern.length;
+    const cycleDay = ((diffDays % cycleLength) + cycleLength) % cycleLength;
+    return pattern[cycleDay] || null;
+  }
+
   if (sched.type !== 'rotating' && sched.type !== 'rotating-3week') {
     const date = new Date(dateStr);
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });

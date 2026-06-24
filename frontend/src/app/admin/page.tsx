@@ -38,7 +38,8 @@ import {
   getBackupsList, createBackup, restoreBackup, getBackupStatus, deleteBackup,
   getAttendanceLogs, saveAttendanceLogsBulk, addSpecialEvent,
   getWeeklyScheduleDefault, getAppVersion,
-  triggerUpdateDownload, getUpdateDownloadStatus
+  triggerUpdateDownload, getUpdateDownloadStatus,
+  getRosterRules, createRosterRule, deleteRosterRule, RosterRule
 } from '../../lib/api';
 
 interface DayInfo {
@@ -51,6 +52,22 @@ interface DayInfo {
 const getBaseRotatingShift = (sched: any, dateStr: string) => {
   if (!sched) return null;
   if (sched.type === 'flexible') return null;
+
+  if (sched.type === 'custom-rotation') {
+    const pattern = sched.pattern || [];
+    if (pattern.length === 0) return null;
+    const anchorStr = sched.anchor_date || '2026-06-01';
+    const anchor = new Date(anchorStr);
+    const target = new Date(dateStr);
+    anchor.setHours(0,0,0,0);
+    target.setHours(0,0,0,0);
+    const diffTime = target.getTime() - anchor.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    const cycleLength = pattern.length;
+    const cycleDay = ((diffDays % cycleLength) + cycleLength) % cycleLength;
+    return pattern[cycleDay] || null;
+  }
 
   if (sched.type !== 'rotating' && sched.type !== 'rotating-3week') {
     const date = new Date(dateStr);
@@ -183,7 +200,7 @@ const monthsList = [
 ];
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates' | 'settings'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates' | 'settings' | 'roster-rules'>('employees');
   const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
   const [mySection, setMySection] = useState('KKVS');
   const [loading, setLoading] = useState(true);
@@ -213,6 +230,7 @@ export default function AdminPanel() {
   const [backups, setBackups] = useState<string[]>([]);
   const [backupStatus, setBackupStatus] = useState<{ integrity: string; last_backup: string; database_size_bytes: number } | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [rosterRules, setRosterRules] = useState<RosterRule[]>([]);
 
   // Search/Filters states
   const [empSearchQuery, setEmpSearchQuery] = useState('');
@@ -239,8 +257,11 @@ export default function AdminPanel() {
   const [empLevel, setEmpLevel] = useState(1);
   const [empSection, setEmpSection] = useState('KKVS');
   const [empRestDay, setEmpRestDay] = useState('Wednesday');
-  const [scheduleType, setScheduleType] = useState<'simple' | 'rotating' | 'rotating-3week' | 'flexible'>('simple');
+  const [scheduleType, setScheduleType] = useState<'simple' | 'rotating' | 'rotating-3week' | 'flexible' | 'custom-rotation'>('simple');
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null);
+  const [ruleName, setRuleName] = useState('');
+  const [rulePattern, setRulePattern] = useState('');
   const [empWeeklySchedule, setEmpWeeklySchedule] = useState<{ [day: string]: string }>(getWeeklyScheduleDefault('Wednesday'));
   const [rotatingSchedule, setRotatingSchedule] = useState<{
     week1: { [day: string]: string };
@@ -468,6 +489,13 @@ export default function AdminPanel() {
       
       const aLogs = await getAuditLogs();
       setAuditLogs(aLogs);
+
+      try {
+        const rules = await getRosterRules();
+        setRosterRules(rules);
+      } catch (ruleErr) {
+        console.error("Failed to load roster rules", ruleErr);
+      }
       
       const rulesList: ShiftRule[] = [];
       for (const sec of storedSections) {
@@ -543,6 +571,17 @@ export default function AdminPanel() {
       return;
     }
 
+    if (scheduleType === 'custom-rotation') {
+      if (!selectedRuleId) {
+        showToast("Please select a roster rotation rule.", "error");
+        return;
+      }
+      if (!empAnchorDate) {
+        showToast("Please select an anchor date.", "error");
+        return;
+      }
+    }
+
     const sectionObj = sections.find(s => s.section_code === empSection);
     
     const weeklySchedulePayload = scheduleType === 'simple' 
@@ -565,6 +604,20 @@ export default function AdminPanel() {
           week3: rotatingSchedule.week3,
           custom_night_weeks: customNightWeeks
         }
+      : scheduleType === 'custom-rotation'
+      ? (() => {
+          const matchedRule = rosterRules.find(r => r.id === Number(selectedRuleId));
+          if (!matchedRule) {
+            throw new Error("Selected roster rule not found.");
+          }
+          return {
+            type: 'custom-rotation',
+            rule_name: matchedRule.name,
+            anchor_date: empAnchorDate,
+            pattern: matchedRule.pattern.split(','),
+            custom_night_weeks: customNightWeeks
+          };
+        })()
       : {
           type: 'rotating',
           anchor_date: empAnchorDate,
@@ -675,6 +728,13 @@ export default function AdminPanel() {
         week4: getWeeklyScheduleDefault(emp.default_rest_day),
       });
       setCustomNightWeeks((sched as any).custom_night_weeks || []);
+    } else if (sched && (sched as any).type === 'custom-rotation') {
+      setScheduleType('custom-rotation');
+      setEmpAnchorDate((sched as any).anchor_date || '2026-06-01');
+      // Set selectedRuleId based on rule name match
+      const matchedRule = rosterRules.find(r => r.name === (sched as any).rule_name);
+      setSelectedRuleId(matchedRule ? matchedRule.id : null);
+      setCustomNightWeeks((sched as any).custom_night_weeks || []);
     } else if (sched && (sched as any).type === 'flexible') {
       setScheduleType('flexible');
       setEmpAnchorDate('2026-06-01');
@@ -710,6 +770,7 @@ export default function AdminPanel() {
     setOverrideFrom('');
     setOverrideTo('');
     setOverrideShift('N');
+    setSelectedRuleId(null);
     setEmpWeeklySchedule(getWeeklyScheduleDefault('Wednesday'));
     setRotatingSchedule({
       week1: getWeeklyScheduleDefault('Wednesday'),
@@ -731,6 +792,50 @@ export default function AdminPanel() {
     } catch (err) {
       showToast("Failed to delete employee.", "error");
       console.error(err);
+    }
+  };
+
+  const handleAddRosterRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ruleName.trim() || !rulePattern.trim()) {
+      showToast("Please provide both rule name and pattern.", "error");
+      return;
+    }
+
+    const cleanPattern = rulePattern
+      .split(',')
+      .map(s => s.trim().toUpperCase())
+      .filter(Boolean)
+      .join(',');
+
+    if (!cleanPattern) {
+      showToast("Please provide a valid comma-separated pattern.", "error");
+      return;
+    }
+
+    try {
+      await createRosterRule({ name: ruleName.trim(), pattern: cleanPattern });
+      showToast("Roster rotation rule saved successfully!", "success");
+      setRuleName('');
+      setRulePattern('');
+      loadAdminData();
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to create roster rule.", "error");
+    }
+  };
+
+  const handleDeleteRosterRule = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this roster rotation rule? Existing employees using it will keep their current schedule settings, but you won't be able to select this rule for new or edited employees.")) {
+      return;
+    }
+    try {
+      await deleteRosterRule(id);
+      showToast("Roster rotation rule deleted successfully.", "success");
+      loadAdminData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to delete roster rotation rule.", "error");
     }
   };
 
@@ -1307,7 +1412,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs navigation grid */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-10 gap-2 border-b border-slate-200 pb-3">
+      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-2 border-b border-slate-200 pb-3">
         {[
           { id: 'employees', label: 'Enroll & Transfer', icon: Users },
           { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
@@ -1318,7 +1423,8 @@ export default function AdminPanel() {
           { id: 'backups', label: 'DB Backups', icon: Database },
           { id: 'audit', label: 'Audit Logs', icon: History },
           { id: 'updates', label: 'System Update', icon: RefreshCw },
-          { id: 'settings', label: getTranslation(lang, 'My Section'), icon: Settings }
+          { id: 'settings', label: getTranslation(lang, 'My Section'), icon: Settings },
+          { id: 'roster-rules', label: 'Roster Settings', icon: Sliders }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1536,234 +1642,6 @@ export default function AdminPanel() {
                         </div>
                       )}
                     </div>
-
-                    {/* Schedule Configuration Modal */}
-                    {isScheduleModalOpen && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
-                        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
-                          <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                              <CalendarDays size={16} className="text-blue-600" />
-                              Roster Schedule Configuration
-                            </h3>
-                            <button 
-                              type="button"
-                              onClick={() => setIsScheduleModalOpen(false)} 
-                              className="text-slate-400 hover:text-slate-650 font-bold text-sm transition"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          
-                          <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
-                            <div className="space-y-1">
-                              <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Schedule Type</label>
-                              <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
-                                {(['simple', 'rotating-3week', 'rotating', 'flexible'] as const).map(type => (
-                                  <button
-                                    key={type}
-                                    type="button"
-                                    onClick={() => {
-                                      setScheduleType(type);
-                                      if (type === 'rotating-3week' && activeRotatingWeek === 'week4') {
-                                        setActiveRotatingWeek('week1');
-                                      }
-                                    }}
-                                    className={`py-1.5 rounded text-[8px] font-extrabold uppercase transition-all duration-200 text-center ${scheduleType === type ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-800'}`}
-                                  >
-                                    {type === 'simple' && '1-Week'}
-                                    {type === 'rotating-3week' && '3-Week'}
-                                    {type === 'rotating' && '4-Week'}
-                                    {type === 'flexible' && 'Flexible'}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {scheduleType === 'flexible' && (
-                              <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg text-slate-600 text-[10px] font-semibold leading-relaxed">
-                                <strong>Flexible / No Fixed Roster Mode:</strong> This employee (e.g. SSE/JE/IC) does not follow a strict weekly or rotating duty cycle. Shift rules will be left blank by default in the attendance sheet and can be manually inputted.
-                              </div>
-                            )}
-
-                            {(scheduleType === 'rotating' || scheduleType === 'rotating-3week') && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
-                                  <input 
-                                    type="date"
-                                    value={empAnchorDate}
-                                    onChange={(e) => setEmpAnchorDate(e.target.value)}
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
-                                    required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
-                                  />
-                                </div>
-                                <div className="flex items-end text-[9px] text-slate-500 italic pb-2 font-medium">
-                                  This anchor date determines when "Week 1" cycle begins.
-                                </div>
-                              </div>
-                            )}
-
-                            {scheduleType !== 'flexible' && (
-                              <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                                {scheduleType === 'simple' ? (
-                                  <div className="space-y-1">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Days Shift Settings</span>
-                                    <div className="grid grid-cols-4 gap-2">
-                                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                                        <div key={day} className="flex flex-col gap-0.5">
-                                          <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                                          <select
-                                            value={empWeeklySchedule[day] || 'G'}
-                                            onChange={(e) => setEmpWeeklySchedule(prev => ({
-                                              ...prev,
-                                              [day]: e.target.value
-                                            }))}
-                                            className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                                          >
-                                            <option value="G">G (Gen)</option>
-                                            <option value="M">M (Morn)</option>
-                                            <option value="E">E (Eve)</option>
-                                            <option value="N">N (Night)</option>
-                                            <option value="R">R (Rest)</option>
-                                          </select>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    {/* Week Tabs */}
-                                    <div className="flex gap-1 border-b border-slate-200 pb-1">
-                                      {(scheduleType === 'rotating-3week' ? ['week1', 'week2', 'week3'] : ['week1', 'week2', 'week3', 'week4']).map(wk => (
-                                        <button
-                                          key={wk}
-                                          type="button"
-                                          onClick={() => setActiveRotatingWeek(wk as any)}
-                                          className={`px-3 py-1 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
-                                        >
-                                          {wk.replace('week', 'W')}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-4 gap-2">
-                                      {getWeekdaysStartingFrom(empAnchorDate).map(day => (
-                                        <div key={day} className="flex flex-col gap-0.5">
-                                          <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                                          <select
-                                            value={rotatingSchedule[activeRotatingWeek]?.[day] || 'G'}
-                                            onChange={(e) => setRotatingSchedule(prev => ({
-                                              ...prev,
-                                              [activeRotatingWeek]: {
-                                                ...prev[activeRotatingWeek],
-                                                [day]: e.target.value
-                                              }
-                                            }))}
-                                            className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                                          >
-                                            <option value="G">G (Gen)</option>
-                                            <option value="M">M (Morn)</option>
-                                            <option value="E">E (Eve)</option>
-                                            <option value="N">N (Night)</option>
-                                            <option value="R">R (Rest)</option>
-                                          </select>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Custom Night Weeks (Override) */}
-                            <div className="border-t border-slate-100 pt-3 space-y-2">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Custom Schedule Overrides</span>
-                              <div className="grid grid-cols-4 gap-1.5 items-end">
-                                <div>
-                                  <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">From Date</label>
-                                  <input 
-                                    type="date"
-                                    value={overrideFrom}
-                                    onChange={(e) => setOverrideFrom(e.target.value)}
-                                    className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">To Date</label>
-                                  <input 
-                                    type="date"
-                                    value={overrideTo}
-                                    onChange={(e) => setOverrideTo(e.target.value)}
-                                    className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">Override Shift</label>
-                                  <select
-                                    value={overrideShift}
-                                    onChange={(e) => setOverrideShift(e.target.value)}
-                                    className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
-                                  >
-                                    <option value="N">N (Night)</option>
-                                    <option value="E">E (Eve)</option>
-                                    <option value="G">G (Gen)</option>
-                                    <option value="M">M (Morn)</option>
-                                  </select>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!overrideFrom || !overrideTo) {
-                                      alert("Please select both start and end dates.");
-                                      return;
-                                    }
-                                    if (overrideFrom > overrideTo) {
-                                      alert("Start date cannot be after end date.");
-                                      return;
-                                    }
-                                    setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo, shift: overrideShift }]);
-                                    setOverrideFrom('');
-                                    setOverrideTo('');
-                                    setOverrideShift('N');
-                                  }}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer"
-                                >
-                                  Add Override
-                                </button>
-                              </div>
-
-                              {customNightWeeks.length > 0 && (
-                                <div className="max-h-24 overflow-y-auto bg-slate-100 border border-slate-200 rounded-lg p-2 space-y-1">
-                                  {customNightWeeks.map((w, index) => (
-                                    <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-200/50 pb-0.5">
-                                      <span>{w.from_date} to {w.to_date} ({w.shift || 'N'})</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => setCustomNightWeeks(prev => prev.filter((_, idx) => idx !== index))}
-                                        className="text-red-500 hover:text-red-700 font-extrabold cursor-pointer bg-transparent border-none"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-150 flex justify-end gap-2 text-xs">
-                              <button 
-                                type="button" 
-                                onClick={() => setIsScheduleModalOpen(false)} 
-                                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 font-bold transition cursor-pointer"
-                              >
-                                Apply & Close
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     <div className="pt-2 flex justify-end gap-2.5">
                       {editingEmployeeId !== null && (
@@ -3212,6 +3090,378 @@ export default function AdminPanel() {
                   <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed font-semibold">
                     Choosing a section here sets it as your default "My Section". The ERP will load this section by default on startup.
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'roster-rules' && (
+            <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-scale-up">
+              {/* Form Column */}
+              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
+                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+                  <PlusCircle size={15} className="text-blue-600" />
+                  Define Roster Rotation Rule
+                </h3>
+                <form onSubmit={handleAddRosterRule} className="space-y-4 text-xs font-bold text-slate-600">
+                  <div>
+                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Rule Name</label>
+                    <input 
+                      type="text" 
+                      value={ruleName}
+                      onChange={(e) => setRuleName(e.target.value)}
+                      placeholder="e.g. KKVS Rotating Cycle"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Rotation Pattern (Comma-Separated)</label>
+                    <textarea 
+                      value={rulePattern}
+                      onChange={(e) => setRulePattern(e.target.value)}
+                      placeholder="e.g. E,E,E,E,E,E,E,R,M,M,M,M,N,N,N,N,N,N,N,R,R"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-805 focus:outline-none focus:border-blue-500 font-mono h-24 resize-none uppercase"
+                      required
+                    />
+                    <p className="text-[9.5px] text-slate-400 mt-1 leading-normal font-semibold">
+                      Input shift symbols separated by commas. Valid symbols: G (General), M (Morning), E (Evening), N (Night), R (Rest).
+                    </p>
+                  </div>
+                  <div className="pt-2 flex justify-end">
+                    <button 
+                      type="submit" 
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px] cursor-pointer shadow-sm font-bold flex items-center gap-1.5"
+                    >
+                      <Save size={13} />
+                      Save Rule
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Roster Rules List Column */}
+              <div className="lg:col-span-2 glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-4">
+                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+                  <Sliders size={15} className="text-blue-600" />
+                  Roster Rotation Rules List
+                </h3>
+                {rosterRules.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 font-semibold text-xs">
+                    No roster rotation rules registered yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-455 uppercase tracking-widest text-[9.5px]">
+                          <th className="py-2 px-3">Rule Name</th>
+                          <th className="py-2 px-3">Pattern</th>
+                          <th className="py-2 px-3 text-center">Cycle Length</th>
+                          <th className="py-2 px-3 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rosterRules.map(rule => (
+                          <tr key={rule.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-3 font-extrabold text-slate-800">{rule.name}</td>
+                            <td className="py-3 px-3 font-mono font-bold text-slate-600 break-all select-all">
+                              {rule.pattern}
+                            </td>
+                            <td className="py-3 px-3 text-center font-bold text-blue-650">
+                              {rule.pattern.split(',').length} Days
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <button
+                                onClick={() => handleDeleteRosterRule(rule.id)}
+                                className="text-red-500 hover:text-red-700 font-bold bg-transparent border-none cursor-pointer p-1"
+                                title="Delete Rule"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Schedule Configuration Modal (Relocated to root level for viewport centering and backdrop blur) */}
+          {isScheduleModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40 animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <CalendarDays size={16} className="text-blue-600" />
+                    Roster Schedule Configuration
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={() => setIsScheduleModalOpen(false)} 
+                    className="text-slate-400 hover:text-slate-650 font-bold text-sm transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Schedule Type</label>
+                    <div className="grid grid-cols-5 gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                      {([ 'simple', 'rotating-3week', 'rotating', 'flexible', 'custom-rotation' ] as const).map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setScheduleType(type);
+                            if (type === 'rotating-3week' && activeRotatingWeek === 'week4') {
+                              setActiveRotatingWeek('week1');
+                            }
+                          }}
+                          className={`py-1.5 rounded text-[8px] font-extrabold uppercase transition-all duration-200 text-center ${scheduleType === type ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                          {type === 'simple' && '1-Week'}
+                          {type === 'rotating-3week' && '3-Week'}
+                          {type === 'rotating' && '4-Week'}
+                          {type === 'flexible' && 'Flexible'}
+                          {type === 'custom-rotation' && 'Rule'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {scheduleType === 'flexible' && (
+                    <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg text-slate-650 text-[10px] font-semibold leading-relaxed">
+                      <strong>Flexible / No Fixed Roster Mode:</strong> This employee (e.g. SSE/JE/IC) does not follow a strict weekly or rotating duty cycle. Shift rules will be left blank by default in the attendance sheet and can be manually inputted.
+                    </div>
+                  )}
+
+                  {scheduleType === 'custom-rotation' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Rotation Rule</label>
+                          <select
+                            value={selectedRuleId || ''}
+                            onChange={(e) => setSelectedRuleId(e.target.value ? Number(e.target.value) : null)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                            required
+                          >
+                            <option value="">-- Select Rule --</option>
+                            {rosterRules.map(r => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
+                          <input 
+                            type="date"
+                            value={empAnchorDate}
+                            onChange={(e) => setEmpAnchorDate(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                            required
+                          />
+                        </div>
+                      </div>
+                      {selectedRuleId && (() => {
+                        const r = rosterRules.find(rule => rule.id === Number(selectedRuleId));
+                        if (!r) return null;
+                        return (
+                          <div className="p-3.5 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 text-[10px]">
+                            <div className="flex justify-between items-center text-slate-500 font-bold uppercase tracking-wider">
+                              <span>Rule Pattern Details</span>
+                              <span className="text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
+                                {r.pattern.split(',').length} Days Cycle
+                              </span>
+                            </div>
+                            <p className="text-slate-700 font-bold leading-normal font-mono break-all bg-white/70 p-2 rounded-lg border border-slate-100">
+                              {r.pattern}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {(scheduleType === 'rotating' || scheduleType === 'rotating-3week') && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
+                        <input 
+                          type="date"
+                          value={empAnchorDate}
+                          onChange={(e) => setEmpAnchorDate(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                          required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
+                        />
+                      </div>
+                      <div className="flex items-end text-[9px] text-slate-500 italic pb-2 font-medium">
+                        This anchor date determines when "Week 1" cycle begins.
+                      </div>
+                    </div>
+                  )}
+
+                  {scheduleType !== 'flexible' && scheduleType !== 'custom-rotation' && (
+                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      {scheduleType === 'simple' ? (
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Days Shift Settings</span>
+                          <div className="grid grid-cols-4 gap-2">
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                              <div key={day} className="flex flex-col gap-0.5">
+                                <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
+                                <select
+                                  value={empWeeklySchedule[day] || 'G'}
+                                  onChange={(e) => setEmpWeeklySchedule(prev => ({
+                                    ...prev,
+                                    [day]: e.target.value
+                                  }))}
+                                  className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                                >
+                                  <option value="G">G (Gen)</option>
+                                  <option value="M">M (Morn)</option>
+                                  <option value="E">E (Eve)</option>
+                                  <option value="N">N (Night)</option>
+                                  <option value="R">R (Rest)</option>
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Week Tabs */}
+                          <div className="flex gap-1 border-b border-slate-200 pb-1">
+                            {(scheduleType === 'rotating-3week' ? ['week1', 'week2', 'week3'] : ['week1', 'week2', 'week3', 'week4']).map(wk => (
+                              <button
+                                key={wk}
+                                type="button"
+                                onClick={() => setActiveRotatingWeek(wk as any)}
+                                className={`px-3 py-1 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
+                              >
+                                {wk.replace('week', 'W')}
+                              </button>
+                            ))}
+                          </div>
+                          
+                          <div className="grid grid-cols-4 gap-2">
+                            {getWeekdaysStartingFrom(empAnchorDate).map(day => (
+                              <div key={day} className="flex flex-col gap-0.5">
+                                <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
+                                <select
+                                  value={rotatingSchedule[activeRotatingWeek]?.[day] || 'G'}
+                                  onChange={(e) => setRotatingSchedule(prev => ({
+                                    ...prev,
+                                    [activeRotatingWeek]: {
+                                      ...prev[activeRotatingWeek],
+                                      [day]: e.target.value
+                                    }
+                                  }))}
+                                  className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                                >
+                                  <option value="G">G (Gen)</option>
+                                  <option value="M">M (Morn)</option>
+                                  <option value="E">E (Eve)</option>
+                                  <option value="N">N (Night)</option>
+                                  <option value="R">R (Rest)</option>
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Custom Night Weeks (Override) */}
+                  <div className="border-t border-slate-100 pt-3 space-y-2">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Custom Schedule Overrides</span>
+                    <div className="grid grid-cols-4 gap-1.5 items-end">
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">From Date</label>
+                        <input 
+                          type="date"
+                          value={overrideFrom}
+                          onChange={(e) => setOverrideFrom(e.target.value)}
+                          className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">To Date</label>
+                        <input 
+                          type="date"
+                          value={overrideTo}
+                          onChange={(e) => setOverrideTo(e.target.value)}
+                          className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">Override Shift</label>
+                        <select
+                          value={overrideShift}
+                          onChange={(e) => setOverrideShift(e.target.value)}
+                          className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
+                        >
+                          <option value="N">N (Night)</option>
+                          <option value="E">E (Eve)</option>
+                          <option value="G">G (Gen)</option>
+                          <option value="M">M (Morn)</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!overrideFrom || !overrideTo) {
+                            alert("Please select both start and end dates.");
+                            return;
+                          }
+                          if (overrideFrom > overrideTo) {
+                            alert("Start date cannot be after end date.");
+                            return;
+                          }
+                          setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo, shift: overrideShift }]);
+                          setOverrideFrom('');
+                          setOverrideTo('');
+                          setOverrideShift('N');
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer"
+                      >
+                        Add Override
+                      </button>
+                    </div>
+
+                    {customNightWeeks.length > 0 && (
+                      <div className="max-h-24 overflow-y-auto bg-slate-100 border border-slate-200 rounded-lg p-2 space-y-1">
+                        {customNightWeeks.map((w, index) => (
+                          <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-200/50 pb-0.5">
+                            <span>{w.from_date} to {w.to_date} ({w.shift || 'N'})</span>
+                            <button
+                              type="button"
+                              onClick={() => setCustomNightWeeks(prev => prev.filter((_, idx) => idx !== index))}
+                              className="text-red-500 hover:text-red-700 font-extrabold cursor-pointer bg-transparent border-none"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-150 flex justify-end gap-2 text-xs">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsScheduleModalOpen(false)} 
+                      className="px-4 py-2 border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 font-bold transition cursor-pointer"
+                    >
+                      Apply & Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
