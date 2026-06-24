@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Users, 
-  Moon, 
-  Database, 
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  Moon,
+  Database,
   Info,
   ShieldCheck,
   ChevronRight,
@@ -46,7 +46,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
   const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
+
   const [lines, setLines] = useState<MetroLine[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -175,7 +175,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
   useEffect(() => {
     if (employees.length === 0) return;
-    
+
     // Check localStorage first
     const savedId = localStorage.getItem(`erp_active_in_charge_${activeSection}`);
     if (savedId) {
@@ -251,7 +251,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         const mySec = localStorage.getItem('erp_my_section') || 'KKVS';
         setActiveSection(mySec);
         localStorage.setItem('erp_active_section', mySec);
-        
+
         // Set selected line based on saved section
         const matchingSec = storedSections.find(s => s.section_code === mySec);
         if (matchingSec) {
@@ -287,7 +287,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const root = document.documentElement;
-      
+
       const themeColorsMap: { [key: string]: { activeBg: string; activeText: string; iconBg: string; iconGlow: string; dotColor: string; accentText: string; activeBorder: string } } = {
         indigo: {
           activeBg: '#f5f7ff',
@@ -354,7 +354,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       else if (theme.activeBg.includes('slate')) colorKey = 'slate';
 
       const selected = themeColorsMap[colorKey];
-      
+
       // Fallback/Dynamic generator logic for custom line colors from DB
       const currentSectionObj = sections.find(s => s.section_code === activeSection);
       const currentLineObj = lines.find(l => l.id === currentSectionObj?.line_id);
@@ -533,7 +533,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
   ];
 
   // Filtering for command palette search
-  const filteredEmployees = paletteSearch.trim() === '' ? [] : employees.filter(emp => 
+  const filteredEmployees = paletteSearch.trim() === '' ? [] : employees.filter(emp =>
     emp.name.toLowerCase().includes(paletteSearch.toLowerCase()) ||
     emp.pf_number.includes(paletteSearch) ||
     emp.designation.toLowerCase().includes(paletteSearch.toLowerCase())
@@ -541,22 +541,22 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
   return (
     <div className={`flex h-screen bg-[#FAF9F6] text-[#191919] overflow-hidden ${lang === 'bn' ? 'lang-bn' : ''}`}>
-      
+
       {/* Sidebar navigation */}
-      <aside 
-        className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out bg-white text-slate-800 border-r border-slate-200/50 flex flex-col z-20 no-print shadow-xs`}
+      <aside
+        className={`${isSidebarOpen ? 'w-64' : 'w-20'
+          } shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out bg-white text-slate-800 border-r border-slate-200/50 flex flex-col z-20 no-print shadow-xs`}
       >
         {/* Branding header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 overflow-hidden">
           {isSidebarOpen ? (
             <>
               <div className="flex items-center gap-2.5 min-w-0 animate-in fade-in duration-200">
-                <svg className={`w-8 h-8 rounded-xl bg-gradient-to-br ${theme.logoBg} text-white p-1.5 shadow-md ${theme.iconGlow} shrink-0 select-none ring-2 ${theme.accentRing}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9h15M14 5l4 4-4 4" />
-                  <path d="M21 15H6M10 11l-4 4 4 4" />
-                </svg>
+                <img
+                  src="/image.png"
+                  alt="Metro Rail Logo"
+                  className={`w-12 h-12 rounded-xl object-contain bg-white p-1 shadow-sm shrink-0 select-none ring-2 ${theme.accentRing}`}
+                />
                 <div className="flex flex-col min-w-0">
                   <span className="text-[13px] font-black tracking-wider text-slate-900 font-sans truncate leading-none uppercase">{getTranslation(lang, 'SIGNAL DEPT.')}</span>
                   <span className={`text-[9px] font-extrabold ${theme.accentText} tracking-widest uppercase font-mono mt-1 truncate leading-none`}>
@@ -564,7 +564,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   </span>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => handleToggleSidebar(false)}
                 className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-850 transition cursor-pointer shrink-0 ml-1"
               >
@@ -572,7 +572,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
               </button>
             </>
           ) : (
-            <button 
+            <button
               onClick={() => handleToggleSidebar(true)}
               className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-800 transition cursor-pointer mx-auto animate-in fade-in duration-200"
             >
@@ -589,32 +589,28 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
               <Link
                 key={item.path}
                 href={item.path}
-                className={`flex items-center p-2 rounded-xl text-sm font-extrabold transition-colors duration-200 group cursor-pointer select-none relative ${
-                  isActive 
-                    ? `${theme.activeBg} ${theme.activeText} shadow-xs` 
-                    : 'text-slate-655 hover:bg-[#EFEDE6]/70 hover:text-slate-900'
-                }`}
+                className={`flex items-center p-2 rounded-xl text-sm font-extrabold transition-colors duration-200 group cursor-pointer select-none relative ${isActive
+                  ? `${theme.activeBg} ${theme.activeText} shadow-xs`
+                  : 'text-slate-655 hover:bg-[#EFEDE6]/70 hover:text-slate-900'
+                  }`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-250 ${
-                  isActive 
-                    ? `${theme.iconBg} text-white shadow-sm ${theme.iconGlow}` 
-                    : 'bg-slate-200/50 text-slate-500 group-hover:bg-slate-300/60 group-hover:text-slate-800'
-                }`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-250 ${isActive
+                  ? `${theme.iconBg} text-white shadow-sm ${theme.iconGlow}`
+                  : 'bg-slate-200/50 text-slate-500 group-hover:bg-slate-300/60 group-hover:text-slate-800'
+                  }`}>
                   <item.icon size={16} className="transition-transform duration-250 group-hover:scale-105" />
                 </div>
-                <span className={`overflow-hidden whitespace-nowrap ${
-                  isSidebarOpen 
-                    ? 'opacity-100 max-w-[155px] ml-3.5 transition-all duration-200 ease-in-out delay-75' 
-                    : 'opacity-0 max-w-0 ml-0 transition-none'
-                }`}>
+                <span className={`overflow-hidden whitespace-nowrap ${isSidebarOpen
+                  ? 'opacity-100 max-w-[155px] ml-3.5 transition-all duration-200 ease-in-out delay-75'
+                  : 'opacity-0 max-w-0 ml-0 transition-none'
+                  }`}>
                   {getTranslation(lang, item.name)}
                 </span>
                 {isActive && (
-                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full ${theme.dotColor} animate-pulse ${
-                    isSidebarOpen 
-                      ? 'opacity-100 transition-opacity duration-200 delay-75' 
-                      : 'opacity-0 pointer-events-none transition-none'
-                  }`}></span>
+                  <span className={`absolute right-3.5 w-1.5 h-1.5 rounded-full ${theme.dotColor} animate-pulse ${isSidebarOpen
+                    ? 'opacity-100 transition-opacity duration-200 delay-75'
+                    : 'opacity-0 pointer-events-none transition-none'
+                    }`}></span>
                 )}
               </Link>
             );
@@ -623,14 +619,14 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
       </aside>
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden bg-[#FAF9F6]">
-        
+
         {/* Top Header Bar */}
         <header className="h-16 bg-white border-b border-[#E2E0D9] flex items-center justify-between px-6 z-10 shadow-sm no-print">
           <div className="flex items-center gap-4">
             <h1 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider hidden lg:block">
               {getTranslation(lang, 'S&T STAFF OPERATIONS ERP')}
             </h1>
-            
+
             {/* Dynamic Active Line & Section selector tabs */}
             <div className="flex items-center gap-3">
               {lines.length > 0 && (
@@ -663,25 +659,23 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 {sections
                   .filter(s => s.line_id === selectedLineId)
                   .map((sec) => (
-                    <button 
+                    <button
                       key={sec.section_code}
                       onClick={() => handleSectionChange(sec.section_code)}
-                      className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${
-                        activeSection === sec.section_code 
-                          ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}` 
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
-                      }`}
+                      className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${activeSection === sec.section_code
+                        ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}`
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
+                        }`}
                     >
                       {sec.section_code}
                     </button>
                   ))}
-                <button 
+                <button
                   onClick={() => handleSectionChange('ALL')}
-                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${
-                    activeSection === 'ALL' 
-                      ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}` 
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-205/35'
-                  }`}
+                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${activeSection === 'ALL'
+                    ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}`
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-205/35'
+                    }`}
                 >
                   {getTranslation(lang, 'Joint View')}
                 </button>
@@ -697,11 +691,11 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                     if (lineSections.length === 0) return null;
                     return (
                       <div key={line.id} className="flex items-center gap-2 border-r border-slate-100 pr-3.5 last:border-r-0 mr-1 shrink-0">
-                        <span 
-                          className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs leading-none shrink-0" 
-                          style={{ 
-                            backgroundColor: line.color_code || '#64748B', 
-                            color: '#FFFFFF' 
+                        <span
+                          className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs leading-none shrink-0"
+                          style={{
+                            backgroundColor: line.color_code || '#64748B',
+                            color: '#FFFFFF'
                           }}
                         >
                           {line.line_name.replace(' Line', '')}
@@ -710,11 +704,11 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                           {lineSections.map((sec) => {
                             const isChecked = selectedJoinSections.includes(sec.section_code);
                             return (
-                              <label 
-                                key={sec.section_code} 
+                              <label
+                                key={sec.section_code}
                                 className="flex items-center gap-1 cursor-pointer text-[10.5px] font-black text-slate-750 hover:text-slate-900 select-none transition-colors"
                               >
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={() => toggleJoinSection(sec.section_code)}
@@ -735,7 +729,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
           <div className="flex items-center gap-3">
             {/* Quick Search and Command Palette Button */}
-            <button 
+            <button
               onClick={() => setIsPaletteOpen(true)}
               className="flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-250/60 shadow-2xs transition cursor-pointer"
             >
@@ -748,7 +742,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             </button>
 
             {/* Help Button */}
-            <Link 
+            <Link
               href="/help"
               className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-extrabold text-slate-650 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-250/60 shadow-2xs transition cursor-pointer"
             >
@@ -759,7 +753,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             {/* Language Flag Dropdown */}
             <div className="relative flex items-center border border-slate-250/60 bg-slate-50 hover:bg-slate-100/90 rounded-xl shadow-2xs transition-colors select-none">
               <span className="pl-2.5 text-xs">🇮🇳</span>
-              <select 
+              <select
                 className="bg-transparent border-none text-[10px] font-black text-slate-605 pl-1.5 pr-6 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wide"
                 value={lang}
                 onChange={(e) => {
@@ -780,7 +774,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
             {/* Notification Bell Dropdown wrapper */}
             <div className="relative" ref={notificationsRef}>
-              <button 
+              <button
                 onClick={() => {
                   setIsNotificationsOpen(!isNotificationsOpen);
                   setHasUnreadNotifications(false);
@@ -799,8 +793,8 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-30 overflow-hidden text-xs">
                   <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                     <span className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">{getTranslation(lang, 'Operational Alerts')}</span>
-                    <button 
-                      onClick={() => setNotifications([])} 
+                    <button
+                      onClick={() => setNotifications([])}
                       className={`text-[9px] font-bold ${theme.accentText} hover:underline cursor-pointer`}
                     >
                       {getTranslation(lang, 'Clear All')}
@@ -825,8 +819,8 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                     )}
                   </div>
                   <div className="p-2 border-t border-slate-100 bg-slate-50 text-center">
-                    <Link 
-                      href="/admin" 
+                    <Link
+                      href="/admin"
                       onClick={() => setIsNotificationsOpen(false)}
                       className="text-[10px] font-extrabold text-slate-500 hover:text-slate-800 tracking-wider uppercase"
                     >
@@ -839,7 +833,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
             {/* User Profile Dropdown */}
             <div className="relative pl-2 border-l border-slate-200" ref={profileDropdownRef}>
-              <button 
+              <button
                 onClick={() => setIsProfileDropdownOpen(prev => !prev)}
                 className="flex items-center gap-2.5 text-left hover:opacity-85 transition focus:outline-none cursor-pointer animate-in fade-in duration-200"
               >
@@ -859,7 +853,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{getTranslation(lang, 'Active Section In-Charge')}</span>
                     <span className="text-xs font-extrabold text-slate-700 mt-0.5 block">{getTranslation(lang, 'Section')}: {activeSection}</span>
                   </div>
-                  
+
                   <div className="max-h-48 overflow-y-auto">
                     {eligibleInCharges.length === 0 ? (
                       <div className="px-4 py-3 text-center text-xs text-slate-400 font-bold">
@@ -870,9 +864,8 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                         <button
                           key={emp.emp_id}
                           onClick={() => selectInCharge(emp)}
-                          className={`w-full text-left px-4 py-2 hover:bg-slate-50 transition text-xs flex flex-col gap-0.5 cursor-pointer ${
-                            activeInCharge?.emp_id === emp.emp_id ? `${theme.activeBg} ${theme.activeText} border-l-2 ${theme.activeBorder}` : 'text-slate-750 hover:text-slate-900'
-                          }`}
+                          className={`w-full text-left px-4 py-2 hover:bg-slate-50 transition text-xs flex flex-col gap-0.5 cursor-pointer ${activeInCharge?.emp_id === emp.emp_id ? `${theme.activeBg} ${theme.activeText} border-l-2 ${theme.activeBorder}` : 'text-slate-750 hover:text-slate-900'
+                            }`}
                         >
                           <span className="font-extrabold">{emp.name}</span>
                           <span className="text-[9px] text-slate-400 uppercase tracking-wider">{emp.designation}</span>
@@ -889,22 +882,22 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         {/* Command Palette Modal Overlay */}
         {isPaletteOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex justify-center z-50 pt-20 no-print">
-            <div 
-              ref={paletteRef} 
+            <div
+              ref={paletteRef}
               className="bg-white border border-[#E2E0D9] w-full max-w-xl h-max max-h-[70vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
             >
               {/* Search Bar Input */}
               <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-200">
                 <Search size={18} className="text-slate-400 shrink-0" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={paletteSearch}
                   onChange={(e) => setPaletteSearch(e.target.value)}
                   placeholder="Search staff names, designations, actions, pages..."
                   className="w-full text-sm font-bold text-slate-800 placeholder-slate-400 bg-transparent border-none focus:outline-none"
                   autoFocus
                 />
-                <button 
+                <button
                   onClick={() => setIsPaletteOpen(false)}
                   className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
                 >
@@ -961,7 +954,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 ) : (
                   <div>
                     <span className="text-[10px] font-extrabold tracking-wider text-slate-400 uppercase px-2">SEARCH RESULTS</span>
-                    
+
                     {filteredEmployees.length === 0 ? (
                       <p className="text-center py-6 text-xs text-slate-400 font-bold">
                         No employees or designations match your search.
@@ -992,7 +985,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   </div>
                 )}
               </div>
-              
+
               {/* Palette Footer */}
               <div className="bg-slate-50 px-4 py-2 border-t border-slate-200 flex items-center justify-between text-[10px] font-bold text-slate-400">
                 <span>Use Arrow keys or Mouse. Enter to choose.</span>

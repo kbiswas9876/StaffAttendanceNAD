@@ -5,7 +5,7 @@ import subprocess
 from PIL import Image
 
 def convert_png_to_ico():
-    png_path = "ChatGPT Image Jun 14, 2026, 10_42_04 PM.png"
+    png_path = "image.png"
     ico_path = "icon.ico"
     
     print(f"Checking for source image: {png_path}...")
