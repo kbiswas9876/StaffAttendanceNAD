@@ -57,7 +57,8 @@ import {
   getCRLedger,
   CRLedgerEntry,
   getRosterRules,
-  RosterRule
+  RosterRule,
+  parseLocalDate
 } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
 
@@ -71,7 +72,7 @@ const getWeekdaysStartingFrom = (anchorDateStr: string) => {
   const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   if (!anchorDateStr) return defaultDays;
   try {
-    const date = new Date(anchorDateStr);
+    const date = parseLocalDate(anchorDateStr);
     if (isNaN(date.getTime())) return defaultDays;
     const startDay = date.toLocaleDateString('en-US', { weekday: 'long' });
     const startIndex = defaultDays.indexOf(startDay);
@@ -505,8 +506,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       const pattern = s.pattern || [];
       if (pattern.length === 0) return null;
       const anchorStr = s.anchor_date || '2026-06-01';
-      const anchor = new Date(anchorStr);
-      const target = new Date(dateStr);
+      const anchor = parseLocalDate(anchorStr);
+      const target = parseLocalDate(dateStr);
       anchor.setHours(0,0,0,0);
       target.setHours(0,0,0,0);
       const diffTime = target.getTime() - anchor.getTime();
@@ -518,14 +519,14 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     }
 
     if (s.type !== 'rotating' && s.type !== 'rotating-3week') {
-      const date = new Date(dateStr);
+      const date = parseLocalDate(dateStr);
       const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
       return s[dayOfWeek] || null;
     }
 
     const anchorStr = s.anchor_date || '2026-06-01';
-    const anchor = new Date(anchorStr);
-    const target = new Date(dateStr);
+    const anchor = parseLocalDate(anchorStr);
+    const target = parseLocalDate(dateStr);
 
     anchor.setHours(0, 0, 0, 0);
     target.setHours(0, 0, 0, 0);
@@ -673,7 +674,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
 
     // Cycle Start Date and Length Calculations
-    const todayObj = new Date(DASHBOARD_TODAY);
+    const todayObj = parseLocalDate(DASHBOARD_TODAY);
     todayObj.setHours(0,0,0,0);
 
     let cycleStartDateStr = anchorDate;
@@ -687,7 +688,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       cycleLength = sched.pattern?.length || 7;
     }
     
-    const anchor = new Date(anchorDate);
+    const anchor = parseLocalDate(anchorDate);
     anchor.setHours(0,0,0,0);
     
     if (!isNaN(anchor.getTime()) && todayObj.getTime() >= anchor.getTime()) {
@@ -937,7 +938,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       </span>
                     </div>
                     <div className="grid grid-cols-7 gap-1.5">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((dayName, dayIdx) => {
+                      {weekdays.map((dayName, dayIdx) => {
                         const dayDate = new Date(weekStart);
                         dayDate.setDate(dayDate.getDate() + dayIdx);
                         const dayDateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;

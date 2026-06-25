@@ -34,7 +34,8 @@ import {
   deleteAttendanceLogsRange,
   createBackup,
   getSections,
-  Section
+  Section,
+  parseLocalDate
 } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
 
@@ -121,8 +122,8 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
     const pattern = sched.pattern || [];
     if (pattern.length === 0) return null;
     const anchorStr = sched.anchor_date || '2026-06-01';
-    const anchor = new Date(anchorStr);
-    const target = new Date(dateStr);
+    const anchor = parseLocalDate(anchorStr);
+    const target = parseLocalDate(dateStr);
     anchor.setHours(0,0,0,0);
     target.setHours(0,0,0,0);
     const diffTime = target.getTime() - anchor.getTime();
@@ -134,14 +135,14 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
   }
 
   if (sched.type !== 'rotating' && sched.type !== 'rotating-3week') {
-    const date = new Date(dateStr);
+    const date = parseLocalDate(dateStr);
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     return sched[dayOfWeek] || null;
   }
 
   const anchorStr = sched.anchor_date || '2026-06-01';
-  const anchor = new Date(anchorStr);
-  const target = new Date(dateStr);
+  const anchor = parseLocalDate(anchorStr);
+  const target = parseLocalDate(dateStr);
 
   anchor.setHours(0,0,0,0);
   target.setHours(0,0,0,0);

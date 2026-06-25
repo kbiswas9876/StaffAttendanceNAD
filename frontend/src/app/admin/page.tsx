@@ -39,7 +39,8 @@ import {
   getAttendanceLogs, saveAttendanceLogsBulk, addSpecialEvent,
   getWeeklyScheduleDefault, getAppVersion,
   triggerUpdateDownload, getUpdateDownloadStatus,
-  getRosterRules, createRosterRule, deleteRosterRule, RosterRule
+  getRosterRules, createRosterRule, deleteRosterRule, RosterRule,
+  parseLocalDate
 } from '../../lib/api';
 
 interface DayInfo {
@@ -57,8 +58,8 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
     const pattern = sched.pattern || [];
     if (pattern.length === 0) return null;
     const anchorStr = sched.anchor_date || '2026-06-01';
-    const anchor = new Date(anchorStr);
-    const target = new Date(dateStr);
+    const anchor = parseLocalDate(anchorStr);
+    const target = parseLocalDate(dateStr);
     anchor.setHours(0,0,0,0);
     target.setHours(0,0,0,0);
     const diffTime = target.getTime() - anchor.getTime();
@@ -70,14 +71,14 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
   }
 
   if (sched.type !== 'rotating' && sched.type !== 'rotating-3week') {
-    const date = new Date(dateStr);
+    const date = parseLocalDate(dateStr);
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     return sched[dayOfWeek] || null;
   }
 
   const anchorStr = sched.anchor_date || '2026-06-01';
-  const anchor = new Date(anchorStr);
-  const target = new Date(dateStr);
+  const anchor = parseLocalDate(anchorStr);
+  const target = parseLocalDate(dateStr);
 
   anchor.setHours(0,0,0,0);
   target.setHours(0,0,0,0);
@@ -170,7 +171,7 @@ const getWeekdaysStartingFrom = (anchorDateStr: string) => {
   const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   if (!anchorDateStr) return defaultDays;
   try {
-    const date = new Date(anchorDateStr);
+    const date = parseLocalDate(anchorDateStr);
     if (isNaN(date.getTime())) return defaultDays;
     const startDay = date.toLocaleDateString('en-US', { weekday: 'long' });
     const startIndex = defaultDays.indexOf(startDay);

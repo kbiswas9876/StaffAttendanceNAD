@@ -584,3 +584,18 @@ export const deleteRosterRule = async (id: number): Promise<void> => {
   });
 };
 
+export const parseLocalDate = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  const datePart = dateStr.split(/[ T]/)[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const dt = new Date(y, m, d);
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  return new Date(dateStr);
+};
+
+
