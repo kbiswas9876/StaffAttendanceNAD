@@ -3411,10 +3411,9 @@ def export_ta_bill_excel(id: int):
                     elif any(k in cell.value for k in ["Countersigned", "Signature of Officer", "Controlling Officer", "Head of Office"]):
                         cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
                         if "Signature of Officer" in cell.value:
-                            # Dynamic merge with left cell to prevent clipping
+                            # Merge signature cell with column to its right to prevent clipping without overwriting Head of Office
                             row_idx = cell.row
                             col_idx = cell.column
-                            val = cell.value
                             
                             # Clean conflicting merge ranges
                             for r_range in list(ws.merged_cells.ranges):
@@ -3425,15 +3424,36 @@ def export_ta_bill_excel(id: int):
                                     except Exception:
                                         pass
                             
-                            # Shift content and merge
+                            # Merge current cell with the empty cell to its right (col_idx to col_idx + 1)
+                            ws.merge_cells(start_row=row_idx, start_column=col_idx, end_row=row_idx, end_column=col_idx + 1)
+                            
+                            # Style the merged cell anchor (col_idx)
+                            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
+                            cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+                        elif "Head of Office" in cell.value:
+                            # Merge Head of Office with the column to its left to make room for signature overflow
+                            row_idx = cell.row
+                            col_idx = cell.column
+                            val = cell.value
+                            
+                            # Clean conflicting merge ranges for col_idx - 1
+                            for r_range in list(ws.merged_cells.ranges):
+                                min_col, min_row, max_col, max_row = r_range.bounds
+                                if min_row <= row_idx <= max_row and min_col <= (col_idx - 1) <= max_col:
+                                    try:
+                                        ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+                                    except Exception:
+                                        pass
+                            
+                            # Move value left and merge
                             ws.cell(row=row_idx, column=col_idx - 1).value = val
                             ws.cell(row=row_idx, column=col_idx).value = None
                             ws.merge_cells(start_row=row_idx, start_column=col_idx - 1, end_row=row_idx, end_column=col_idx)
                             
-                            # Style merged cells
+                            # Style new merged cell
                             cell_left = ws.cell(row=row_idx, column=col_idx - 1)
                             cell_left.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
-                            cell_left.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+                            cell_left.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
                         else:
                             cell.alignment = Alignment(horizontal="left", vertical="center")
                     elif "Note:" in cell.value:
@@ -3470,10 +3490,13 @@ def export_ta_bill_excel(id: int):
         raise HTTPException(status_code=500, detail=f"Failed to load TA template: {e}")
         
     journey_type = bill.get("journey_type", "NORMAL")
-    sheet_to_keep = "format" if journey_type == "NORMAL" else "SUBRATA"
+    if journey_type == "NORMAL":
+        sheet_to_keep = "format"
+    else:
+        sheet_to_keep = "SUBRATA1" if "SUBRATA1" in wb.sheetnames else "SUBRATA"
     
     if sheet_to_keep not in wb.sheetnames:
-        raise HTTPException(status_code=500, detail=f"Template sheet '{sheet_to_keep}' not found in workbook.")
+        raise HTTPException(status_code=500, detail=f"Template sheet '{sheet_to_keep}' not found in workbook. Available sheets: {wb.sheetnames}")
         
     ws = wb[sheet_to_keep]
     

@@ -20,7 +20,7 @@ interface NDAStaffRow {
   level: number;
   dates: string;
   section_code: string;
-  rawDates?: { day: number, monthStr: string }[];
+  rawDates?: { day: number, monthStr: string; monthNum?: number }[];
   total_days: number;
   total_hours: number;
   weightage: string;
@@ -269,7 +269,8 @@ export default function NightDutyNDA() {
           const dateObj = new Date(log.date);
           const day = dateObj.getDate();
           const monthStr = dateObj.toLocaleString('en-US', { month: 'short' });
-          return { day, monthStr };
+          const monthNum = dateObj.getMonth() + 1;
+          return { day, monthStr, monthNum };
         });
 
         const total_days = dayNumbers.length;
@@ -469,6 +470,28 @@ export default function NightDutyNDA() {
               <option value={2025} className="bg-white text-slate-800">2025</option>
             </select>
           </div>
+          
+          {/* Dates Format Selector */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-slate-700 no-print select-none">
+            <button
+              type="button"
+              onClick={() => setDatesFormat('simple')}
+              className={`px-3 py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
+                datesFormat === 'simple' ? 'bg-white shadow-xs text-theme-primary' : 'hover:bg-slate-50 text-slate-500'
+              }`}
+            >
+              Simple Dates
+            </button>
+            <button
+              type="button"
+              onClick={() => setDatesFormat('full')}
+              className={`px-3 py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
+                datesFormat === 'full' ? 'bg-white shadow-xs text-theme-primary' : 'hover:bg-slate-50 text-slate-500'
+              }`}
+            >
+              Full Dates (d/m)
+            </button>
+          </div>
 
           {/* Signatories Config Toggle */}
           <button
@@ -493,32 +516,40 @@ export default function NightDutyNDA() {
 
       {/* Signatory Config Panel */}
       {showSigConfig && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-755 select-none">
-          <div className="flex flex-col gap-1.5">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-755 select-none animate-scale-up">
+          <div className="flex flex-col gap-1.5 col-span-1 md:col-span-2">
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Left Signatory (SSE In-Charge)</label>
-            <select
-              value={signatoryLeftName}
-              onChange={(e) => {
-                setSignatoryLeftName(e.target.value);
-                const matched = employees.find(emp => emp.name === e.target.value);
-                if (matched) {
-                  setSignatoryLeftTitle(matched.designation);
-                }
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="">-- Custom/Manual --</option>
-              {employees.map(e => (
-                <option key={e.emp_id} value={e.name}>{e.name} ({e.designation})</option>
-              ))}
-            </select>
-            <input
-              type="text"
-              value={signatoryLeftName}
-              onChange={(e) => setSignatoryLeftName(e.target.value)}
-              placeholder="Type Manual Name..."
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)]"
-            />
+            <div className="flex gap-2">
+              <select
+                value={employees.some(e => e.name === signatoryLeftName) ? signatoryLeftName : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    setSignatoryLeftName(val);
+                    const matched = employees.find(emp => emp.name === val);
+                    if (matched) {
+                      setSignatoryLeftTitle(matched.designation);
+                    }
+                  } else {
+                    setSignatoryLeftName("");
+                    setSignatoryLeftTitle("");
+                  }
+                }}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="">-- Custom/Manual --</option>
+                {employees.map(e => (
+                  <option key={e.emp_id} value={e.name}>{e.name} ({e.designation})</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={signatoryLeftName}
+                onChange={(e) => setSignatoryLeftName(e.target.value)}
+                placeholder="Type Name..."
+                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-theme"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Left Signatory Designation</label>
@@ -527,7 +558,7 @@ export default function NightDutyNDA() {
               value={signatoryLeftTitle}
               onChange={(e) => setSignatoryLeftTitle(e.target.value)}
               placeholder="e.g. SSE/Sig/KKVS/IC"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)]"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-theme"
             />
           </div>
           <div>
@@ -537,7 +568,7 @@ export default function NightDutyNDA() {
               value={signatoryRight}
               onChange={(e) => setSignatoryRight(e.target.value)}
               placeholder="e.g. Dy. CPO"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)]"
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-theme"
             />
           </div>
           <div>
@@ -547,31 +578,8 @@ export default function NightDutyNDA() {
               value={billUnit}
               onChange={(e) => setBillUnit(e.target.value)}
               placeholder="e.g. 2201-806"
-              className="w-full border border-slate-250 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
+              className="w-full border border-slate-250 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus:border-theme font-semibold"
             />
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Dates Format</label>
-            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-slate-700">
-              <button
-                type="button"
-                onClick={() => setDatesFormat('simple')}
-                className={`flex-1 text-center py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
-                  datesFormat === 'simple' ? 'bg-white shadow-xs text-theme-primary' : 'hover:bg-slate-50'
-                }`}
-              >
-                Simple
-              </button>
-              <button
-                type="button"
-                onClick={() => setDatesFormat('full')}
-                className={`flex-1 text-center py-1 rounded-md text-xs font-extrabold transition cursor-pointer ${
-                  datesFormat === 'full' ? 'bg-white shadow-xs text-theme-primary' : 'hover:bg-slate-50'
-                }`}
-              >
-                Full
-              </button>
-            </div>
           </div>
         </div>
       )}
