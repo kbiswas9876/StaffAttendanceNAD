@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Users,
   PlusCircle,
@@ -87,6 +88,11 @@ const getWeekdaysStartingFrom = (anchorDateStr: string) => {
 };
 
 function EmployeeProfile360({ empId, onClose }: ProfileProps) {
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [leaveBank, setLeaveBank] = useState<LeaveBank | null>(null);
   const [attendance, setAttendance] = useState<AttendanceLog[]>([]);
@@ -957,15 +963,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         )}
 
-        {/* Next Scheduled Shifts Preview Panel */}
-        <div className="pt-3 border-t border-slate-150 space-y-2">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Upcoming Shifts Preview</span>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            {formatNextShiftText("Today", today, todayShift)}
-            {formatNextShiftText("Tomorrow", tomorrow, tomorrowShift)}
-            {formatNextShiftText("Day After", dayAfter, dayAfterShift)}
-          </div>
-        </div>
+        {/* Next Scheduled Shifts Preview Panel removed since it is merged into the top timeline */}
 
         <div className="pt-3 border-t border-slate-150">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Custom Schedule Overrides</span>
@@ -986,35 +984,221 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     );
   };
 
+  // Timeline dates and helper configurations
+  const yesterdayObj = new Date(DASHBOARD_TODAY);
+  yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+  const yesterdayStr = `${yesterdayObj.getFullYear()}-${String(yesterdayObj.getMonth() + 1).padStart(2, '0')}-${String(yesterdayObj.getDate()).padStart(2, '0')}`;
+
+  const tomorrowObj = new Date(DASHBOARD_TODAY);
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+  const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, '0')}-${String(tomorrowObj.getDate()).padStart(2, '0')}`;
+
+  const dayAfterObj = new Date(DASHBOARD_TODAY);
+  dayAfterObj.setDate(dayAfterObj.getDate() + 2);
+  const dayAfterStr = `${dayAfterObj.getFullYear()}-${String(dayAfterObj.getMonth() + 1).padStart(2, '0')}-${String(dayAfterObj.getDate()).padStart(2, '0')}`;
+
+  const yesterdayShift = getShiftForDate(yesterdayStr);
+  const todayShift = getShiftForDate(DASHBOARD_TODAY);
+  const tomorrowShift = getShiftForDate(tomorrowStr);
+  const dayAfterShift = getShiftForDate(dayAfterStr);
+
+  const yesterdayStatus = attendanceMap[yesterdayStr] || null;
+  const todayStatusVal = attendanceMap[DASHBOARD_TODAY] || null;
+  const tomorrowStatus = attendanceMap[tomorrowStr] || null;
+  const dayAfterStatus = attendanceMap[dayAfterStr] || null;
+
+  const renderStatusTimelineCard = (
+    label: string,
+    dateStr: string,
+    shift: string | null,
+    isToday: boolean,
+    actualStatus?: string | null
+  ) => {
+    const code = (actualStatus || shift || 'R').toUpperCase();
+    let bgClass = '';
+    let borderClass = 'border-slate-200';
+    let textClass = 'text-slate-800';
+    let iconClass = 'bg-slate-50 text-slate-400 border-slate-100';
+    let shiftText = 'Rest Day';
+    let icon = <Coffee size={16} />;
+    let statusLabel = '';
+
+    if (actualStatus) {
+      if (['CL', 'LAP', 'Sick', 'SCL'].includes(actualStatus)) {
+        bgClass = 'bg-amber-50/50 hover:bg-amber-50';
+        borderClass = 'border-amber-200';
+        textClass = 'text-amber-805';
+        iconClass = 'bg-amber-100 text-amber-600 border-amber-200';
+        shiftText = actualStatus === 'CL' ? 'Casual Leave' : actualStatus === 'LAP' ? 'Average Pay Leave (LAP)' : actualStatus === 'Sick' ? 'Medical Sick' : 'Special Casual Leave';
+        icon = <FileText size={16} />;
+        statusLabel = 'On Leave';
+      } else if (actualStatus === 'CR') {
+        bgClass = 'bg-sky-50/50 hover:bg-sky-50';
+        borderClass = 'border-sky-200';
+        textClass = 'text-sky-800';
+        iconClass = 'bg-sky-100 text-sky-600 border-sky-200';
+        shiftText = 'Compensatory Rest';
+        icon = <Coffee size={16} />;
+        statusLabel = 'Off Duty';
+      } else if (actualStatus === 'R') {
+        bgClass = 'bg-slate-50/50 hover:bg-slate-100';
+        borderClass = 'border-slate-200';
+        textClass = 'text-slate-655';
+        iconClass = 'bg-slate-100 text-slate-500 border-slate-200';
+        shiftText = 'Weekly Rest Day';
+        icon = <Coffee size={16} />;
+        statusLabel = 'Weekly Off';
+      } else if (actualStatus === 'PH') {
+        bgClass = 'bg-yellow-50/50 hover:bg-yellow-50';
+        borderClass = 'border-yellow-250';
+        textClass = 'text-yellow-805';
+        iconClass = 'bg-yellow-100 text-yellow-600 border-yellow-200';
+        shiftText = 'Public Holiday';
+        icon = <Calendar size={16} />;
+        statusLabel = 'Holiday';
+      } else if (actualStatus === 'P' || actualStatus === 'P/N') {
+        const actShift = (shift || 'G').toUpperCase();
+        if (actShift === 'N' || actualStatus === 'P/N') {
+          bgClass = 'bg-purple-50/50 hover:bg-purple-50';
+          borderClass = 'border-purple-200';
+          textClass = 'text-purple-800';
+          iconClass = 'bg-purple-100 text-purple-655 border-purple-200';
+          shiftText = 'Night Shift';
+          icon = <Moon size={16} className="animate-pulse" />;
+          statusLabel = 'On Duty (N)';
+        } else if (actShift === 'M') {
+          bgClass = 'bg-sky-50/50 hover:bg-sky-50';
+          borderClass = 'border-sky-200';
+          textClass = 'text-sky-800';
+          iconClass = 'bg-sky-100 text-sky-605 border-sky-200';
+          shiftText = 'Morning Shift';
+          icon = <Sunrise size={16} />;
+          statusLabel = 'On Duty (M)';
+        } else if (actShift === 'E') {
+          bgClass = 'bg-orange-50/50 hover:bg-orange-50';
+          borderClass = 'border-orange-200';
+          textClass = 'text-orange-850';
+          iconClass = 'bg-orange-100 text-orange-600 border-orange-200';
+          shiftText = 'Evening Shift';
+          icon = <Sunset size={16} />;
+          statusLabel = 'On Duty (E)';
+        } else {
+          bgClass = 'bg-emerald-50/50 hover:bg-emerald-50';
+          borderClass = 'border-emerald-200';
+          textClass = 'text-emerald-800';
+          iconClass = 'bg-emerald-100 text-emerald-600 border-emerald-200';
+          shiftText = 'General Shift';
+          icon = <Sun size={16} />;
+          statusLabel = 'On Duty (G)';
+        }
+      }
+    } else {
+      if (code === 'R') {
+        bgClass = 'bg-slate-50/50 hover:bg-slate-100';
+        borderClass = 'border-slate-200';
+        textClass = 'text-slate-550';
+        iconClass = 'bg-slate-100 text-slate-450 border-slate-200';
+        shiftText = 'Rest Day (Scheduled)';
+        icon = <Coffee size={16} />;
+        statusLabel = 'Rest (Sched)';
+      } else if (code === 'N') {
+        bgClass = 'bg-indigo-50/30 hover:bg-indigo-50/60';
+        borderClass = 'border-indigo-150';
+        textClass = 'text-indigo-800';
+        iconClass = 'bg-indigo-50 text-indigo-650 border-indigo-150';
+        shiftText = 'Night Shift (Scheduled)';
+        icon = <Moon size={16} />;
+        statusLabel = 'Scheduled (N)';
+      } else if (code === 'M') {
+        bgClass = 'bg-sky-50/30 hover:bg-sky-50/60';
+        borderClass = 'border-sky-150';
+        textClass = 'text-sky-800';
+        iconClass = 'bg-sky-50 text-sky-600 border-sky-150';
+        shiftText = 'Morning Shift (Scheduled)';
+        icon = <Sunrise size={16} />;
+        statusLabel = 'Scheduled (M)';
+      } else if (code === 'E') {
+        bgClass = 'bg-orange-50/30 hover:bg-orange-50/60';
+        borderClass = 'border-orange-150';
+        textClass = 'text-orange-855';
+        iconClass = 'bg-orange-55 text-orange-605 border-orange-150';
+        shiftText = 'Evening Shift (Scheduled)';
+        icon = <Sunset size={16} />;
+        statusLabel = 'Scheduled (E)';
+      } else {
+        bgClass = 'bg-emerald-50/30 hover:bg-emerald-50/60';
+        borderClass = 'border-emerald-150';
+        textClass = 'text-emerald-800';
+        iconClass = 'bg-emerald-55 text-emerald-600 border-emerald-150';
+        shiftText = 'General Shift (Scheduled)';
+        icon = <Sun size={16} />;
+        statusLabel = 'Scheduled (G)';
+      }
+    }
+
+    const dateObj = new Date(dateStr);
+    const dateLabel = isNaN(dateObj.getTime()) ? '' : dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+    return (
+      <div 
+        key={dateStr}
+        className={`glass-panel p-4.5 rounded-2xl flex items-center gap-3.5 border transition-all duration-200 relative overflow-hidden shadow-2xs ${bgClass} ${borderClass} ${
+          isToday ? 'ring-4 ring-yellow-400 ring-offset-1 scale-[1.02] shadow-xs border-yellow-350' : ''
+        }`}
+      >
+        {isToday && (
+          <span className="absolute top-2.5 right-3 z-10 bg-yellow-400 text-slate-900 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs animate-pulse">
+            Today
+          </span>
+        )}
+        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs ${iconClass}`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-[9px] font-black text-slate-400 block tracking-widest uppercase leading-none">{label} ({dateLabel})</span>
+          <span className={`text-[12px] font-black mt-1 block truncate leading-tight ${textClass}`}>{shiftText}</span>
+          <span className="text-[9.5px] font-bold text-slate-500 mt-1 block leading-none">{statusLabel}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-3">
+      <div className="glass-panel p-5 rounded-2xl bg-white border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xs">
+        <div className="flex items-center gap-4">
           <button
             onClick={onClose}
-            className="p-2 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 transition cursor-pointer"
+            className="p-2 rounded-xl bg-white hover:bg-theme-active border border-slate-200 hover:border-theme-active text-slate-600 hover:text-theme-primary transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-xs flex items-center justify-center shrink-0 hover:scale-105 active:scale-95"
+            title="Back to Directory"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={18} className="stroke-[3]" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-              {employee.name}
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active font-bold uppercase tracking-wider">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-2xl font-black tracking-tight text-slate-800 leading-tight">
+                {employee.name}
+              </h2>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-theme-active text-theme-primary border border-theme-active/50 text-[10px] font-black tracking-wider uppercase mt-0.5">
                 PF: {employee.pf_number}
               </span>
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {employee.designation} | Section: <strong>{employee.section_code}</strong> | Pay Level: <strong>{employee.level}</strong>
+            </div>
+            <p className="text-xs font-semibold text-slate-500 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-extrabold text-slate-700">{employee.designation}</span>
+              <span className="text-slate-350">•</span>
+              <span>Section: <strong className="text-slate-700">{employee.section_code}</strong></span>
+              <span className="text-slate-350">•</span>
+              <span>Pay Level: <strong className="text-theme-primary">Level {employee.level}</strong></span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-sm font-bold text-slate-800">
-          <Calendar size={15} className="text-slate-500 ml-1" />
+        <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-bold text-slate-700 shadow-2xs">
+          <Calendar size={14} className="text-slate-400 ml-1" />
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="bg-transparent border-none focus:outline-none cursor-pointer"
+            className="bg-transparent border-none focus:outline-none cursor-pointer pr-4 font-extrabold text-slate-800"
           >
             <option value={2026}>2026 Roster Heatmap</option>
             <option value={2025}>2025 Roster Heatmap</option>
@@ -1022,37 +1206,24 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         </div>
       </div>
 
-      {/* Presence & Duty Status Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-        <div className="flex flex-col space-y-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Roster Status Today ({new Date().toLocaleDateString('en-GB').replace(/\//g, '.')})</span>
-          <div className="flex items-center gap-2">
-            <span className={`px-3 py-1.5 rounded-full text-xs font-black border ${todayBadge.bg}`}>
-              {todayBadge.label}
-            </span>
-          </div>
+      {/* Unified Shift Status Timeline Panel */}
+      <div className="space-y-3">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Roster Shift & Duty Status Timeline</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {renderStatusTimelineCard("Yesterday", yesterdayStr, yesterdayShift, false, yesterdayStatus)}
+          {renderStatusTimelineCard("Today", DASHBOARD_TODAY, todayShift, true, todayStatusVal)}
+          {renderStatusTimelineCard("Tomorrow", tomorrowStr, tomorrowShift, false, tomorrowStatus)}
+          {renderStatusTimelineCard("Day After", dayAfterStr, dayAfterShift, false, dayAfterStatus)}
         </div>
-        <div className="flex flex-col space-y-2 border-l border-slate-100 pl-0 md:pl-5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Last Worked Duty Shift</span>
-          <div className="text-xs font-bold text-slate-700">
-            {lastDuty ? (
-              <span className="flex items-center gap-1.5">
-                <span className="font-extrabold text-theme-primary">{new Date(lastDuty.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                <span>—</span>
-                {(() => {
-                  const details = getLastWorkedShiftLabel(lastDuty.status, lastDuty.date);
-                  return (
-                    <span className={details.bg}>
-                      {details.label}
-                    </span>
-                  );
-                })()}
-              </span>
-            ) : (
-              <span className="text-slate-400 font-semibold italic">No previous duty logs in this period.</span>
-            )}
+        {lastDuty && (
+          <div className="text-[10px] font-bold text-slate-500 bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 w-max shadow-2xs flex items-center gap-1.5 ml-1">
+            <Clock size={11} className="text-slate-400" />
+            <span>Last Worked Duty:</span> 
+            <span className="font-mono text-theme-primary font-black">{new Date(lastDuty.date).toLocaleDateString('en-GB')}</span> 
+            <span className="text-slate-350">•</span>
+            <span className="text-slate-700 font-extrabold">{getLastWorkedShiftLabel(lastDuty.status, lastDuty.date).label}</span>
           </div>
-        </div>
+        )}
       </div>
 
       {renderScheduleCard()}
@@ -1328,7 +1499,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         </div>
       </div>
-      {isEditModalOpen && (
+      {isEditModalOpen && isClient && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -1406,9 +1577,10 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-      {isScheduleEditOpen && (
+      {isScheduleEditOpen && isClient && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
             <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -1714,7 +1886,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1722,6 +1895,11 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
 // --- STAFF DIRECTORY MAIN LIST COMPONENT ---
 function StaffDirectory() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [activeSection, setActiveSection] = useState<string>('KKVS');
@@ -2041,7 +2219,7 @@ function StaffDirectory() {
         </div>
       </div>
 
-      {isFormOpen && (
+      {isFormOpen && mounted && createPortal(
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white border border-[#E2E0D9] w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -2141,7 +2319,8 @@ function StaffDirectory() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {toast && (

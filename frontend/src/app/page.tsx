@@ -12,9 +12,16 @@ import {
   ArrowRight,
   TrendingUp,
   UserCheck,
-  CalendarCheck
+  CalendarCheck,
+  Sun,
+  Sunrise,
+  Sunset,
+  Coffee,
+  FileText,
+  Calendar,
+  Clock
 } from 'lucide-react';
-import { getEmployees, getAttendanceLogs, getSpecialEvents, getSections, Employee, AttendanceLog, SpecialEvent } from '../lib/api';
+import { getEmployees, getAttendanceLogs, getSpecialEvents, getSections, Employee, AttendanceLog, SpecialEvent, parseLocalDate } from '../lib/api';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -23,6 +30,15 @@ export default function Dashboard() {
   const [attendance, setAttendance] = useState<AttendanceLog[]>([]);
   const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Availability Checker States
+  const getTodayDateStr = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  };
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
+  const [dateSpecificLogs, setDateSpecificLogs] = useState<AttendanceLog[]>([]);
+  const [dateLogsLoading, setDateLogsLoading] = useState<boolean>(false);
 
   // Dynamically calculate current visual cycle range for dashboard KPI counts
   const { DASHBOARD_START, DASHBOARD_END, DASHBOARD_TODAY } = (() => {
@@ -108,6 +124,113 @@ export default function Dashboard() {
     }
   }, []);
 
+  useEffect(() => {
+    const fetchSpecificDateLogs = async () => {
+      if (!selectedDate) return;
+      
+      // If selectedDate is within DASHBOARD_START and DASHBOARD_END, we filter the pre-loaded attendance in memory
+      if (selectedDate >= DASHBOARD_START && selectedDate <= DASHBOARD_END) {
+        const filtered = attendance.filter(log => log.date === selectedDate);
+        setDateSpecificLogs(filtered);
+        return;
+      }
+
+      // Otherwise, fetch dynamically from DB
+      setDateLogsLoading(true);
+      try {
+        let dayLogs: AttendanceLog[] = [];
+        if (activeSection === 'ALL') {
+          const storedSections = await getSections();
+          for (const sec of storedSections) {
+            try {
+              const logs = await getAttendanceLogs(sec.section_code, selectedDate, selectedDate);
+              dayLogs = [...dayLogs, ...logs];
+            } catch (err) {
+              console.error(`Failed to fetch custom date logs for ${sec.section_code}`, err);
+            }
+          }
+        } else {
+          dayLogs = await getAttendanceLogs(activeSection, selectedDate, selectedDate);
+        }
+        setDateSpecificLogs(dayLogs);
+      } catch (err) {
+        console.error("Failed to load date specific logs", err);
+      } finally {
+        setDateLogsLoading(false);
+      }
+    };
+
+    fetchSpecificDateLogs();
+  }, [selectedDate, attendance, activeSection]);
+
+  // Dynamic shift calculation helpers for checker
+  const getBaseRotatingShiftForDate = (employee: Employee, dateStr: string) => {
+    const s = employee.weekly_schedule as any;
+    if (!s) return null;
+    if (s.type === 'flexible') return null;
+
+    if (s.type === 'custom-rotation') {
+      const pattern = s.pattern || [];
+      if (pattern.length === 0) return null;
+      const anchorStr = s.anchor_date || '2026-06-01';
+      const anchor = parseLocalDate(anchorStr);
+      const target = parseLocalDate(dateStr);
+      anchor.setHours(0,0,0,0);
+      target.setHours(0,0,0,0);
+      const diffTime = target.getTime() - anchor.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      
+      const cycleLength = pattern.length;
+      const cycleDay = ((diffDays % cycleLength) + cycleLength) % cycleLength;
+      return pattern[cycleDay] || null;
+    }
+
+    if (s.type !== 'rotating' && s.type !== 'rotating-3week') {
+      const date = parseLocalDate(dateStr);
+      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+      return s[dayOfWeek] || null;
+    }
+
+    const anchorStr = s.anchor_date || '2026-06-01';
+    const anchor = parseLocalDate(anchorStr);
+    const target = parseLocalDate(dateStr);
+
+    anchor.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+
+    const diffTime = target.getTime() - anchor.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (s.type === 'rotating-3week') {
+      const cycleDay = ((diffDays % 21) + 21) % 21;
+      const weekNum = Math.floor(cycleDay / 7) + 1;
+      const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+      const wk = `week${weekNum}`;
+      return s[wk]?.[dayOfWeek] || null;
+    } else {
+      const cycleDay = ((diffDays % 28) + 28) % 28;
+      const weekNum = Math.floor(cycleDay / 7) + 1;
+      const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+      const wk = `week${weekNum}`;
+      return s[wk]?.[dayOfWeek] || null;
+    }
+  };
+
+  const getShiftForDate = (employee: Employee, dateStr: string) => {
+    const s = employee.weekly_schedule as any;
+    if (!s) return null;
+    const overrides = s.custom_night_weeks;
+    if (Array.isArray(overrides)) {
+      const override = overrides.find(w => dateStr >= w.from_date && dateStr <= w.to_date);
+      if (override) {
+        const baseShift = getBaseRotatingShiftForDate(employee, dateStr);
+        if (baseShift === 'R') return 'R';
+        return override.shift || 'N';
+      }
+    }
+    return getBaseRotatingShiftForDate(employee, dateStr);
+  };
+
   // Compute Metrics
   const totalStaff = employees.length;
   const sseCount = employees.filter(e => e.designation.toLowerCase().includes('sse')).length;
@@ -140,6 +263,83 @@ export default function Dashboard() {
     });
   });
   const totalCRAccrued = Math.max(0, totalCREarned - totalCRAvailed);
+
+  // Categorize staff shifts for checker
+  const categorizeStaffAvailability = () => {
+    const morningList: Employee[] = [];
+    const eveningList: Employee[] = [];
+    const nightList: Employee[] = [];
+    const generalList: Employee[] = [];
+    const restOrLeaveList: { emp: Employee; reason: string; labelBg: string }[] = [];
+
+    employees.forEach(emp => {
+      // Find log status if any
+      const log = dateSpecificLogs.find(l => l.emp_id === emp.emp_id);
+      
+      if (log) {
+        if (['CL', 'LAP', 'Sick', 'SCL'].includes(log.status)) {
+          let reason = 'On Leave';
+          let labelBg = 'bg-amber-100 text-amber-800 border-amber-300';
+          if (log.status === 'CL') { reason = 'Casual Leave (CL)'; }
+          else if (log.status === 'LAP') { reason = 'LAP Leave'; labelBg = 'bg-orange-100 text-orange-850 border-orange-300'; }
+          else if (log.status === 'Sick') { reason = 'Medical Sick'; labelBg = 'bg-red-100 text-red-800 border-red-300'; }
+          else if (log.status === 'SCL') { reason = 'Special CL'; labelBg = 'bg-pink-100 text-pink-850 border-pink-300'; }
+          restOrLeaveList.push({ emp, reason, labelBg });
+          return;
+        }
+        if (log.status === 'CR') {
+          restOrLeaveList.push({ emp, reason: 'Compensatory Rest (CR)', labelBg: 'bg-sky-100 text-sky-850 border-sky-300' });
+          return;
+        }
+        if (log.status === 'R') {
+          restOrLeaveList.push({ emp, reason: 'Weekly Rest Day', labelBg: 'bg-slate-100 text-slate-500 border-slate-200' });
+          return;
+        }
+        if (log.status === 'PH') {
+          restOrLeaveList.push({ emp, reason: 'Public Holiday (PH)', labelBg: 'bg-yellow-100 text-yellow-805 border-yellow-300' });
+          return;
+        }
+        
+        // If present P or P/N
+        if (log.status === 'P' || log.status === 'P/N') {
+          const shift = getShiftForDate(emp, selectedDate) || 'G';
+          const code = shift.toUpperCase();
+          if (log.status === 'P/N' || log.is_night || code === 'N') {
+            nightList.push(emp);
+          } else if (code === 'M') {
+            morningList.push(emp);
+          } else if (code === 'E') {
+            eveningList.push(emp);
+          } else {
+            generalList.push(emp);
+          }
+          return;
+        }
+      }
+
+      // No log in database, check scheduled cycle
+      const schedShift = getShiftForDate(emp, selectedDate) || 'R';
+      const code = schedShift.toUpperCase();
+
+      if (code === 'R') {
+        restOrLeaveList.push({ emp, reason: 'Weekly Rest Day', labelBg: 'bg-slate-100 text-slate-500 border-slate-200' });
+      } else if (code === 'N') {
+        nightList.push(emp);
+      } else if (code === 'M') {
+        morningList.push(emp);
+      } else if (code === 'E') {
+        eveningList.push(emp);
+      } else if (code === 'G' || code === 'P') {
+        generalList.push(emp);
+      } else {
+        generalList.push(emp);
+      }
+    });
+
+    return { morningList, eveningList, nightList, generalList, restOrLeaveList };
+  };
+
+  const { morningList, eveningList, nightList, generalList, restOrLeaveList } = categorizeStaffAvailability();
 
   return (
     <div className="p-6 space-y-6">
@@ -241,6 +441,240 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Daily Shift & Roster Availability Checker Card */}
+      <div className="glass-panel p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-150 pb-3">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <CalendarDays size={18} className="text-theme-primary font-bold" />
+              Daily Shift & Roster Availability Board
+            </h3>
+            <p className="text-[11px] text-slate-550 font-semibold mt-0.5">
+              Select a date to view dynamic staff availability across scheduled shifts and roster overrides.
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            {/* Quick date switches */}
+            <div className="flex items-center gap-1 p-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold">
+              {(() => {
+                const getPastFutureDate = (diff: number) => {
+                  const dObj = new Date();
+                  dObj.setDate(dObj.getDate() + diff);
+                  return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
+                };
+                const yDate = getPastFutureDate(-1);
+                const tDate = getTodayDateStr();
+                const tmDate = getPastFutureDate(1);
+                
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(yDate)}
+                      className={`px-2.5 py-1 rounded text-[9px] font-extrabold uppercase transition-all duration-150 cursor-pointer ${
+                        selectedDate === yDate ? 'bg-theme-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Yesterday
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(tDate)}
+                      className={`px-2.5 py-1 rounded text-[9px] font-extrabold uppercase transition-all duration-150 cursor-pointer ${
+                        selectedDate === tDate ? 'bg-theme-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(tmDate)}
+                      className={`px-2.5 py-1 rounded text-[9px] font-extrabold uppercase transition-all duration-150 cursor-pointer ${
+                        selectedDate === tmDate ? 'bg-theme-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Tomorrow
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+            
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 shadow-2xs">
+              <Calendar size={13} className="text-slate-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                className="bg-transparent border-none focus:outline-none cursor-pointer text-slate-800 font-extrabold text-[11px]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {dateLogsLoading || loading ? (
+          <div className="py-12 text-center text-xs font-semibold text-slate-400 flex items-center justify-center gap-2">
+            <Clock size={16} className="animate-spin text-theme-primary" />
+            Recalculating shift compliance and staff roster availability...
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+            
+            {/* 1. Morning Shift (M) */}
+            <div className="rounded-2xl p-4 bg-slate-50/50 flex flex-col space-y-3 shadow-2xs">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
+                <span className="text-[10px] font-black text-sky-700 tracking-wider uppercase flex items-center gap-1">
+                  <Sunrise size={13} className="text-sky-500 fill-sky-50" />
+                  Morning Shift (M)
+                </span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-850 font-black">
+                  {morningList.length} Staff
+                </span>
+              </div>
+              <div className="flex-1 space-y-2 max-h-56 overflow-y-auto pr-1">
+                {morningList.length === 0 ? (
+                  <span className="text-[10.5px] font-medium text-slate-400 italic block py-4 text-center">No staff scheduled</span>
+                ) : (
+                  morningList.map(emp => (
+                    <div 
+                      key={emp.emp_id} 
+                      onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
+                      className="bg-white hover:bg-slate-50/30 rounded-xl p-3 flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-205 cursor-pointer hover:-translate-y-0.5 transform"
+                    >
+                      <span className="text-[13px] font-bold text-slate-800 truncate mr-1.5">{emp.name}</span>
+                      <span className="text-[9.5px] font-extrabold text-sky-750 bg-sky-50 px-2 py-0.5 rounded shrink-0 uppercase tracking-wider">{emp.designation}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 2. Evening Shift (E) */}
+            <div className="rounded-2xl p-4 bg-slate-50/50 flex flex-col space-y-3 shadow-2xs">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
+                <span className="text-[10px] font-black text-orange-705 tracking-wider uppercase flex items-center gap-1">
+                  <Sunset size={13} className="text-orange-500 fill-orange-50" />
+                  Evening Shift (E)
+                </span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-850 font-black">
+                  {eveningList.length} Staff
+                </span>
+              </div>
+              <div className="flex-1 space-y-2 max-h-56 overflow-y-auto pr-1">
+                {eveningList.length === 0 ? (
+                  <span className="text-[10.5px] font-medium text-slate-400 italic block py-4 text-center">No staff scheduled</span>
+                ) : (
+                  eveningList.map(emp => (
+                    <div 
+                      key={emp.emp_id} 
+                      onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
+                      className="bg-white hover:bg-slate-50/30 rounded-xl p-3 flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-205 cursor-pointer hover:-translate-y-0.5 transform"
+                    >
+                      <span className="text-[13px] font-bold text-slate-800 truncate mr-1.5">{emp.name}</span>
+                      <span className="text-[9.5px] font-extrabold text-orange-750 bg-orange-50 px-2 py-0.5 rounded shrink-0 uppercase tracking-wider">{emp.designation}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 3. Night Shift (N / P/N) */}
+            <div className="rounded-2xl p-4 bg-slate-50/50 flex flex-col space-y-3 shadow-2xs">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
+                <span className="text-[10px] font-black text-purple-700 tracking-wider uppercase flex items-center gap-1">
+                  <Moon size={13} className="text-purple-500 fill-purple-50" />
+                  Night Shift (N)
+                </span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-850 font-black">
+                  {nightList.length} Staff
+                </span>
+              </div>
+              <div className="flex-1 space-y-2 max-h-56 overflow-y-auto pr-1">
+                {nightList.length === 0 ? (
+                  <span className="text-[10.5px] font-medium text-slate-400 italic block py-4 text-center">No staff scheduled</span>
+                ) : (
+                  nightList.map(emp => (
+                    <div 
+                      key={emp.emp_id} 
+                      onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
+                      className="bg-white hover:bg-slate-50/30 rounded-xl p-3 flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-205 cursor-pointer hover:-translate-y-0.5 transform"
+                    >
+                      <span className="text-[13px] font-bold text-slate-800 truncate mr-1.5">{emp.name}</span>
+                      <span className="text-[9.5px] font-extrabold text-purple-750 bg-purple-50 px-2 py-0.5 rounded shrink-0 uppercase tracking-wider">{emp.designation}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 4. General Shift (G) */}
+            <div className="rounded-2xl p-4 bg-slate-50/50 flex flex-col space-y-3 shadow-2xs">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
+                <span className="text-[10px] font-black text-emerald-700 tracking-wider uppercase flex items-center gap-1">
+                  <Sun size={13} className="text-emerald-500 fill-emerald-50" />
+                  General Shift (G)
+                </span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-850 font-black">
+                  {generalList.length} Staff
+                </span>
+              </div>
+              <div className="flex-1 space-y-2 max-h-56 overflow-y-auto pr-1">
+                {generalList.length === 0 ? (
+                  <span className="text-[10.5px] font-medium text-slate-400 italic block py-4 text-center">No staff scheduled</span>
+                ) : (
+                  generalList.map(emp => (
+                    <div 
+                      key={emp.emp_id} 
+                      onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
+                      className="bg-white hover:bg-slate-50/30 rounded-xl p-3 flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-205 cursor-pointer hover:-translate-y-0.5 transform"
+                    >
+                      <span className="text-[13px] font-bold text-slate-800 truncate mr-1.5">{emp.name}</span>
+                      <span className="text-[9.5px] font-extrabold text-emerald-750 bg-emerald-50 px-2 py-0.5 rounded shrink-0 uppercase tracking-wider">{emp.designation}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 5. Rest Day / On Leave / Off Duty */}
+            <div className="rounded-2xl p-4 bg-slate-50/50 flex flex-col space-y-3 shadow-2xs">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
+                <span className="text-[10px] font-black text-slate-600 tracking-wider uppercase flex items-center gap-1">
+                  <Coffee size={13} className="text-slate-500" />
+                  Rest & Off Duty
+                </span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-black">
+                  {restOrLeaveList.length} Staff
+                </span>
+              </div>
+              <div className="flex-1 space-y-2 max-h-56 overflow-y-auto pr-1">
+                {restOrLeaveList.length === 0 ? (
+                  <span className="text-[10.5px] font-medium text-slate-400 italic block py-4 text-center">No off-duty staff</span>
+                ) : (
+                  restOrLeaveList.map(({ emp, reason, labelBg }) => (
+                    <div 
+                      key={emp.emp_id} 
+                      onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
+                      className="bg-white hover:bg-slate-50/30 rounded-xl p-3 flex flex-col gap-2 shadow-sm hover:shadow-md transition-all duration-205 cursor-pointer hover:-translate-y-0.5 transform"
+                    >
+                      <div className="flex justify-between items-center w-full">
+                        <span className="text-[13px] font-bold text-slate-800 truncate mr-1.5">{emp.name}</span>
+                        <span className="text-[9.5px] font-extrabold text-slate-500 bg-slate-100 px-2 py-0.5 rounded shrink-0 uppercase tracking-wider">{emp.designation}</span>
+                      </div>
+                      <span className={`text-[8.5px] font-black px-2.5 py-0.5 rounded-full text-center w-max uppercase tracking-wider border ${labelBg}`}>
+                        {reason}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Main Grid Content */}
