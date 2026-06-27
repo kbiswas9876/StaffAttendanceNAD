@@ -444,6 +444,8 @@ export default function AttendanceGrid() {
   const [signatoryLeftTitle, setSignatoryLeftTitle] = useState('');
   const [signatoryRight, setSignatoryRight] = useState('Dy. CPO');
   const [showSigConfig, setShowSigConfig] = useState(false);
+  const [printScaleMode, setPrintScaleMode] = useState<string>('0');
+  const [printScaleValue, setPrintScaleValue] = useState<number>(100);
 
   // Load default signatories based on loaded employees in the section
   const updateSignatoryFromLocalStorage = () => {
@@ -597,7 +599,8 @@ export default function AttendanceGrid() {
       submission_date: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
       signatory_left: signatoryLeftName ? `${signatoryLeftName}\n${signatoryLeftTitle}` : signatoryLeftTitle,
       signatory_right: signatoryRight,
-      rows: exportRows
+      rows: exportRows,
+      scale: printScaleMode === '0' ? null : printScaleValue
     };
 
     try {
@@ -1313,7 +1316,7 @@ export default function AttendanceGrid() {
 
       {/* Signatory Config Panel */}
       {showSigConfig && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-slate-750 no-print">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold text-slate-750 no-print animate-scale-up">
           <div>
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Left Signatory (SSE In-Charge)</label>
             <div className="flex gap-2">
@@ -1361,6 +1364,41 @@ export default function AttendanceGrid() {
               placeholder="e.g. Dy. CPO"
               className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus-border-theme"
             />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Excel Export Print Scale</label>
+            <div className="flex gap-2">
+              <select
+                value={printScaleMode}
+                onChange={(e) => {
+                  setPrintScaleMode(e.target.value);
+                  if (e.target.value !== 'custom') {
+                    setPrintScaleValue(Number(e.target.value));
+                  }
+                }}
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="0">Default (Fit Width)</option>
+                <option value="100">100% Scale</option>
+                <option value="95">95% Scale</option>
+                <option value="90">90% Scale</option>
+                <option value="85">85% Scale</option>
+                <option value="80">80% Scale</option>
+                <option value="75">75% Scale</option>
+                <option value="custom">Custom %...</option>
+              </select>
+              {printScaleMode === 'custom' && (
+                <input
+                  type="number"
+                  min="10"
+                  max="400"
+                  value={printScaleValue}
+                  onChange={(e) => setPrintScaleValue(Number(e.target.value))}
+                  className="w-16 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-805 focus:outline-none focus-border-theme text-center font-bold"
+                  placeholder="%"
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

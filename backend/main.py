@@ -811,6 +811,7 @@ class AttendanceExportRequest(BaseModel):
     signatory_left: str # SSE/SIG/KKVS/IC
     signatory_right: str # Dy. CPO
     rows: List[AttendanceRow]
+    scale: Optional[int] = None
 
 # --- Helper Functions for Weightage ---
 def calculate_weightage(total_days: int):
@@ -2194,7 +2195,10 @@ async def export_attendance_excel(req: AttendanceExportRequest):
     sheet.set_landscape()
     sheet.set_paper(9)                  # A4
     sheet.set_margins(0.4, 0.4, 0.5, 0.5)
-    sheet.fit_to_pages(1, 0)            # fit width to 1 page
+    if req.scale and req.scale > 0:
+        sheet.set_print_scale(req.scale)
+    else:
+        sheet.fit_to_pages(1, 0)            # fit width to 1 page
 
     # ── Dynamic column layout ─────────────────────────────────────────────────
     # Compute how many day columns we actually need, then place Remarks
@@ -3150,13 +3154,13 @@ def export_ta_bill_excel(id: int):
         # Column count
         max_col = 10 if journey_type == "NORMAL" else 11
         
-        # Row Heights
-        ws.row_dimensions[1].height = 26
-        ws.row_dimensions[2].height = 26
-        ws.row_dimensions[4].height = 26
-        ws.row_dimensions[5].height = 26
-        ws.row_dimensions[7].height = 30
-        ws.row_dimensions[8].height = 22
+        # Row Heights - Increased for breathing space
+        ws.row_dimensions[1].height = 28
+        ws.row_dimensions[2].height = 28
+        ws.row_dimensions[4].height = 28
+        ws.row_dimensions[5].height = 28
+        ws.row_dimensions[7].height = 32
+        ws.row_dimensions[8].height = 24
 
         # Helper to check if a cell is merged across columns
         def is_merged_across_columns(ws, row, col):
@@ -3258,7 +3262,7 @@ def export_ta_bill_excel(id: int):
         ws.page_setup.paperSize = 9 # A4
         ws.sheet_properties.pageSetUpPr.fitToPage = True
         ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
+        ws.page_setup.fitToHeight = 1
 
         # Adjust margins to maximize printable width and make it look clean
         ws.page_margins.left = 0.4
@@ -3349,13 +3353,13 @@ def export_ta_bill_excel(id: int):
                     stay_height = calculate_needed_row_height(stay_text, combined_width, font_size=9.5, bold=True)
                     needed_height = max(needed_height, stay_height)
                     
-            pair_height = max(50, needed_height)
+            pair_height = max(56, needed_height)
             row_height = pair_height / 2
             ws.row_dimensions[r1].height = row_height
             ws.row_dimensions[r2].height = row_height
 
         # 4. Format Total Row
-        ws.row_dimensions[total_row].height = 30
+        ws.row_dimensions[total_row].height = 34
 
         
         for c in range(1, max_col + 1):
@@ -3389,11 +3393,11 @@ def export_ta_bill_excel(id: int):
                 )
                 
                 if has_signature_keywords:
-                    ws.row_dimensions[r].height = 28
+                    ws.row_dimensions[r].height = 32
                 elif has_cert_keywords:
-                    ws.row_dimensions[r].height = 24
+                    ws.row_dimensions[r].height = 28
                 else:
-                    ws.row_dimensions[r].height = 18
+                    ws.row_dimensions[r].height = 20
             else:
                 ws.row_dimensions[r].height = 10
 
@@ -3407,7 +3411,29 @@ def export_ta_bill_excel(id: int):
                     elif any(k in cell.value for k in ["Countersigned", "Signature of Officer", "Controlling Officer", "Head of Office"]):
                         cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
                         if "Signature of Officer" in cell.value:
-                            cell.alignment = Alignment(horizontal="right", vertical="center")
+                            # Dynamic merge with left cell to prevent clipping
+                            row_idx = cell.row
+                            col_idx = cell.column
+                            val = cell.value
+                            
+                            # Clean conflicting merge ranges
+                            for r_range in list(ws.merged_cells.ranges):
+                                min_col, min_row, max_col, max_row = r_range.bounds
+                                if min_row <= row_idx <= max_row and min_col <= col_idx <= max_col:
+                                    try:
+                                        ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+                                    except Exception:
+                                        pass
+                            
+                            # Shift content and merge
+                            ws.cell(row=row_idx, column=col_idx - 1).value = val
+                            ws.cell(row=row_idx, column=col_idx).value = None
+                            ws.merge_cells(start_row=row_idx, start_column=col_idx - 1, end_row=row_idx, end_column=col_idx)
+                            
+                            # Style merged cells
+                            cell_left = ws.cell(row=row_idx, column=col_idx - 1)
+                            cell_left.font = Font(name="Segoe UI", size=9.5, bold=True, color="1B365D")
+                            cell_left.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
                         else:
                             cell.alignment = Alignment(horizontal="left", vertical="center")
                     elif "Note:" in cell.value:
