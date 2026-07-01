@@ -16,7 +16,9 @@ import {
   HelpCircle,
   TrendingUp,
   MapPin,
-  Clock
+  Clock,
+  Settings,
+  X
 } from 'lucide-react';
 import { 
   getEmployees, 
@@ -27,8 +29,14 @@ import {
   deleteTABill, 
   Employee, 
   TABill, 
-  TAEntry 
+  TAEntry,
+  getTAConfig,
+  saveTAConfig,
+  TAConfig,
+  TARateRule,
+  TAThresholdRule
 } from '../../lib/api';
+import AdminAuthModal from '../components/AdminAuthModal';
 
 function LatexRenderer({ math }: { math: string }) {
   const containerRef = React.useRef<HTMLSpanElement>(null);
@@ -97,6 +105,65 @@ export default function TravellingAllowancePage() {
   // Metadata state
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [taBills, setTaBills] = useState<TABill[]>([]);
+  const [taConfig, setTaConfig] = useState<TAConfig>({
+    rates: [
+      { min_level: 1, max_level: 5, rate: 650 },
+      { min_level: 6, max_level: 12, rate: 1000 }
+    ],
+    thresholds: [
+      { max_hours: 6, multiplier: 0.3 },
+      { max_hours: 12, multiplier: 0.7 },
+      { max_hours: 24, multiplier: 1.0 }
+    ],
+    rounding_mode: 'nearest_integer'
+  });
+  
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [tempRates, setTempRates] = useState<TARateRule[]>([]);
+  const [tempThresholds, setTempThresholds] = useState<TAThresholdRule[]>([]);
+  const [tempRoundingMode, setTempRoundingMode] = useState<'none' | 'nearest_integer' | 'nearest_05' | 'ceiling' | 'floor'>('nearest_integer');
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  const handleOpenSettings = () => {
+    setTempRates(taConfig.rates.map(r => ({ ...r })));
+    setTempThresholds(taConfig.thresholds.map(t => ({ ...t })));
+    setTempRoundingMode(taConfig.rounding_mode);
+    setIsSettingsOpen(true);
+  };
+
+  const handleSaveSettingsRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+    if (isAuthenticated) {
+      saveSettingsActual();
+    } else {
+      setIsAuthOpen(true);
+    }
+  };
+
+  const saveSettingsActual = async () => {
+    setIsLoading(true);
+    try {
+      const success = await saveTAConfig({
+        rates: tempRates,
+        thresholds: tempThresholds,
+        rounding_mode: tempRoundingMode
+      });
+      if (success) {
+        showNotification("Travelling Allowance calculation settings updated successfully!", "success");
+        const config = await getTAConfig();
+        setTaConfig(config);
+        setIsSettingsOpen(false);
+      } else {
+        showNotification("Failed to save calculation settings.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification("Failed to save calculation settings.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Selected state
   const [selectedEmpId, setSelectedEmpId] = useState<number | ''>('');
@@ -153,7 +220,7 @@ export default function TravellingAllowancePage() {
     );
   }, [taBills, historySearch]);
 
-  // Load staff and bills
+  // Load staff, bills, and ta config
   const loadInitialData = async (sectionCode: string) => {
     try {
       setIsLoading(true);
@@ -161,6 +228,12 @@ export default function TravellingAllowancePage() {
       setEmployees(emps);
       const bills = await getTABills(sectionCode);
       setTaBills(bills);
+      try {
+        const config = await getTAConfig();
+        setTaConfig(config);
+      } catch (configErr) {
+        console.error("Failed to load TA config", configErr);
+      }
     } catch (e) {
       console.error("Failed to load data", e);
       showNotification("Failed to load staff/bills list", "error");
@@ -225,10 +298,26 @@ export default function TravellingAllowancePage() {
     setEntries([]);
   };
 
+  // Helper: Apply rounding mode
+  const applyRounding = (val: number): number => {
+    const mode = taConfig.rounding_mode || 'nearest_integer';
+    if (mode === 'none') {
+      return Number(val.toFixed(2));
+    } else if (mode === 'nearest_05') {
+      return Math.round(val * 2) / 2;
+    } else if (mode === 'ceiling') {
+      return Math.ceil(val);
+    } else if (mode === 'floor') {
+      return Math.floor(val);
+    } else {
+      return Math.round(val);
+    }
+  };
+
   // Helper: Calculate base rate from pay commission level
   const getBaseRate = (level: number): number => {
-    // Levels 1-5 = Rs. 650; Levels 6-12 = Rs. 1000
-    return level >= 6 ? 1000 : 650;
+    const match = taConfig.rates.find(r => level >= r.min_level && level <= r.max_level);
+    return match ? match.rate : (level >= 6 ? 1000 : 650);
   };
 
   // Helper: Calculate absence duration and multiplier
@@ -255,17 +344,10 @@ export default function TravellingAllowancePage() {
       
       const diffHours = diffMins / 60.0;
       
-      // Rates:
-      // <= 6 hrs = 30%
-      // 6 to 12 hrs = 70%
-      // > 12 hrs = 100%
-      if (diffHours <= 6) {
-        return { multiplier: 0.3, fractionText: '0.3' };
-      } else if (diffHours <= 12) {
-        return { multiplier: 0.7, fractionText: '0.7' };
-      } else {
-        return { multiplier: 1.0, fractionText: '1.0' };
-      }
+      const sortedThresholds = [...taConfig.thresholds].sort((a, b) => a.max_hours - b.max_hours);
+      const matched = sortedThresholds.find(t => diffHours <= t.max_hours);
+      const mult = matched ? matched.multiplier : 1.0;
+      return { multiplier: mult, fractionText: String(mult) };
     } catch (e) {
       return { multiplier: 0, fractionText: '0.0' };
     }
@@ -319,7 +401,7 @@ export default function TravellingAllowancePage() {
       days_nights: '0.7',
       object_journey: 'Attended Metro Bhavan for paper work as per instruction of higher authority.',
       rate: baseRate,
-      amount: Math.round(baseRate * 0.7)
+      amount: applyRounding(baseRate * 0.7)
     };
     
     const newInward: TAEntry = {
@@ -360,7 +442,7 @@ export default function TravellingAllowancePage() {
         days_nights: '1.0',
         object_journey: 'For on campus refresher course Letter no-MRTS/SG-501/23 pt .XIX Dt .29.01.2026',
         rate: baseRate,
-        amount: baseRate
+        amount: applyRounding(baseRate)
       };
       setEntries([...entries, newLeg]);
     } else {
@@ -376,7 +458,7 @@ export default function TravellingAllowancePage() {
         days_nights: '100%X5',
         object_journey: '',
         rate: baseRate,
-        amount: baseRate * 5
+        amount: applyRounding(baseRate * 5)
       };
       setEntries([...entries, newStay]);
     }
@@ -429,7 +511,7 @@ export default function TravellingAllowancePage() {
         const { multiplier, fractionText } = calculateNormalLegAbsence(timeOut, timeIn);
         
         updated[pairIndex].days_nights = fractionText;
-        updated[pairIndex].amount = Math.round(baseRate * multiplier);
+        updated[pairIndex].amount = applyRounding(baseRate * multiplier);
       }
     } else {
       // TRAINING Calculations
@@ -450,13 +532,13 @@ export default function TravellingAllowancePage() {
         updated[index].station_from = loc;
         updated[index].days_nights = `100%X${numDays}`;
         updated[index].train_no = `STAYED AT ${loc} hostel campus for refresher course from ${startDisplay} to ${endDisplay}`;
-        updated[index].amount = Math.round(numDays * baseRate);
+        updated[index].amount = applyRounding(numDays * baseRate);
       } else {
         // Training leg: manual multiplier input in days_nights
         if (field === 'days_nights') {
           try {
             const mult = parseFloat(value) || 0;
-            updated[index].amount = Math.round(baseRate * mult);
+            updated[index].amount = applyRounding(baseRate * mult);
           } catch (e) {}
         }
       }
@@ -467,7 +549,7 @@ export default function TravellingAllowancePage() {
 
   // Compute Total amount
   const calculateTotalAmount = (): number => {
-    return Math.round(entries.reduce((sum, entry) => sum + (entry.amount || 0), 0));
+    return applyRounding(entries.reduce((sum, entry) => sum + (entry.amount || 0), 0));
   };
 
   // Save TA Bill to Database
@@ -634,6 +716,14 @@ export default function TravellingAllowancePage() {
             className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition-all duration-200"
           >
             Clear / New Bill
+          </button>
+          
+          <button
+            onClick={() => handleOpenSettings()}
+            className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition-all duration-200 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Settings className="w-4 h-4 text-slate-505" />
+            Calculation Settings
           </button>
         </div>
       </div>
@@ -1507,6 +1597,230 @@ export default function TravellingAllowancePage() {
           )}
         </div>
       </div>
+
+      {/* Dynamic TA Config Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <Settings size={18} />
+                </div>
+                <h3 className="font-extrabold text-slate-800 text-sm">Travelling Allowance (TA) Calculation Settings</h3>
+              </div>
+              <button 
+                onClick={() => setIsSettingsOpen(false)} 
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-150 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <form onSubmit={handleSaveSettingsRequest} className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Section 1: Base Rates by Pay Level */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">1. Pay Level Base Rates</h4>
+                  <button
+                    type="button"
+                    onClick={() => setTempRates([...tempRates, { min_level: 1, max_level: 12, rate: 500 }])}
+                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-transparent border-none"
+                  >
+                    + Add Level Rule
+                  </button>
+                </div>
+                <div className="border border-slate-155 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-155 font-bold text-slate-500">
+                        <th className="px-4 py-2">Min Pay Level</th>
+                        <th className="px-4 py-2">Max Pay Level</th>
+                        <th className="px-4 py-2">Base Rate (Rs.)</th>
+                        <th className="px-4 py-2 text-center w-12">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tempRates.map((r, idx) => (
+                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={12}
+                              value={r.min_level}
+                              onChange={(e) => {
+                                const newRates = [...tempRates];
+                                newRates[idx].min_level = Number(e.target.value);
+                                setTempRates(newRates);
+                              }}
+                              className="w-16 border border-slate-200 rounded px-2 py-1 text-center"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={12}
+                              value={r.max_level}
+                              onChange={(e) => {
+                                const newRates = [...tempRates];
+                                newRates[idx].max_level = Number(e.target.value);
+                                setTempRates(newRates);
+                              }}
+                              className="w-16 border border-slate-200 rounded px-2 py-1 text-center"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              value={r.rate}
+                              onChange={(e) => {
+                                const newRates = [...tempRates];
+                                newRates[idx].rate = Number(e.target.value);
+                                setTempRates(newRates);
+                              }}
+                              className="w-24 border border-slate-200 rounded px-2 py-1"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setTempRates(tempRates.filter((_, i) => i !== idx))}
+                              className="text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 2: Absence Hours Thresholds */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">2. Absence Duration Multipliers</h4>
+                  <button
+                    type="button"
+                    onClick={() => setTempThresholds([...tempThresholds, { max_hours: 24, multiplier: 1.0 }])}
+                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-transparent border-none"
+                  >
+                    + Add Threshold Rule
+                  </button>
+                </div>
+                <div className="border border-slate-155 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-155 font-bold text-slate-500">
+                        <th className="px-4 py-2">Max Hours Limit</th>
+                        <th className="px-4 py-2">Multiplier Ratio (e.g. 0.3 for 30%)</th>
+                        <th className="px-4 py-2 text-center w-12">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tempThresholds.map((t, idx) => (
+                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={24}
+                              value={t.max_hours}
+                              onChange={(e) => {
+                                const newThresholds = [...tempThresholds];
+                                newThresholds[idx].max_hours = Number(e.target.value);
+                                setTempThresholds(newThresholds);
+                              }}
+                              className="w-20 border border-slate-200 rounded px-2 py-1 text-center"
+                            /> hours
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min={0.0}
+                              max={1.0}
+                              value={t.multiplier}
+                              onChange={(e) => {
+                                const newThresholds = [...tempThresholds];
+                                newThresholds[idx].multiplier = Number(e.target.value);
+                                setTempThresholds(newThresholds);
+                              }}
+                              className="w-24 border border-slate-200 rounded px-2 py-1 text-center"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setTempThresholds(tempThresholds.filter((_, i) => i !== idx))}
+                              className="text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 3: Amount Rounding Rule */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">3. Amount Rounding Rule</label>
+                <select
+                  value={tempRoundingMode}
+                  onChange={(e) => setTempRoundingMode(e.target.value as any)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 cursor-pointer font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500"
+                >
+                  <option value="none">No Rounding (Exact Decimals)</option>
+                  <option value="nearest_integer">Round to Nearest Integer (e.g. 437.49 =&gt; 437, 437.5 =&gt; 438)</option>
+                  <option value="nearest_05">Round to Nearest 0.5 (e.g. 437.45 =&gt; 437.5, 437.2 =&gt; 437.0)</option>
+                  <option value="ceiling">Ceiling - Round Up (e.g. 437.05 =&gt; 438)</option>
+                  <option value="floor">Floor - Round Down (e.g. 437.95 =&gt; 437)</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-slate-100 justify-end text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-sm cursor-pointer"
+                >
+                  Save Configuration
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* Admin Verification Modal for TA Settings saving */}
+      <AdminAuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onSuccess={() => {
+          setIsAuthOpen(false);
+          saveSettingsActual();
+        }}
+      />
     </div>
   );
 }

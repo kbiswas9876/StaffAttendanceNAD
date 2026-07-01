@@ -598,4 +598,61 @@ export const parseLocalDate = (dateStr: string): Date => {
   return new Date(dateStr);
 };
 
+export interface TARateRule {
+  min_level: number;
+  max_level: number;
+  rate: number;
+}
+
+export interface TAThresholdRule {
+  max_hours: number;
+  multiplier: number;
+}
+
+export interface TAConfig {
+  rates: TARateRule[];
+  thresholds: TAThresholdRule[];
+  rounding_mode: 'none' | 'nearest_integer' | 'nearest_05' | 'ceiling' | 'floor';
+}
+
+export const verifyAdminPassword = async (password: string): Promise<boolean> => {
+  try {
+    const res = await apiFetch<{ status: string }>("/admin/verify-password", {
+      method: "POST",
+      body: JSON.stringify({ password })
+    });
+    return res.status === "success";
+  } catch (e) {
+    return false;
+  }
+};
+
+export const changeAdminPassword = async (oldPass: string, newPass: string): Promise<boolean> => {
+  try {
+    const res = await apiFetch<{ status: string }>("/admin/change-password", {
+      method: "POST",
+      body: JSON.stringify({ old_password: oldPass, new_password: newPass })
+    });
+    return res.status === "success";
+  } catch (e) {
+    throw e;
+  }
+};
+
+export const getTAConfig = async (): Promise<TAConfig> => {
+  return apiFetch<TAConfig>("/settings/get-ta-config");
+};
+
+export const saveTAConfig = async (config: TAConfig): Promise<boolean> => {
+  try {
+    const res = await apiFetch<{ status: string }>("/settings/save-ta-config", {
+      method: "POST",
+      body: JSON.stringify(config)
+    });
+    return res.status === "success";
+  } catch (e) {
+    return false;
+  }
+};
+
 

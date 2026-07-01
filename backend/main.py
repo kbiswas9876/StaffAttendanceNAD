@@ -683,6 +683,36 @@ def init_db():
             VALUES (?, ?)
         """, ("3-Week Rotating (KKVS)", "E,E,E,E,E,E,E,R,M,M,M,M,N,N,N,N,N,N,N,R,R"))
     conn.commit()
+
+    # Create system_settings table for password and TA config
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+    """)
+    cursor.execute("SELECT COUNT(*) FROM system_settings WHERE key = 'admin_password'")
+    if cursor.fetchone()[0] == 0:
+        import hashlib
+        default_hash = hashlib.sha256("admin123".encode()).hexdigest()
+        cursor.execute("INSERT INTO system_settings (key, value) VALUES ('admin_password', ?)", (default_hash,))
+    
+    cursor.execute("SELECT COUNT(*) FROM system_settings WHERE key = 'ta_config'")
+    if cursor.fetchone()[0] == 0:
+        default_ta_config = {
+            "rates": [
+                {"min_level": 1, "max_level": 5, "rate": 650},
+                {"min_level": 6, "max_level": 12, "rate": 1000}
+            ],
+            "thresholds": [
+                {"max_hours": 6, "multiplier": 0.3},
+                {"max_hours": 12, "multiplier": 0.7},
+                {"max_hours": 24, "multiplier": 1.0}
+            ],
+            "rounding_mode": "nearest_integer"
+        }
+        cursor.execute("INSERT INTO system_settings (key, value) VALUES ('ta_config', ?)", (json.dumps(default_ta_config),))
+    conn.commit()
         
     conn.close()
 
@@ -1953,19 +1983,20 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
             sheet.write(current_row, 4, row.level, d_fmt)
             
             # Dates with Nil for empty
+            excel_row_num = current_row + 1
             if has_dates:
                 sheet.write(current_row, 5, row.dates, d_fmt)
                 sheet.write(current_row, 6, row.total_days, d_fmt)
-                sheet.write(current_row, 7, total_hrs, d_fmt)
-                sheet.write(current_row, 8, wt_hrs_val, wt_fmt)
-                sheet.write(current_row, 9, wt_mins_val, wt_fmt)
+                sheet.write_formula(current_row, 7, f"=IF(G{excel_row_num}=0, 0, G{excel_row_num} * 8)", d_fmt, total_hrs)
+                sheet.write_formula(current_row, 8, f"=IF(G{excel_row_num}=0, \"—\", INT((G{excel_row_num} * 80) / 60))", wt_fmt, wt_hrs_val)
+                sheet.write_formula(current_row, 9, f"=IF(G{excel_row_num}=0, \"—\", MOD(G{excel_row_num} * 80, 60))", wt_fmt, wt_mins_val)
                 nd_rows_with_data += 1
             else:
                 sheet.write(current_row, 5, "Nil", nil_fmt)
                 sheet.write(current_row, 6, 0, d_fmt)
-                sheet.write(current_row, 7, 0, d_fmt)
-                sheet.write(current_row, 8, "—", d_fmt)
-                sheet.write(current_row, 9, "—", d_fmt)
+                sheet.write_formula(current_row, 7, f"=IF(G{excel_row_num}=0, 0, G{excel_row_num} * 8)", d_fmt, 0)
+                sheet.write_formula(current_row, 8, f"=IF(G{excel_row_num}=0, \"—\", INT((G{excel_row_num} * 80) / 60))", d_fmt, "—")
+                sheet.write_formula(current_row, 9, f"=IF(G{excel_row_num}=0, \"—\", MOD(G{excel_row_num} * 80, 60))", d_fmt, "—")
             
             sheet.write(current_row, 10, row.remarks or "", d_fmt)
             current_row += 1
@@ -1974,12 +2005,14 @@ async def export_night_duty_excel(req: NightDutyExportRequest):
     sheet.set_row(current_row, 22)
     total_days_sum = sum(r.total_days for r in req.rows)
     total_hrs_sum = total_days_sum * 8
-    sheet.merge_range(current_row, 0, current_row, 5, "TOTAL", total_label_fmt)
-    sheet.write(current_row, 6, total_days_sum, total_val_fmt)
-    sheet.write(current_row, 7, total_hrs_sum, total_val_fmt)
     wt_total_hrs_val, wt_total_mins_val = calculate_weightage_numeric(total_days_sum)
-    sheet.write(current_row, 8, wt_total_hrs_val, total_val_fmt)
-    sheet.write(current_row, 9, wt_total_mins_val, total_val_fmt)
+    
+    excel_total_row = current_row + 1
+    sheet.merge_range(current_row, 0, current_row, 5, "TOTAL", total_label_fmt)
+    sheet.write_formula(current_row, 6, f"=SUM(G13:G{current_row})", total_val_fmt, total_days_sum)
+    sheet.write_formula(current_row, 7, f"=SUM(H13:H{current_row})", total_val_fmt, total_hrs_sum)
+    sheet.write_formula(current_row, 8, f"=INT((G{excel_total_row} * 80) / 60)", total_val_fmt, wt_total_hrs_val)
+    sheet.write_formula(current_row, 9, f"=MOD(G{excel_total_row} * 80, 60)", total_val_fmt, wt_total_mins_val)
     sheet.write(current_row, 10, f"{nd_rows_with_data} staff on night duty", total_label_fmt)
     current_row += 1
 
@@ -3013,6 +3046,78 @@ def delete_ta_bill(id: int):
     finally:
         conn.close()
 
+class VerifyPasswordSchema(BaseModel):
+    password: str
+
+class ChangePasswordSchema(BaseModel):
+    old_password: str
+    new_password: str
+
+class TAConfigSchema(BaseModel):
+    rates: list
+    thresholds: list
+    rounding_mode: str
+
+@app.post("/api/admin/verify-password")
+def verify_admin_password(payload: VerifyPasswordSchema):
+    conn = get_db()
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT value FROM system_settings WHERE key = 'admin_password'").fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=500, detail="Password not configured in database.")
+    import hashlib
+    incoming_hash = hashlib.sha256(payload.password.encode()).hexdigest()
+    if incoming_hash == row[0]:
+        return {"status": "success"}
+    raise HTTPException(status_code=401, detail="Incorrect password.")
+
+@app.post("/api/admin/change-password")
+def change_admin_password(payload: ChangePasswordSchema):
+    conn = get_db()
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT value FROM system_settings WHERE key = 'admin_password'").fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=500, detail="Password not configured in database.")
+    import hashlib
+    old_hash = hashlib.sha256(payload.old_password.encode()).hexdigest()
+    if old_hash != row[0]:
+        conn.close()
+        raise HTTPException(status_code=401, detail="Incorrect old password.")
+    
+    new_hash = hashlib.sha256(payload.new_password.encode()).hexdigest()
+    cursor.execute("UPDATE system_settings SET value = ? WHERE key = 'admin_password'", (new_hash,))
+    conn.commit()
+    conn.close()
+    log_audit("Update", "Admin", "Admin password changed successfully.")
+    return {"status": "success"}
+
+@app.get("/api/settings/get-ta-config")
+def get_ta_config():
+    conn = get_db()
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT value FROM system_settings WHERE key = 'ta_config'").fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=500, detail="TA Config not configured in database.")
+    return json.loads(row[0])
+
+@app.post("/api/settings/save-ta-config")
+def save_ta_config(payload: TAConfigSchema):
+    conn = get_db()
+    cursor = conn.cursor()
+    config_data = {
+        "rates": payload.rates,
+        "thresholds": payload.thresholds,
+        "rounding_mode": payload.rounding_mode
+    }
+    cursor.execute("UPDATE system_settings SET value = ? WHERE key = 'ta_config'", (json.dumps(config_data),))
+    conn.commit()
+    conn.close()
+    log_audit("Update", "Settings", "Travelling Allowance config updated successfully.")
+    return {"status": "success"}
+
 def num_to_words(n):
     n = int(round(n))
     if n == 0:
@@ -3479,6 +3584,17 @@ def export_ta_bill_excel(id: int):
     bill = dict(bill_row)
     entries_rows = conn.execute("SELECT * FROM ta_entries WHERE bill_id = ? ORDER BY id ASC", (id,)).fetchall()
     entries = [dict(r) for r in entries_rows]
+    
+    # Fetch TA dynamic config from system_settings
+    rounding_mode = "nearest_integer"
+    try:
+        row_config = conn.execute("SELECT value FROM system_settings WHERE key = 'ta_config'").fetchone()
+        if row_config:
+            ta_config = json.loads(row_config[0])
+            rounding_mode = ta_config.get("rounding_mode", "nearest_integer")
+    except Exception as e:
+        print("Failed to load ta_config from db:", e)
+        
     conn.close()
     
     if not os.path.exists(TA_TEMPLATE_PATH):
@@ -3729,9 +3845,20 @@ def export_ta_bill_excel(id: int):
                 days_nights_display = days_nights_val
             ws.cell(row=r1_idx, column=7).value = days_nights_display
             
-            ws.cell(row=r1_idx, column=8).value = leg_out.get("object_journey", "")
             ws.cell(row=r1_idx, column=9).value = leg_out.get("rate", 0)
-            ws.cell(row=r1_idx, column=10).value = leg_out.get("amount", 0)
+            
+            formula_base = f"G{r1_idx} * I{r1_idx}"
+            if rounding_mode == "nearest_integer":
+                ws.cell(row=r1_idx, column=10).value = f"=ROUND({formula_base}, 0)"
+            elif rounding_mode == "nearest_05":
+                ws.cell(row=r1_idx, column=10).value = f"=MROUND({formula_base}, 0.5)"
+            elif rounding_mode == "ceiling":
+                ws.cell(row=r1_idx, column=10).value = f"=ROUNDUP({formula_base}, 0)"
+            elif rounding_mode == "floor":
+                ws.cell(row=r1_idx, column=10).value = f"=ROUNDDOWN({formula_base}, 0)"
+            else:
+                ws.cell(row=r1_idx, column=10).value = f"={formula_base}"
+                
             total_amount += leg_out.get("amount", 0)
             
             if leg_in:
@@ -3762,7 +3889,7 @@ def export_ta_bill_excel(id: int):
         total_row_idx = 9 + required_rows
         ws.cell(row=total_row_idx, column=8).value = f"Total :Rupees {num_to_words(total_amount)} only"
         ws.cell(row=total_row_idx, column=9).value = "Rs."
-        ws.cell(row=total_row_idx, column=10).value = total_amount
+        ws.cell(row=total_row_idx, column=10).value = f"=SUM(J9:J{total_row_idx-1})"
 
 
     else:
@@ -3812,7 +3939,23 @@ def export_ta_bill_excel(id: int):
             ws.cell(row=r1_idx, column=10).value = entry.get("rate", 0)
             ws.merge_cells(start_row=r1_idx, start_column=10, end_row=r2_idx, end_column=10)
             
-            ws.cell(row=r1_idx, column=11).value = entry.get("amount", 0)
+            if is_stay:
+                formula_base = f"VALUE(MID(H{r1_idx}, FIND(\"X\", H{r1_idx})+1, 10)) * J{r1_idx}"
+            else:
+                formula_base = f"H{r1_idx} * J{r1_idx}"
+                
+            if rounding_mode == "nearest_integer":
+                amt_formula = f"=ROUND({formula_base}, 0)"
+            elif rounding_mode == "nearest_05":
+                amt_formula = f"=MROUND({formula_base}, 0.5)"
+            elif rounding_mode == "ceiling":
+                amt_formula = f"=ROUNDUP({formula_base}, 0)"
+            elif rounding_mode == "floor":
+                amt_formula = f"=ROUNDDOWN({formula_base}, 0)"
+            else:
+                amt_formula = f"={formula_base}"
+                
+            ws.cell(row=r1_idx, column=11).value = amt_formula
             ws.merge_cells(start_row=r1_idx, start_column=11, end_row=r2_idx, end_column=11)
             total_amount += entry.get("amount", 0)
             
@@ -3848,7 +3991,7 @@ def export_ta_bill_excel(id: int):
         total_row_idx = 9 + required_rows
         ws.cell(row=total_row_idx, column=9).value = f"Total :Rupees {num_to_words(total_amount)} only"
         ws.cell(row=total_row_idx, column=10).value = "Rs."
-        ws.cell(row=total_row_idx, column=11).value = total_amount
+        ws.cell(row=total_row_idx, column=11).value = f"=SUM(K9:K{total_row_idx-1})"
 
 
     for r in range(1, ws.max_row + 1):

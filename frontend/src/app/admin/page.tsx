@@ -24,7 +24,8 @@ import {
   Clock,
   ChevronRight,
   Info,
-  AlertTriangle
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 import { getTranslation } from '../../lib/translations';
 import { 
@@ -40,7 +41,7 @@ import {
   getWeeklyScheduleDefault, getAppVersion,
   triggerUpdateDownload, getUpdateDownloadStatus,
   getRosterRules, createRosterRule, deleteRosterRule, RosterRule,
-  parseLocalDate
+  parseLocalDate, changeAdminPassword, verifyAdminPassword
 } from '../../lib/api';
 
 interface DayInfo {
@@ -201,10 +202,100 @@ const monthsList = [
 ];
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates' | 'settings' | 'roster-rules'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates' | 'settings' | 'roster-rules' | 'security'>('employees');
   const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
   const [mySection, setMySection] = useState('KKVS');
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState('');
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  const handleUnlockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUnlockError('');
+    if (!unlockPassword.trim()) {
+      setUnlockError('Password is required');
+      return;
+    }
+
+    setIsUnlocking(true);
+    try {
+      const isValid = await verifyAdminPassword(unlockPassword);
+      if (isValid) {
+        sessionStorage.setItem('admin_authenticated', 'true');
+        window.dispatchEvent(new Event('admin_auth_changed'));
+        setIsAuthenticated(true);
+      } else {
+        setUnlockError('Incorrect password. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setUnlockError('Verification error occurred');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const auth = sessionStorage.getItem('admin_authenticated') === 'true';
+      setIsAuthenticated(auth);
+    }
+  }, []);
+
+  useEffect(() => {
+    const checkAuth = () => {
+      setIsAuthenticated(sessionStorage.getItem('admin_authenticated') === 'true');
+    };
+    window.addEventListener('admin_auth_changed', checkAuth);
+    return () => window.removeEventListener('admin_auth_changed', checkAuth);
+  }, []);
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setPasswordError('All fields are required');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      setPasswordError('Password must be at least 4 characters long');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const success = await changeAdminPassword(oldPassword, newPassword);
+      if (success) {
+        setPasswordSuccess('Administrator password changed successfully!');
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordError('Failed to change password. Please verify current password.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setPasswordError(err.message || 'Error occurred. Please verify your current password.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1450,6 +1541,51 @@ export default function AdminPanel() {
     return matchesSearch && matchesModule;
   });
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden p-6 space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="flex flex-col items-center text-center space-y-2">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+              <Lock size={28} />
+            </div>
+            <h2 className="text-lg font-black text-slate-800">Admin Control Locked</h2>
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed font-semibold">
+              Please enter the administrator password to unlock the administrative console.
+            </p>
+          </div>
+
+          <form onSubmit={handleUnlockSubmit} className="space-y-4 text-xs font-bold text-slate-600">
+            <div className="space-y-1.5">
+              <input
+                type="password"
+                value={unlockPassword}
+                onChange={(e) => setUnlockPassword(e.target.value)}
+                placeholder="Administrator Password"
+                className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition text-center"
+                autoFocus
+              />
+            </div>
+
+            {unlockError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-150 text-[11px] font-semibold text-rose-600 rounded-xl text-center">
+                {unlockError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isUnlocking}
+              className="w-full py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 transition rounded-xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              {isUnlocking ? 'Unlocking...' : 'Unlock Console'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       
@@ -1469,7 +1605,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs navigation grid */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-2 border-b border-slate-200 pb-3">
+      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-12 gap-2 border-b border-slate-200 pb-3">
         {[
           { id: 'employees', label: 'Enroll & Transfer', icon: Users },
           { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
@@ -1481,7 +1617,8 @@ export default function AdminPanel() {
           { id: 'holidays', label: 'Holidays Master', icon: CalendarDays },
           { id: 'updates', label: 'System Update', icon: RefreshCw },
           { id: 'audit', label: 'Audit Logs', icon: History },
-          { id: 'backups', label: 'DB Backups', icon: Database }
+          { id: 'backups', label: 'DB Backups', icon: Database },
+          { id: 'security', label: 'Security & Auth', icon: Lock }
         ].map(tab => (
           <button
             key={tab.id}
@@ -3132,6 +3269,74 @@ export default function AdminPanel() {
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="page-transition glass-panel p-6 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+                <Lock size={15} className="text-indigo-600" />
+                Security & Authentication Settings
+              </h3>
+
+              <form onSubmit={handlePasswordChangeSubmit} className="space-y-4 max-w-sm text-xs font-bold text-slate-600">
+                <p className="text-slate-500 font-medium text-[11px]">
+                  Use this form to change the administrative password. Changing this will affect all password-protected operational actions across the system.
+                </p>
+
+                <div className="space-y-1.5">
+                  <label className="block uppercase tracking-wider text-[10px] text-slate-500">Current Admin Password</label>
+                  <input
+                    type="password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block uppercase tracking-wider text-[10px] text-slate-500">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block uppercase tracking-wider text-[10px] text-slate-500">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-150 text-[11px] text-rose-600 rounded-xl">
+                    {passwordError}
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-150 text-[11px] text-emerald-600 rounded-xl">
+                    {passwordSuccess}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="px-4 py-2.5 text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 rounded-xl font-bold transition shadow-sm cursor-pointer"
+                >
+                  {isChangingPassword ? 'Updating Password...' : 'Change Password'}
+                </button>
+              </form>
             </div>
           )}
 

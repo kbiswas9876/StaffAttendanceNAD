@@ -62,6 +62,7 @@ import {
   parseLocalDate
 } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
+import AdminAuthModal from '../components/AdminAuthModal';
 
 // --- EMPLOYEE PROFILE 360 COMPONENT ---
 interface ProfileProps {
@@ -151,7 +152,36 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const [overrideTo, setOverrideTo] = useState('');
   const [overrideShift, setOverrideShift] = useState('N');
 
-  const openEditModal = () => {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [pendingAuthAction, setPendingAuthAction] = useState<'edit-balances' | 'edit-pattern' | null>(null);
+
+  const checkAuthAndExecute = (action: 'edit-balances' | 'edit-pattern') => {
+    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+    if (isAuthenticated) {
+      if (action === 'edit-balances') {
+        openEditModalActual();
+      } else {
+        openScheduleEditModalActual();
+      }
+    } else {
+      setPendingAuthAction(action);
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    if (pendingAuthAction === 'edit-balances') {
+      openEditModalActual();
+    } else if (pendingAuthAction === 'edit-pattern') {
+      openScheduleEditModalActual();
+    }
+    setPendingAuthAction(null);
+  };
+
+  const openEditModal = () => checkAuthAndExecute('edit-balances');
+  const openScheduleEditModal = () => checkAuthAndExecute('edit-pattern');
+
+  const openEditModalActual = () => {
     if (leaveBank) {
       setEditTotalCl(leaveBank.total_cl);
       setEditTotalLap(leaveBank.total_lap);
@@ -186,7 +216,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     }
   };
 
-  const openScheduleEditModal = () => {
+  const openScheduleEditModalActual = () => {
     if (!employee) return;
     setEmpRestDay(employee.default_rest_day);
     const sched = employee.weekly_schedule as any;
@@ -727,35 +757,66 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       let bgClass = '';
       let icon = null;
       let shiftLabel = '';
-      let textClass = 'text-white font-extrabold';
-      let weekdayClass = 'text-white/90 font-black';
-      let dateClass = 'text-white/80 font-semibold text-[8px] mt-0.5';
-      let iconColor = 'text-white';
+      let textClass = '';
+      let weekdayClass = '';
+      let dateClass = '';
+      let iconWrapperClass = '';
+      let iconColor = '';
 
       if (code === 'N' || code === 'P/N') {
-        bgClass = 'bg-indigo-600 border-transparent shadow-sm';
-        icon = <Moon size={12} className={`${iconColor} animate-pulse fill-white/20`} />;
+        bgClass = 'bg-indigo-50 border-indigo-200 shadow-2xs';
+        iconColor = 'text-indigo-600';
+        iconWrapperClass = 'bg-indigo-100/80';
+        icon = <Moon size={12} className={`${iconColor} animate-pulse fill-indigo-600/10`} />;
         shiftLabel = 'Night';
+        textClass = 'text-indigo-900 font-extrabold';
+        weekdayClass = 'text-indigo-950 font-black';
+        dateClass = 'text-indigo-800/80 font-semibold text-[8px] mt-0.5';
       } else if (code === 'G' || code === 'P') {
-        bgClass = 'bg-emerald-600 border-transparent shadow-sm';
-        icon = <Sun size={12} className={`${iconColor} fill-white/20`} />;
+        bgClass = 'bg-emerald-50 border-emerald-200 shadow-2xs';
+        iconColor = 'text-emerald-600';
+        iconWrapperClass = 'bg-emerald-100/80';
+        icon = <Sun size={12} className={`${iconColor} fill-emerald-600/10`} />;
         shiftLabel = 'General';
+        textClass = 'text-emerald-900 font-extrabold';
+        weekdayClass = 'text-emerald-950 font-black';
+        dateClass = 'text-emerald-800/80 font-semibold text-[8px] mt-0.5';
       } else if (code === 'M') {
-        bgClass = 'bg-sky-600 border-transparent shadow-sm';
+        bgClass = 'bg-sky-50 border-sky-200 shadow-2xs';
+        iconColor = 'text-sky-600';
+        iconWrapperClass = 'bg-sky-100/80';
         icon = <Sunrise size={12} className={iconColor} />;
         shiftLabel = 'Morning';
+        textClass = 'text-sky-900 font-extrabold';
+        weekdayClass = 'text-sky-950 font-black';
+        dateClass = 'text-sky-800/80 font-semibold text-[8px] mt-0.5';
       } else if (code === 'E') {
-        bgClass = 'bg-orange-600 border-transparent shadow-sm';
+        bgClass = 'bg-orange-50 border-orange-200 shadow-2xs';
+        iconColor = 'text-orange-600';
+        iconWrapperClass = 'bg-orange-100/80';
         icon = <Sunset size={12} className={iconColor} />;
         shiftLabel = 'Evening';
+        textClass = 'text-orange-900 font-extrabold';
+        weekdayClass = 'text-orange-950 font-black';
+        dateClass = 'text-orange-800/80 font-semibold text-[8px] mt-0.5';
       } else if (code === 'R') {
-        bgClass = 'bg-slate-500 border-transparent shadow-sm';
+        bgClass = 'bg-slate-50 border-slate-200 shadow-2xs';
+        iconColor = 'text-slate-550';
+        iconWrapperClass = 'bg-slate-100';
         icon = <Coffee size={12} className={iconColor} />;
         shiftLabel = 'Rest';
+        textClass = 'text-slate-600 font-extrabold';
+        weekdayClass = 'text-slate-800 font-black';
+        dateClass = 'text-slate-500/80 font-semibold text-[8px] mt-0.5';
       } else {
-        bgClass = 'bg-blue-600 border-transparent shadow-sm';
+        bgClass = 'bg-blue-50 border-blue-200 shadow-2xs';
+        iconColor = 'text-blue-600';
+        iconWrapperClass = 'bg-blue-100/80';
         icon = <Sunrise size={12} className={iconColor} />;
         shiftLabel = code;
+        textClass = 'text-blue-900 font-extrabold';
+        weekdayClass = 'text-blue-950 font-black';
+        dateClass = 'text-blue-800/80 font-semibold text-[8px] mt-0.5';
       }
 
       const dateObj = new Date(dateStr);
@@ -767,7 +828,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           className={`flex flex-col items-center justify-between py-2 px-1 rounded-xl border text-center transition hover:scale-[1.06] hover:shadow-md select-none relative ${bgClass} ${
             isToday 
               ? 'ring-4 ring-yellow-400 ring-offset-1 shadow-lg border-yellow-350 scale-[1.04]' 
-              : 'border-transparent'
+              : 'border-slate-200'
           }`}
         >
           {isToday && (
@@ -777,7 +838,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           )}
           <span className={`text-[8.5px] uppercase tracking-wider font-black ${weekdayClass}`}>{dayName.substring(0, 3)}</span>
           <span className={dateClass}>{formattedDate}</span>
-          <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center my-1.5 shrink-0">
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center my-1.5 shrink-0 ${iconWrapperClass}`}>
             {icon}
           </div>
           <span className={`text-[9.5px] tracking-tight leading-none truncate w-full ${textClass}`} title={shiftLabel}>{shiftLabel}</span>
@@ -1889,6 +1950,16 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         </div>,
         document.body
       )}
+
+      {/* Admin Auth Modal */}
+      <AdminAuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setPendingAuthAction(null);
+        }} 
+        onSuccess={handleAuthSuccess} 
+      />
     </div>
   );
 }
