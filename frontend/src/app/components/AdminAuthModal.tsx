@@ -13,6 +13,7 @@ interface AdminAuthModalProps {
 export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuthModalProps) {
   const [password, setPassword] = useState('');
   const [rememberSession, setRememberSession] = useState(true);
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -32,10 +33,15 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
     try {
       const isValid = await verifyAdminPassword(password);
       if (isValid) {
-        if (rememberSession) {
+        if (rememberDevice) {
+          localStorage.setItem('admin_authenticated', 'true');
           sessionStorage.setItem('admin_authenticated', 'true');
+        } else if (rememberSession) {
+          sessionStorage.setItem('admin_authenticated', 'true');
+          localStorage.removeItem('admin_authenticated');
         } else {
           sessionStorage.removeItem('admin_authenticated');
+          localStorage.removeItem('admin_authenticated');
         }
         // Let's also trigger an event so other parts of the app know immediately
         window.dispatchEvent(new Event('admin_auth_changed'));
@@ -105,16 +111,33 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
             </div>
           )}
 
-          {/* Remember Checkbox */}
-          <label className="flex items-center gap-2 select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rememberSession}
-              onChange={(e) => setRememberSession(e.target.checked)}
-              className="w-3.5 h-3.5 border-slate-305 rounded-sm text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
-            />
-            <span className="text-[11px] font-medium text-slate-500">Remember for this session</span>
-          </label>
+          {/* Remember Checkboxes */}
+          <div className="flex flex-col gap-2 pt-1">
+            <label className="flex items-center gap-2 select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberSession}
+                onChange={(e) => {
+                  setRememberSession(e.target.checked);
+                  if (!e.target.checked) setRememberDevice(false);
+                }}
+                className="w-3.5 h-3.5 border-slate-355 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="text-[11px] font-semibold text-slate-500">Remember for this session</span>
+            </label>
+            <label className="flex items-center gap-2 select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={(e) => {
+                  setRememberDevice(e.target.checked);
+                  if (e.target.checked) setRememberSession(true);
+                }}
+                className="w-3.5 h-3.5 border-slate-355 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="text-[11px] font-semibold text-slate-550">Keep me logged in on this device</span>
+            </label>
+          </div>
 
           {/* Action buttons */}
           <div className="flex gap-2.5 pt-2">

@@ -156,7 +156,7 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const [pendingAuthAction, setPendingAuthAction] = useState<'edit-balances' | 'edit-pattern' | null>(null);
 
   const checkAuthAndExecute = (action: 'edit-balances' | 'edit-pattern') => {
-    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true' || localStorage.getItem('admin_authenticated') === 'true';
     if (isAuthenticated) {
       if (action === 'edit-balances') {
         openEditModalActual();

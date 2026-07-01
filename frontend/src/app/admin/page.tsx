@@ -214,6 +214,7 @@ export default function AdminPanel() {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
+  const [rememberUnlock, setRememberUnlock] = useState(false);
   const [unlockError, setUnlockError] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
 
@@ -229,7 +230,13 @@ export default function AdminPanel() {
     try {
       const isValid = await verifyAdminPassword(unlockPassword);
       if (isValid) {
-        sessionStorage.setItem('admin_authenticated', 'true');
+        if (rememberUnlock) {
+          localStorage.setItem('admin_authenticated', 'true');
+          sessionStorage.setItem('admin_authenticated', 'true');
+        } else {
+          sessionStorage.setItem('admin_authenticated', 'true');
+          localStorage.removeItem('admin_authenticated');
+        }
         window.dispatchEvent(new Event('admin_auth_changed'));
         setIsAuthenticated(true);
       } else {
@@ -243,16 +250,24 @@ export default function AdminPanel() {
     }
   };
 
+  const handleLockConsole = () => {
+    sessionStorage.removeItem('admin_authenticated');
+    localStorage.removeItem('admin_authenticated');
+    window.dispatchEvent(new Event('admin_auth_changed'));
+    setIsAuthenticated(false);
+    showToast("Administrative console locked.", "success");
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const auth = sessionStorage.getItem('admin_authenticated') === 'true';
+      const auth = sessionStorage.getItem('admin_authenticated') === 'true' || localStorage.getItem('admin_authenticated') === 'true';
       setIsAuthenticated(auth);
     }
   }, []);
 
   useEffect(() => {
     const checkAuth = () => {
-      setIsAuthenticated(sessionStorage.getItem('admin_authenticated') === 'true');
+      setIsAuthenticated(sessionStorage.getItem('admin_authenticated') === 'true' || localStorage.getItem('admin_authenticated') === 'true');
     };
     window.addEventListener('admin_auth_changed', checkAuth);
     return () => window.removeEventListener('admin_auth_changed', checkAuth);
@@ -1539,9 +1554,7 @@ export default function AdminPanel() {
                           log.user.toLowerCase().includes(auditSearch.toLowerCase());
     const matchesModule = auditModuleFilter === 'ALL' || log.module === auditModuleFilter;
     return matchesSearch && matchesModule;
-  });
-
-  if (!isAuthenticated) {
+  });  if (!isAuthenticated) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
         <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden p-6 space-y-4 animate-in zoom-in-95 duration-200">
@@ -1550,7 +1563,7 @@ export default function AdminPanel() {
               <Lock size={28} />
             </div>
             <h2 className="text-lg font-black text-slate-800">Admin Control Locked</h2>
-            <p className="text-xs text-slate-500 max-w-xs leading-relaxed font-semibold">
+            <p className="text-xs text-slate-505 max-w-xs leading-relaxed font-semibold">
               Please enter the administrator password to unlock the administrative console.
             </p>
           </div>
@@ -1565,6 +1578,19 @@ export default function AdminPanel() {
                 className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition text-center"
                 autoFocus
               />
+            </div>
+
+            <div className="flex items-center gap-2 select-none cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                id="rememberUnlock"
+                checked={rememberUnlock}
+                onChange={(e) => setRememberUnlock(e.target.checked)}
+                className="w-3.5 h-3.5 border-slate-355 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+              />
+              <label htmlFor="rememberUnlock" className="text-[11px] font-semibold text-slate-500 cursor-pointer">
+                Keep me logged in on this device
+              </label>
             </div>
 
             {unlockError && (
@@ -1586,6 +1612,36 @@ export default function AdminPanel() {
     );
   }
 
+  const tabCategories = [
+    {
+      title: 'Roster & Staff',
+      items: [
+        { id: 'employees', label: 'Enroll & Transfer', icon: Users },
+        { id: 'roster', label: 'Roster Planner', icon: Calendar },
+        { id: 'roster-rules', label: 'Roster Settings', icon: Sliders }
+      ]
+    },
+    {
+      title: 'Infrastructure & Timing',
+      items: [
+        { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
+        { id: 'shifts', label: 'Shift Rules', icon: Clock },
+        { id: 'codes', label: 'Roster Codes', icon: Sliders },
+        { id: 'holidays', label: 'Holidays Master', icon: CalendarDays }
+      ]
+    },
+    {
+      title: 'System & Security',
+      items: [
+        { id: 'settings', label: 'My Section', icon: Settings },
+        { id: 'security', label: 'Security & Auth', icon: Lock },
+        { id: 'updates', label: 'System Update', icon: RefreshCw },
+        { id: 'backups', label: 'DB Backups', icon: Database },
+        { id: 'audit', label: 'Audit Logs', icon: History }
+      ]
+    }
+  ];
+
   return (
     <div className="p-6 space-y-6">
       
@@ -1595,72 +1651,40 @@ export default function AdminPanel() {
           <h1 className="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
             Admin Control & System Settings
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-505 mt-1">
             Configure calendar events, database copies, transaction audit trails, metro lines, roster sections, and signaller profiles.
           </p>
         </div>
-        <div className="no-print bg-theme-active text-theme-active px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-theme-active shadow-sm animate-pulse">
-          Super Admin Mode
+        <div className="flex items-center gap-3 no-print">
+          <div className="bg-theme-active text-theme-active px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-theme-active shadow-sm animate-pulse">
+            Super Admin Mode
+          </div>
+          <button
+            onClick={handleLockConsole}
+            className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <Lock size={11} /> Lock Console
+          </button>
         </div>
       </div>
 
-      {/* Tabs navigation grid */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-12 gap-2 border-b border-slate-200 pb-3">
-        {[
-          { id: 'employees', label: 'Enroll & Transfer', icon: Users },
-          { id: 'lines', label: 'Lines & Sections', icon: TrendingUp },
-          { id: 'settings', label: getTranslation(lang, 'My Section'), icon: Settings },
-          { id: 'roster-rules', label: 'Roster Settings', icon: Sliders },
-          { id: 'shifts', label: 'Shift Rules', icon: Clock },
-          { id: 'roster', label: 'Roster Planner', icon: Calendar },
-          { id: 'codes', label: 'Roster Codes', icon: Sliders },
-          { id: 'holidays', label: 'Holidays Master', icon: CalendarDays },
-          { id: 'updates', label: 'System Update', icon: RefreshCw },
-          { id: 'audit', label: 'Audit Logs', icon: History },
-          { id: 'backups', label: 'DB Backups', icon: Database },
-          { id: 'security', label: 'Security & Auth', icon: Lock }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id as any);
-              handleCancelEditEmployee();
-              handleCancelEditLine();
-              handleCancelEditSection();
-              handleCancelEditCode();
-              setEditingHolidayId(null);
-            }}
-            className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition cursor-pointer select-none duration-150 ${
-              activeTab === tab.id
-                ? 'tab-theme-active'
-                : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'
-            }`}
-          >
-            <tab.icon size={18} className="mb-1 shrink-0" />
-            <span className="text-[10px] font-bold tracking-tight block">{getTranslation(lang, tab.label)}</span>
-          </button>
-        ))}
-      </div>
-
       {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
-          {/* Left Column Form Skeleton */}
-          <div className="space-y-6">
-            <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-              <div className="h-4 w-36 bg-[#E5E3DC] rounded pb-1" />
-              <div className="space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="h-3 w-16 bg-[#E5E3DC] rounded" />
-                    <div className="h-9 w-full bg-[#FAF9F6] border border-slate-200/50 rounded-lg" />
-                  </div>
-                ))}
-                <div className="h-9 w-24 bg-[#E5E3DC] rounded-lg mt-2" />
+        <div className="flex flex-col xl:flex-row gap-6 animate-pulse">
+          {/* Left Column Sidebar Skeleton */}
+          <div className="w-full xl:w-64 shrink-0 flex flex-col gap-4 no-print">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
+                <div className="h-3 w-20 bg-[#E5E3DC] rounded px-1" />
+                <div className="flex flex-col gap-2">
+                  {[1, 2, 3].map(j => (
+                    <div key={j} className="h-8 w-full bg-[#FAF9F6] border border-slate-100 rounded-xl" />
+                  ))}
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-          {/* Right Column List Skeleton */}
-          <div className="lg:col-span-2 glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden bg-white shadow-sm">
+          {/* Right Column Content Skeleton */}
+          <div className="flex-1 glass-panel rounded-xl border border-slate-200 flex flex-col overflow-hidden bg-white shadow-sm h-[500px]">
             <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <div className="h-4 w-44 bg-[#E5E3DC] rounded" />
               <div className="h-6 w-16 bg-[#E5E3DC] rounded" />
@@ -1684,10 +1708,48 @@ export default function AdminPanel() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col xl:flex-row gap-6">
           
-          {/* TAB 1: EMPLOYEES & TRANSFER */}
-          {activeTab === 'employees' && (
+          {/* Left Column Sidebar */}
+          <div className="w-full xl:w-64 shrink-0 flex flex-col gap-4 no-print">
+            {tabCategories.map(category => (
+              <div key={category.title} className="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-2.5 shadow-sm">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">
+                  {getTranslation(lang, category.title)}
+                </span>
+                <div className="flex flex-row flex-wrap xl:flex-col gap-1">
+                  {category.items.map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveTab(tab.id as any);
+                          handleCancelEditEmployee();
+                          handleCancelEditLine();
+                          handleCancelEditSection();
+                          handleCancelEditCode();
+                          setEditingHolidayId(null);
+                        }}
+                        className={`flex items-center gap-3 w-auto xl:w-full px-3.5 py-2.5 rounded-xl transition duration-150 font-bold text-xs select-none cursor-pointer ${
+                          isActive
+                            ? 'tab-theme-active border border-theme-active shadow-2xs'
+                            : 'text-slate-655 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
+                        }`}
+                      >
+                        <tab.icon size={15} className={`shrink-0 ${isActive ? 'text-theme-active-icon' : 'text-slate-405'}`} />
+                        <span>{getTranslation(lang, tab.label)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Right Column Content Area */}
+          <div className="flex-1 min-w-0">
+            {activeTab === 'employees' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Add & Transfer Forms Column */}
               <div className="space-y-6">
@@ -3712,6 +3774,7 @@ export default function AdminPanel() {
             </div>
           )}
 
+          </div>
         </div>
       )}
 

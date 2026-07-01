@@ -133,7 +133,7 @@ export default function TravellingAllowancePage() {
 
   const handleSaveSettingsRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true' || localStorage.getItem('admin_authenticated') === 'true';
     if (isAuthenticated) {
       saveSettingsActual();
     } else {

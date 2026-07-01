@@ -628,103 +628,105 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             </h1>
 
             {/* Dynamic Active Line & Section selector tabs */}
-            <div className="flex items-center gap-3">
-              {lines.length > 0 && (
-                <div className="relative flex items-center border border-slate-200/80 bg-slate-50 hover:bg-slate-100/80 rounded-xl transition-colors select-none">
-                  <select
-                    value={selectedLineId}
-                    onChange={(e) => {
-                      const lineId = Number(e.target.value);
-                      setSelectedLineId(lineId);
-                      localStorage.setItem('erp_active_line_id', String(lineId));
-                      // Find first section of this line and switch
-                      const firstSec = sections.find(s => s.line_id === lineId);
-                      if (firstSec) {
-                        handleSectionChange(firstSec.section_code);
-                      }
-                    }}
-                    className="bg-transparent border-none text-[11px] font-black text-slate-700 pl-3.5 pr-8 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wider"
-                  >
-                    {lines.map(l => (
-                      <option key={l.id} value={l.id}>{l.line_name.toUpperCase()}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-2.5 pointer-events-none text-slate-400 flex items-center">
-                    <ChevronRight size={11} className="rotate-90" />
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-slate-50 border border-slate-200/80 p-0.5 rounded-xl flex items-center gap-0.5 shadow-2xs">
-                {sections
-                  .filter(s => s.line_id === selectedLineId)
-                  .map((sec) => (
-                    <button
-                      key={sec.section_code}
-                      onClick={() => handleSectionChange(sec.section_code)}
-                      className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${activeSection === sec.section_code
-                        ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}`
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
-                        }`}
+            {pathname !== '/admin' && (
+              <div className="flex items-center gap-3 animate-in fade-in duration-200">
+                {lines.length > 0 && (
+                  <div className="relative flex items-center border border-slate-200/80 bg-slate-50 hover:bg-slate-100/80 rounded-xl transition-colors select-none">
+                    <select
+                      value={selectedLineId}
+                      onChange={(e) => {
+                        const lineId = Number(e.target.value);
+                        setSelectedLineId(lineId);
+                        localStorage.setItem('erp_active_line_id', String(lineId));
+                        // Find first section of this line and switch
+                        const firstSec = sections.find(s => s.line_id === lineId);
+                        if (firstSec) {
+                          handleSectionChange(firstSec.section_code);
+                        }
+                      }}
+                      className="bg-transparent border-none text-[11px] font-black text-slate-700 pl-3.5 pr-8 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wider"
                     >
-                      {sec.section_code}
-                    </button>
-                  ))}
-                <button
-                  onClick={() => handleSectionChange('ALL')}
-                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${activeSection === 'ALL'
-                    ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}`
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-205/35'
-                    }`}
-                >
-                  {getTranslation(lang, 'Joint View')}
-                </button>
-              </div>
+                      {lines.map(l => (
+                        <option key={l.id} value={l.id}>{l.line_name.toUpperCase()}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-2.5 pointer-events-none text-slate-400 flex items-center">
+                      <ChevronRight size={11} className="rotate-90" />
+                    </div>
+                  </div>
+                )}
 
-
-              {/* Inline Checklist for selecting active sections under Joint View */}
-              {activeSection === 'ALL' && (
-                <div className="flex flex-wrap items-center gap-4 ml-2 px-3.5 py-1.5 bg-[#FDFDFD] border border-slate-200/80 rounded-xl shadow-2xs animate-in fade-in duration-200 select-none">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{getTranslation(lang, 'Include')}:</span>
-                  {lines.map((line) => {
-                    const lineSections = sections.filter(s => s.line_id === line.id);
-                    if (lineSections.length === 0) return null;
-                    return (
-                      <div key={line.id} className="flex items-center gap-2 border-r border-slate-100 pr-3.5 last:border-r-0 mr-1 shrink-0">
-                        <span
-                          className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs leading-none shrink-0"
-                          style={{
-                            backgroundColor: line.color_code || '#64748B',
-                            color: '#FFFFFF'
-                          }}
-                        >
-                          {line.line_name.replace(' Line', '')}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {lineSections.map((sec) => {
-                            const isChecked = selectedJoinSections.includes(sec.section_code);
-                            return (
-                              <label
-                                key={sec.section_code}
-                                className="flex items-center gap-1 cursor-pointer text-[10.5px] font-black text-slate-750 hover:text-slate-900 select-none transition-colors"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => toggleJoinSection(sec.section_code)}
-                                  className="w-3 h-3 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
-                                />
-                                {sec.section_code}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="bg-slate-50 border border-slate-200/80 p-0.5 rounded-xl flex items-center gap-0.5 shadow-2xs">
+                  {sections
+                    .filter(s => s.line_id === selectedLineId)
+                    .map((sec) => (
+                      <button
+                        key={sec.section_code}
+                        onClick={() => handleSectionChange(sec.section_code)}
+                        className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${activeSection === sec.section_code
+                          ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}`
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/35'
+                          }`}
+                      >
+                        {sec.section_code}
+                      </button>
+                    ))}
+                  <button
+                    onClick={() => handleSectionChange('ALL')}
+                    className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition-all cursor-pointer ${activeSection === 'ALL'
+                      ? `${theme.iconBg} text-white shadow-xs ${theme.iconGlow}`
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-205/35'
+                      }`}
+                  >
+                    {getTranslation(lang, 'Joint View')}
+                  </button>
                 </div>
-              )}
-            </div>
+
+
+                {/* Inline Checklist for selecting active sections under Joint View */}
+                {activeSection === 'ALL' && (
+                  <div className="flex flex-wrap items-center gap-4 ml-2 px-3.5 py-1.5 bg-[#FDFDFD] border border-slate-200/80 rounded-xl shadow-2xs animate-in fade-in duration-200 select-none">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{getTranslation(lang, 'Include')}:</span>
+                    {lines.map((line) => {
+                      const lineSections = sections.filter(s => s.line_id === line.id);
+                      if (lineSections.length === 0) return null;
+                      return (
+                        <div key={line.id} className="flex items-center gap-2 border-r border-slate-100 pr-3.5 last:border-r-0 mr-1 shrink-0">
+                          <span
+                            className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs leading-none shrink-0"
+                            style={{
+                              backgroundColor: line.color_code || '#64748B',
+                              color: '#FFFFFF'
+                            }}
+                          >
+                            {line.line_name.replace(' Line', '')}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {lineSections.map((sec) => {
+                              const isChecked = selectedJoinSections.includes(sec.section_code);
+                              return (
+                                <label
+                                  key={sec.section_code}
+                                  className="flex items-center gap-1 cursor-pointer text-[10.5px] font-black text-slate-750 hover:text-slate-900 select-none transition-colors"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleJoinSection(sec.section_code)}
+                                    className="w-3 h-3 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  {sec.section_code}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
