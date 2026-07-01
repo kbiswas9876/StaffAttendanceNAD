@@ -123,6 +123,7 @@ export default function TravellingAllowancePage() {
   const [tempThresholds, setTempThresholds] = useState<TAThresholdRule[]>([]);
   const [tempRoundingMode, setTempRoundingMode] = useState<'none' | 'nearest_integer' | 'nearest_05' | 'ceiling' | 'floor'>('nearest_integer');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isConfirmRecalcOpen, setIsConfirmRecalcOpen] = useState(false);
 
   const handleOpenSettings = () => {
     setTempRates(taConfig.rates.map(r => ({ ...r })));
@@ -135,25 +136,127 @@ export default function TravellingAllowancePage() {
     e.preventDefault();
     const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true' || localStorage.getItem('admin_authenticated') === 'true';
     if (isAuthenticated) {
-      saveSettingsActual();
+      setIsConfirmRecalcOpen(true);
     } else {
       setIsAuthOpen(true);
     }
   };
 
-  const saveSettingsActual = async () => {
+  const saveSettingsActual = async (recalculateHistory: boolean) => {
     setIsLoading(true);
     try {
       const success = await saveTAConfig({
         rates: tempRates,
         thresholds: tempThresholds,
         rounding_mode: tempRoundingMode
-      });
+      }, recalculateHistory);
       if (success) {
         showNotification("Travelling Allowance calculation settings updated successfully!", "success");
         const config = await getTAConfig();
         setTaConfig(config);
         setIsSettingsOpen(false);
+        setIsConfirmRecalcOpen(false);
+        
+        // Dynamic recalculate open page entries
+        if (entries.length > 0) {
+          const empLevel = selectedEmp?.level || 1;
+          const matchedRate = config.rates.find((r: any) => empLevel >= r.min_level && empLevel <= r.max_level);
+          const entryRate = matchedRate ? matchedRate.rate : (empLevel >= 6 ? 1000 : 650);
+          
+          let updated: TAEntry[] = [];
+          if (journeyType === 'NORMAL') {
+            const numPairs = Math.ceil(entries.length / 2);
+            for (let i = 0; i < numPairs; i++) {
+              const legOut = { ...entries[2 * i] };
+              const legIn = (2 * i + 1) < entries.length ? { ...entries[2 * i + 1] } : null;
+              
+              const timeOut = legOut.time_left || '';
+              const timeIn = legIn ? (legIn.time_arrived || '') : '';
+              
+              const { multiplier, fractionText } = calculateNormalLegAbsence(timeOut, timeIn);
+              
+              // Apply rounded calculation for legOut
+              const baseVal = multiplier * entryRate;
+              let entryAmt = 0;
+              if (config.rounding_mode === 'none') {
+                entryAmt = Number(baseVal.toFixed(2));
+              } else if (config.rounding_mode === 'nearest_05') {
+                entryAmt = Math.round(baseVal * 2) / 2;
+              } else if (config.rounding_mode === 'ceiling') {
+                entryAmt = Math.ceil(baseVal);
+              } else if (config.rounding_mode === 'floor') {
+                entryAmt = Math.floor(baseVal);
+              } else {
+                entryAmt = Math.round(baseVal);
+              }
+              
+              legOut.rate = entryRate;
+              legOut.days_nights = fractionText;
+              legOut.amount = entryAmt;
+              updated.push(legOut);
+              
+              if (legIn) {
+                legIn.rate = 0;
+                legIn.days_nights = '';
+                legIn.amount = 0;
+                updated.push(legIn);
+              }
+            }
+          } else {
+            // TRAINING
+            updated = entries.map(entry => {
+              let entryAmt = entry.amount;
+              if (entry.is_stay) {
+                let days = 1.0;
+                let days_nights_str = String(entry.days_nights || '');
+                if (days_nights_str.includes('X')) {
+                  const parts = days_nights_str.split('X');
+                  if (parts.length > 1) {
+                    days = parseFloat(parts[1]) || 1.0;
+                  }
+                } else {
+                  days = parseFloat(days_nights_str) || 1.0;
+                }
+                
+                const baseVal = days * entryRate;
+                if (config.rounding_mode === 'none') {
+                  entryAmt = Number(baseVal.toFixed(2));
+                } else if (config.rounding_mode === 'nearest_05') {
+                  entryAmt = Math.round(baseVal * 2) / 2;
+                } else if (config.rounding_mode === 'ceiling') {
+                  entryAmt = Math.ceil(baseVal);
+                } else if (config.rounding_mode === 'floor') {
+                  entryAmt = Math.floor(baseVal);
+                } else {
+                  entryAmt = Math.round(baseVal);
+                }
+              } else {
+                const res = calculateNormalLegAbsence(entry.time_left || '', entry.time_arrived || '');
+                const baseVal = res.multiplier * entryRate;
+                if (config.rounding_mode === 'none') {
+                  entryAmt = Number(baseVal.toFixed(2));
+                } else if (config.rounding_mode === 'nearest_05') {
+                  entryAmt = Math.round(baseVal * 2) / 2;
+                } else if (config.rounding_mode === 'ceiling') {
+                  entryAmt = Math.ceil(baseVal);
+                } else if (config.rounding_mode === 'floor') {
+                  entryAmt = Math.floor(baseVal);
+                } else {
+                  entryAmt = Math.round(baseVal);
+                }
+              }
+              return { ...entry, rate: entryRate, amount: entryAmt };
+            });
+          }
+          setEntries(updated);
+        }
+        // Refetch and update history list in the UI
+        try {
+          const bills = await getTABills(activeSection);
+          setTaBills(bills);
+        } catch (e) {
+          console.error(e);
+        }
       } else {
         showNotification("Failed to save calculation settings.", "error");
       }
@@ -312,6 +415,15 @@ export default function TravellingAllowancePage() {
     } else {
       return Math.round(val);
     }
+  };
+
+  // Helper: Format amount for display based on rounding settings
+  const formatAmount = (val: number | undefined | null): string => {
+    if (val === undefined || val === null) return '0.00';
+    if (taConfig.rounding_mode === 'none' || taConfig.rounding_mode === 'nearest_05') {
+      return val.toFixed(2);
+    }
+    return Math.round(val).toString();
   };
 
   // Helper: Calculate base rate from pay commission level
@@ -1358,7 +1470,7 @@ export default function TravellingAllowancePage() {
                         </div>
                         <div className="flex items-center gap-4 text-right">
                           <div>Rate: <span className="font-bold text-slate-700">Rs. {legOut.rate}</span></div>
-                          <div>Amount: <span className="font-extrabold text-theme-active">Rs. {legOut.amount}</span></div>
+                          <div>Amount: <span className="font-extrabold text-theme-active">Rs. {formatAmount(legOut.amount)}</span></div>
                         </div>
                       </div>
                     </div>
@@ -1436,7 +1548,7 @@ export default function TravellingAllowancePage() {
                         </div>
                         <div className="flex items-center gap-4 text-right">
                           <div>Rate: <span className="font-bold text-slate-700">Rs. {entry.rate}</span></div>
-                          <div>Amount: <span className="font-extrabold text-theme-active">Rs. {entry.amount}</span></div>
+                          <div>Amount: <span className="font-extrabold text-theme-active">Rs. {formatAmount(entry.amount)}</span></div>
                         </div>
                       </div>
                     </div>
@@ -1560,7 +1672,7 @@ export default function TravellingAllowancePage() {
 
                       <div className="flex items-center justify-end gap-6 pt-3 border-t border-[var(--theme-active-border)]/30 text-xs font-semibold text-slate-500">
                         <div>Rate: <span className="font-bold text-slate-700">Rs. {entry.rate}</span></div>
-                        <div>Amount: <span className="font-extrabold text-theme-active">Rs. {entry.amount}</span></div>
+                        <div>Amount: <span className="font-extrabold text-theme-active">Rs. {formatAmount(entry.amount)}</span></div>
                       </div>
                     </div>
                   );
@@ -1591,7 +1703,7 @@ export default function TravellingAllowancePage() {
               
               <div className="text-right">
                 <div className="text-xs font-semibold text-slate-500">Gross Allowance Claim:</div>
-                <div className="text-xl font-black text-theme-active">Rs. {calculateTotalAmount()}</div>
+                <div className="text-xl font-black text-theme-active">Rs. {formatAmount(calculateTotalAmount())}</div>
               </div>
             </div>
           )}
@@ -1601,134 +1713,140 @@ export default function TravellingAllowancePage() {
       {/* Dynamic TA Config Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+          <div className="bg-[#FAF9F6] border border-slate-200/80 rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             
             {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                  <Settings size={18} />
+            <div className="flex justify-between items-center px-6 py-5 border-b border-slate-200/60 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
+                  <Settings size={20} />
                 </div>
-                <h3 className="font-extrabold text-slate-800 text-sm">Travelling Allowance (TA) Calculation Settings</h3>
+                <div>
+                  <h3 className="font-black text-slate-800 text-sm tracking-tight">Calculation & Rounding Rules</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Travelling Allowance Settings</p>
+                </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setIsSettingsOpen(false)} 
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-150 transition cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition duration-150 cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Scrollable Content */}
-            <form onSubmit={handleSaveSettingsRequest} className="flex-1 overflow-y-auto p-6 space-y-6">
+            <form onSubmit={handleSaveSettingsRequest} className="flex-1 overflow-y-auto p-6 space-y-8">
               
               {/* Section 1: Base Rates by Pay Level */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">1. Pay Level Base Rates</h4>
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider">1. Pay Level Base Rates</h4>
                   <button
                     type="button"
                     onClick={() => setTempRates([...tempRates, { min_level: 1, max_level: 12, rate: 500 }])}
-                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-transparent border-none"
+                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-white border border-slate-200 shadow-3xs px-2.5 py-1.5 rounded-xl transition hover:scale-105 active:scale-95"
                   >
                     + Add Level Rule
                   </button>
                 </div>
-                <div className="border border-slate-155 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-155 font-bold text-slate-500">
-                        <th className="px-4 py-2">Min Pay Level</th>
-                        <th className="px-4 py-2">Max Pay Level</th>
-                        <th className="px-4 py-2">Base Rate (Rs.)</th>
-                        <th className="px-4 py-2 text-center w-12">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tempRates.map((r, idx) => (
-                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min={1}
-                              max={12}
-                              value={r.min_level}
-                              onChange={(e) => {
-                                const newRates = [...tempRates];
-                                newRates[idx].min_level = Number(e.target.value);
-                                setTempRates(newRates);
-                              }}
-                              className="w-16 border border-slate-200 rounded px-2 py-1 text-center"
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min={1}
-                              max={12}
-                              value={r.max_level}
-                              onChange={(e) => {
-                                const newRates = [...tempRates];
-                                newRates[idx].max_level = Number(e.target.value);
-                                setTempRates(newRates);
-                              }}
-                              className="w-16 border border-slate-200 rounded px-2 py-1 text-center"
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              value={r.rate}
-                              onChange={(e) => {
-                                const newRates = [...tempRates];
-                                newRates[idx].rate = Number(e.target.value);
-                                setTempRates(newRates);
-                              }}
-                              className="w-24 border border-slate-200 rounded px-2 py-1"
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setTempRates(tempRates.filter((_, i) => i !== idx))}
-                              className="text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {tempRates.map((r, idx) => (
+                    <div key={idx} className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-3xs flex flex-col justify-between relative group/card transition hover:border-indigo-200">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-extrabold">Rule #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTempRates(tempRates.filter((_, i) => i !== idx))}
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-605 rounded-xl transition duration-150 cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-500">
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Min Level</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={r.min_level}
+                            onChange={(e) => {
+                              const newRates = [...tempRates];
+                              newRates[idx].min_level = Number(e.target.value);
+                              setTempRates(newRates);
+                            }}
+                            className="w-full border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-xl px-2.5 py-1.5 text-center font-bold text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Max Level</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={r.max_level}
+                            onChange={(e) => {
+                              const newRates = [...tempRates];
+                              newRates[idx].max_level = Number(e.target.value);
+                              setTempRates(newRates);
+                            }}
+                            className="w-full border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-xl px-2.5 py-1.5 text-center font-bold text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Rate (Rs)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={r.rate}
+                            onChange={(e) => {
+                              const newRates = [...tempRates];
+                              newRates[idx].rate = Number(e.target.value);
+                              setTempRates(newRates);
+                            }}
+                            className="w-full border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-xl px-2.5 py-1.5 font-bold text-slate-800 text-center focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Section 2: Absence Hours Thresholds */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">2. Absence Duration Multipliers</h4>
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider">2. Absence Duration Multipliers</h4>
                   <button
                     type="button"
                     onClick={() => setTempThresholds([...tempThresholds, { max_hours: 24, multiplier: 1.0 }])}
-                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-transparent border-none"
+                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-white border border-slate-200 shadow-3xs px-2.5 py-1.5 rounded-xl transition hover:scale-105 active:scale-95"
                   >
                     + Add Threshold Rule
                   </button>
                 </div>
-                <div className="border border-slate-155 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-155 font-bold text-slate-500">
-                        <th className="px-4 py-2">Max Hours Limit</th>
-                        <th className="px-4 py-2">Multiplier Ratio (e.g. 0.3 for 30%)</th>
-                        <th className="px-4 py-2 text-center w-12">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tempThresholds.map((t, idx) => (
-                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <td className="px-4 py-2">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {tempThresholds.map((t, idx) => (
+                    <div key={idx} className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-3xs flex flex-col justify-between relative group/card transition hover:border-indigo-200">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-extrabold">Threshold #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTempThresholds(tempThresholds.filter((_, i) => i !== idx))}
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-605 rounded-xl transition duration-150 cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3.5 text-xs font-semibold text-slate-500">
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Max Hours</label>
+                          <div className="flex items-center gap-1.5">
                             <input
                               type="number"
                               min={1}
@@ -1739,47 +1857,40 @@ export default function TravellingAllowancePage() {
                                 newThresholds[idx].max_hours = Number(e.target.value);
                                 setTempThresholds(newThresholds);
                               }}
-                              className="w-20 border border-slate-200 rounded px-2 py-1 text-center"
-                            /> hours
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              step="0.1"
-                              min={0.0}
-                              max={1.0}
-                              value={t.multiplier}
-                              onChange={(e) => {
-                                const newThresholds = [...tempThresholds];
-                                newThresholds[idx].multiplier = Number(e.target.value);
-                                setTempThresholds(newThresholds);
-                              }}
-                              className="w-24 border border-slate-200 rounded px-2 py-1 text-center"
+                              className="w-full border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-xl px-2.5 py-1.5 text-center font-bold text-slate-800 focus:outline-none"
                             />
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setTempThresholds(tempThresholds.filter((_, i) => i !== idx))}
-                              className="text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            <span className="text-[10px] text-slate-405 font-extrabold uppercase">hrs</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Multiplier Ratio</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min={0.0}
+                            max={1.0}
+                            value={t.multiplier}
+                            onChange={(e) => {
+                              const newThresholds = [...tempThresholds];
+                              newThresholds[idx].multiplier = Number(e.target.value);
+                              setTempThresholds(newThresholds);
+                            }}
+                            className="w-full border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-xl px-2.5 py-1.5 text-center font-bold text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Section 3: Amount Rounding Rule */}
               <div className="space-y-2">
-                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">3. Amount Rounding Rule</label>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">3. Amount Rounding Rule</label>
                 <select
                   value={tempRoundingMode}
                   onChange={(e) => setTempRoundingMode(e.target.value as any)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 cursor-pointer font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500"
+                  className="w-full bg-white border border-slate-205 rounded-xl px-4 py-3 text-xs text-slate-800 cursor-pointer font-bold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-3xs"
                 >
                   <option value="none">No Rounding (Exact Decimals)</option>
                   <option value="nearest_integer">Round to Nearest Integer (e.g. 437.49 =&gt; 437, 437.5 =&gt; 438)</option>
@@ -1790,17 +1901,17 @@ export default function TravellingAllowancePage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-slate-100 justify-end text-xs">
+              <div className="flex gap-3 pt-5 border-t border-slate-200 justify-end text-xs">
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(false)}
-                  className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 font-bold transition cursor-pointer"
+                  className="px-6 py-2.5 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 font-extrabold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-sm cursor-pointer"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-extrabold transition shadow-sm cursor-pointer"
                 >
                   Save Configuration
                 </button>
@@ -1812,13 +1923,55 @@ export default function TravellingAllowancePage() {
         </div>
       )}
 
+      {/* Recalculate History Confirmation Modal */}
+      {isConfirmRecalcOpen && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-md w-full p-6 text-center space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="mx-auto w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center border border-amber-100 animate-bounce">
+              <AlertCircle size={24} />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-base font-black text-slate-800">Apply to Existing Bills?</h3>
+              <p className="text-xs text-slate-505 leading-relaxed font-semibold">
+                Would you like to recalculate all existing historical TA bills in the database using these new rates and rounding settings?
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-2 pt-2 text-xs">
+              <button
+                type="button"
+                onClick={() => saveSettingsActual(true)}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition shadow-sm cursor-pointer"
+              >
+                Yes, Recalculate Historical Bills
+              </button>
+              <button
+                type="button"
+                onClick={() => saveSettingsActual(false)}
+                className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold rounded-xl transition cursor-pointer"
+              >
+                No, Apply to New Bills Only
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsConfirmRecalcOpen(false)}
+                className="w-full py-2.5 text-slate-400 hover:text-slate-600 font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Admin Verification Modal for TA Settings saving */}
       <AdminAuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onSuccess={() => {
           setIsAuthOpen(false);
-          saveSettingsActual();
+          setIsConfirmRecalcOpen(true);
         }}
       />
     </div>

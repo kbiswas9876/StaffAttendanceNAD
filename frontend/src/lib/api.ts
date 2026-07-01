@@ -643,9 +643,9 @@ export const getTAConfig = async (): Promise<TAConfig> => {
   return apiFetch<TAConfig>("/settings/get-ta-config");
 };
 
-export const saveTAConfig = async (config: TAConfig): Promise<boolean> => {
+export const saveTAConfig = async (config: TAConfig, recalculateHistory: boolean = false): Promise<boolean> => {
   try {
-    const res = await apiFetch<{ status: string }>("/settings/save-ta-config", {
+    const res = await apiFetch<{ status: string }>(`/settings/save-ta-config?recalculate_history=${recalculateHistory}`, {
       method: "POST",
       body: JSON.stringify(config)
     });
