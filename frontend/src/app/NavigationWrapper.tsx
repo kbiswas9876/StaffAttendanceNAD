@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   Search,
+  ClipboardList,
   BookOpen,
   Keyboard,
   Bell,
@@ -546,6 +547,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     { name: 'Staff Directory', path: '/employees', icon: Users },
     { name: 'Night Duty NDA', path: '/night-duty', icon: Moon },
     { name: 'Travelling Allowance', path: '/travelling-allowance', icon: Milestone },
+    { name: 'Manpower Planning', path: '/manpower', icon: ClipboardList },
     { name: 'Admin Panel', path: '/admin', icon: ShieldCheck },
   ];
 

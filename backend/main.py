@@ -55,6 +55,18 @@ if not os.path.exists(TA_TEMPLATE_PATH):
         except Exception as e:
             print(f"Failed to copy default TA template: {e}")
 
+MANPOWER_TEMPLATE_PATH = os.path.join(doc_dir, "Integrated_Manpower_Schedule.xlsx")
+if not os.path.exists(MANPOWER_TEMPLATE_PATH):
+    if getattr(sys, 'frozen', False):
+        default_mp = os.path.join(sys._MEIPASS, "Integrated_Manpower_Schedule.xlsx")
+    else:
+        default_mp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Integrated_Manpower_Schedule.xlsx")
+    if os.path.exists(default_mp):
+        try:
+            shutil.copy(default_mp, MANPOWER_TEMPLATE_PATH)
+        except Exception as e:
+            print(f"Failed to copy default Manpower template: {e}")
+
 app = FastAPI(title="Metro Railway Kolkata S&T Staff Management System Backend")
 
 app.add_middleware(
@@ -484,6 +496,33 @@ def init_db():
         );
     """)
 
+    # 12. Manpower Plans Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS manpower_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT 'INTEGRATED MANPOWER & WORK ACTIVITY PLAN',
+            subtitle TEXT NOT NULL DEFAULT 'Combined Schedule for Metro Railway Signaling Department',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+    """)
+
+    # 13. Manpower Plan Rows Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS manpower_plan_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL REFERENCES manpower_plans(id) ON DELETE CASCADE,
+            date_text TEXT,
+            shift_text TEXT,
+            station_text TEXT,
+            work_activity TEXT,
+            railway_manpower TEXT,
+            agency_manpower TEXT,
+            row_order INTEGER NOT NULL
+        );
+    """)
+
     # Seed Default Roster Status Codes
     cursor.execute("SELECT count(*) FROM attendance_codes")
     if cursor.fetchone()[0] == 0:
@@ -719,6 +758,22 @@ def init_db():
 init_db()
 
 # --- Pydantic Models for API Requests ---
+class ManpowerPlanRowSchema(BaseModel):
+    id: Optional[int] = None
+    date_text: Optional[str] = ""
+    shift_text: Optional[str] = ""
+    station_text: Optional[str] = ""
+    work_activity: Optional[str] = ""
+    railway_manpower: Optional[str] = ""
+    agency_manpower: Optional[str] = ""
+    row_order: int
+
+class ManpowerPlanSchema(BaseModel):
+    name: str
+    title: str
+    subtitle: str
+    rows: List[ManpowerPlanRowSchema] = []
+
 class LineSchema(BaseModel):
     line_name: str
     color_code: str
@@ -4034,6 +4089,349 @@ else:
 # Mount _next folder for static resources
 if os.path.exists(os.path.join(frontend_out_dir, "_next")):
     app.mount("/_next", StaticFiles(directory=os.path.join(frontend_out_dir, "_next")), name="next-assets")
+
+# --- Manpower Planning Endpoints ---
+@app.get("/api/manpower-plans")
+def list_manpower_plans():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM manpower_plans ORDER BY created_at DESC")
+        plans = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return plans
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/manpower-plans/{plan_id}")
+def get_manpower_plan(plan_id: int):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        plan_row = cursor.execute("SELECT * FROM manpower_plans WHERE id = ?", (plan_id,)).fetchone()
+        if not plan_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan not found")
+        plan = dict(plan_row)
+        
+        cursor.execute("SELECT * FROM manpower_plan_rows WHERE plan_id = ? ORDER BY row_order ASC", (plan_id,))
+        plan['rows'] = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return plan
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/manpower-plans")
+def create_manpower_plan(plan: ManpowerPlanSchema):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO manpower_plans (name, title, subtitle, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (plan.name, plan.title, plan.subtitle, now, now))
+        plan_id = cursor.lastrowid
+        
+        for row in plan.rows:
+            cursor.execute("""
+                INSERT INTO manpower_plan_rows (plan_id, date_text, shift_text, station_text, work_activity, railway_manpower, agency_manpower, row_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (plan_id, row.date_text, row.shift_text, row.station_text, row.work_activity, row.railway_manpower, row.agency_manpower, row.row_order))
+            
+        conn.commit()
+        
+        # Get saved plan
+        saved_plan_row = cursor.execute("SELECT * FROM manpower_plans WHERE id = ?", (plan_id,)).fetchone()
+        saved_plan = dict(saved_plan_row)
+        cursor.execute("SELECT * FROM manpower_plan_rows WHERE plan_id = ? ORDER BY row_order ASC", (plan_id,))
+        saved_plan['rows'] = [dict(r) for r in cursor.fetchall()]
+        
+        conn.close()
+        log_audit("CREATE", "Manpower Planning", f"Created plan '{plan.name}' (ID: {plan_id})")
+        return saved_plan
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/manpower-plans/{plan_id}")
+def update_manpower_plan(plan_id: int, plan: ManpowerPlanSchema):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verify plan exists
+        existing = cursor.execute("SELECT id FROM manpower_plans WHERE id = ?", (plan_id,)).fetchone()
+        if not existing:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan not found")
+            
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            UPDATE manpower_plans
+            SET name = ?, title = ?, subtitle = ?, updated_at = ?
+            WHERE id = ?
+        """, (plan.name, plan.title, plan.subtitle, now, plan_id))
+        
+        # Bulk replace rows
+        cursor.execute("DELETE FROM manpower_plan_rows WHERE plan_id = ?", (plan_id,))
+        
+        for row in plan.rows:
+            cursor.execute("""
+                INSERT INTO manpower_plan_rows (plan_id, date_text, shift_text, station_text, work_activity, railway_manpower, agency_manpower, row_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (plan_id, row.date_text, row.shift_text, row.station_text, row.work_activity, row.railway_manpower, row.agency_manpower, row.row_order))
+            
+        conn.commit()
+        
+        # Fetch updated plan
+        saved_plan_row = cursor.execute("SELECT * FROM manpower_plans WHERE id = ?", (plan_id,)).fetchone()
+        saved_plan = dict(saved_plan_row)
+        cursor.execute("SELECT * FROM manpower_plan_rows WHERE plan_id = ? ORDER BY row_order ASC", (plan_id,))
+        saved_plan['rows'] = [dict(r) for r in cursor.fetchall()]
+        
+        conn.close()
+        log_audit("UPDATE", "Manpower Planning", f"Updated plan '{plan.name}' (ID: {plan_id})")
+        return saved_plan
+    except HTTPException:
+        raise
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/manpower-plans/{plan_id}")
+def delete_manpower_plan(plan_id: int):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verify plan exists
+        existing = cursor.execute("SELECT name FROM manpower_plans WHERE id = ?", (plan_id,)).fetchone()
+        if not existing:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan not found")
+            
+        plan_name = existing['name']
+        cursor.execute("DELETE FROM manpower_plans WHERE id = ?", (plan_id,))
+        conn.commit()
+        conn.close()
+        log_audit("DELETE", "Manpower Planning", f"Deleted plan '{plan_name}' (ID: {plan_id})")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/manpower-plans/{plan_id}/export-excel")
+def export_manpower_plan_excel(plan_id: int):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    
+    # 1. Fetch the plan and rows
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        plan_row = cursor.execute("SELECT * FROM manpower_plans WHERE id = ?", (plan_id,)).fetchone()
+        if not plan_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan not found")
+        plan = dict(plan_row)
+        
+        cursor.execute("SELECT * FROM manpower_plan_rows WHERE plan_id = ? ORDER BY row_order ASC", (plan_id,))
+        rows = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # 2. Load template
+    if not os.path.exists(MANPOWER_TEMPLATE_PATH):
+        raise HTTPException(status_code=500, detail="Manpower template Excel file not found on server.")
+        
+    try:
+        wb = openpyxl.load_workbook(MANPOWER_TEMPLATE_PATH)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load Manpower template: {e}")
+        
+    ws = wb.active
+    
+    # Update Title and Subtitle
+    ws['A1'].value = plan.get('title', 'INTEGRATED MANPOWER & WORK ACTIVITY PLAN')
+    ws['A2'].value = plan.get('subtitle', 'Combined Schedule for Metro Railway Signaling Department')
+    
+    # Unmerge any existing ranges from row 5 onwards
+    for r_range in list(ws.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = r_range.bounds
+        if min_row >= 5:
+            try:
+                ws.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+            except Exception:
+                pass
+                
+    # Define styles to perfectly match
+    thin_border_side = Side(border_style="thin", color="CBD5E1")
+    data_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+    
+    date_shift_fill = PatternFill(start_color="F3F6F8", end_color="F3F6F8", fill_type="solid")
+    alt_fill = PatternFill(start_color="FAFBFC", end_color="FAFBFC", fill_type="solid")
+    white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+    
+    date_shift_font = Font(name="Segoe UI", size=10, bold=True, color="000A2540")
+    station_font = Font(name="Segoe UI", size=10, bold=True, color="222222")
+    data_font = Font(name="Segoe UI", size=10, color="222222")
+    
+    # Helper to style merged ranges completely
+    def style_range(ws, start_row, start_col, end_row, end_col, border, fill=None, font=None, alignment=None):
+        for r in range(start_row, end_row + 1):
+            for c in range(start_col, end_col + 1):
+                cell = ws.cell(row=r, column=c)
+                if border:
+                    cell.border = border
+                if fill:
+                    cell.fill = fill
+                if font:
+                    cell.font = font
+                if alignment:
+                    cell.alignment = alignment
+                    
+    # Group rows by contiguous (date_text, shift_text)
+    groups = []
+    current_group = None
+    
+    for r in rows:
+        key = (r['date_text'], r['shift_text'])
+        if current_group is None:
+            current_group = {"key": key, "rows": [r]}
+        elif current_group["key"] == key:
+            current_group["rows"].append(r)
+        else:
+            groups.append(current_group)
+            current_group = {"key": key, "rows": [r]}
+            
+    if current_group:
+        groups.append(current_group)
+        
+    # Write groups
+    start_row_idx = 5
+    
+    for g_idx, group in enumerate(groups):
+        group_rows = group["rows"]
+        k = len(group_rows)
+        end_row_idx = start_row_idx + k - 1
+        
+        date_val, shift_val = group["key"]
+        
+        # Write rows
+        for row_idx, r in enumerate(group_rows):
+            current_excel_row = start_row_idx + row_idx
+            
+            # Alternate row fills based on row_idx within group
+            row_fill = alt_fill if row_idx % 2 == 1 else white_fill
+            
+            # Station & Domain
+            cell_c = ws.cell(row=current_excel_row, column=3)
+            cell_c.value = r.get('station_text', '')
+            cell_c.font = station_font
+            cell_c.fill = row_fill
+            cell_c.border = data_border
+            cell_c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            
+            # Planned Work Activity
+            cell_d = ws.cell(row=current_excel_row, column=4)
+            cell_d.value = r.get('work_activity', '')
+            cell_d.font = data_font
+            cell_d.fill = row_fill
+            cell_d.border = data_border
+            cell_d.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            
+            # Railway Manpower
+            cell_e = ws.cell(row=current_excel_row, column=5)
+            cell_e.value = r.get('railway_manpower', '')
+            cell_e.font = data_font
+            cell_e.fill = row_fill
+            cell_e.border = data_border
+            cell_e.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            
+            # Agency / Contractor
+            cell_f = ws.cell(row=current_excel_row, column=6)
+            cell_f.value = r.get('agency_manpower', '')
+            cell_f.font = data_font
+            cell_f.fill = row_fill
+            cell_f.border = data_border
+            cell_f.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            
+            # Calculate optimal height for row
+            lines_c = str(r.get('station_text', '')).split('\n')
+            lines_d = str(r.get('work_activity', '')).split('\n')
+            lines_e = str(r.get('railway_manpower', '')).split('\n')
+            lines_f = str(r.get('agency_manpower', '')).split('\n')
+            max_lines = max(len(lines_c), len(lines_d), len(lines_e), len(lines_f))
+            ws.row_dimensions[current_excel_row].height = max(24, max_lines * 14 + 10)
+            
+        # Merge Date column
+        ws.merge_cells(start_row=start_row_idx, start_column=1, end_row=end_row_idx, end_column=1)
+        ws.cell(row=start_row_idx, column=1).value = date_val
+        style_range(ws, start_row_idx, 1, end_row_idx, 1, data_border, date_shift_fill, date_shift_font, Alignment(horizontal="center", vertical="center", wrap_text=True))
+        
+        # Merge Shift column
+        ws.merge_cells(start_row=start_row_idx, start_column=2, end_row=end_row_idx, end_column=2)
+        ws.cell(row=start_row_idx, column=2).value = shift_val
+        style_range(ws, start_row_idx, 2, end_row_idx, 2, data_border, date_shift_fill, date_shift_font, Alignment(horizontal="center", vertical="center", wrap_text=True))
+        
+        start_row_idx = end_row_idx + 1
+        
+    # Clear any extra rows that might have been left from template
+    max_excel_row = ws.max_row
+    if max_excel_row >= start_row_idx:
+        for r in range(start_row_idx, max_excel_row + 1):
+            ws.row_dimensions[r].height = 15
+            for c in range(1, 7):
+                cell = ws.cell(row=r, column=c)
+                cell.value = None
+                cell.fill = openpyxl.styles.fills.PatternFill(fill_type=None)
+                cell.border = Border()
+                
+    # Page setup for printing fitting landscape A4 perfectly
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = 9 # A4
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0 # Fit width, let height grow/scroll naturally if multiple pages
+    
+    # Adjust margins to maximize space
+    ws.page_margins.left = 0.4
+    ws.page_margins.right = 0.4
+    ws.page_margins.top = 0.4
+    ws.page_margins.bottom = 0.4
+    
+    # Standard column widths
+    ws.column_dimensions['A'].width = 13
+    ws.column_dimensions['B'].width = 16
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 32
+    ws.column_dimensions['E'].width = 30
+    ws.column_dimensions['F'].width = 26
+    
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+    
+    filename = f"Manpower_Plan_{plan.get('name', 'Schedule').replace(' ', '_')}.xlsx"
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # Route to serve other static files or HTML clean URLs
 @app.get("/{path_name:path}")

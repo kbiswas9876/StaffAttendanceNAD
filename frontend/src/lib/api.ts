@@ -655,4 +655,54 @@ export const saveTAConfig = async (config: TAConfig, recalculateHistory: boolean
   }
 };
 
+export interface ManpowerPlanRow {
+  id?: number;
+  plan_id?: number;
+  date_text: string;
+  shift_text: string;
+  station_text: string;
+  work_activity: string;
+  railway_manpower: string;
+  agency_manpower: string;
+  row_order: number;
+}
+
+export interface ManpowerPlan {
+  id?: number;
+  name: string;
+  title: string;
+  subtitle: string;
+  created_at?: string;
+  updated_at?: string;
+  rows?: ManpowerPlanRow[];
+}
+
+export const getManpowerPlans = async (): Promise<ManpowerPlan[]> => {
+  return apiFetch<ManpowerPlan[]>("/manpower-plans");
+};
+
+export const getManpowerPlan = async (id: number): Promise<ManpowerPlan> => {
+  return apiFetch<ManpowerPlan>(`/manpower-plans/${id}`);
+};
+
+export const createManpowerPlan = async (plan: ManpowerPlan): Promise<ManpowerPlan> => {
+  return apiFetch<ManpowerPlan>("/manpower-plans", {
+    method: "POST",
+    body: JSON.stringify(plan)
+  });
+};
+
+export const updateManpowerPlan = async (id: number, plan: ManpowerPlan): Promise<ManpowerPlan> => {
+  return apiFetch<ManpowerPlan>(`/manpower-plans/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(plan)
+  });
+};
+
+export const deleteManpowerPlan = async (id: number): Promise<{ status: string }> => {
+  return apiFetch<{ status: string }>(`/manpower-plans/${id}`, {
+    method: "DELETE"
+  });
+};
+
 
