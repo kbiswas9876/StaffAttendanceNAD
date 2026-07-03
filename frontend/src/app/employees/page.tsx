@@ -63,6 +63,8 @@ import {
 } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
 import AdminAuthModal from '../components/AdminAuthModal';
+import CustomSelect from '../components/CustomSelect';
+import CustomDatePicker from '../components/CustomDatePicker';
 
 // --- EMPLOYEE PROFILE 360 COMPONENT ---
 interface ProfileProps {
@@ -1254,17 +1256,15 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-bold text-slate-700 shadow-2xs">
-          <Calendar size={14} className="text-slate-400 ml-1" />
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="bg-transparent border-none focus:outline-none cursor-pointer pr-4 font-extrabold text-slate-800"
-          >
-            <option value={2026}>2026 Roster Heatmap</option>
-            <option value={2025}>2025 Roster Heatmap</option>
-          </select>
-        </div>
+        <CustomSelect
+          value={selectedYear}
+          onChange={(val) => setSelectedYear(Number(val))}
+          options={[
+            { value: 2026, label: '2026 Roster Heatmap' },
+            { value: 2025, label: '2025 Roster Heatmap' }
+          ]}
+          className="w-52 shrink-0"
+        />
       </div>
 
       {/* Unified Shift Status Timeline Panel */}
@@ -1695,25 +1695,21 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Rotation Rule</label>
-                      <select
-                        value={selectedRuleId || ''}
-                        onChange={(e) => setSelectedRuleId(e.target.value ? Number(e.target.value) : null)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
-                        required
-                      >
-                        <option value="">-- Select Rule --</option>
-                        {rosterRules.map(r => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </select>
+                      <CustomSelect
+                        value={selectedRuleId || ""}
+                        onChange={(val) => setSelectedRuleId(val ? Number(val) : null)}
+                        options={[
+                          { value: "", label: "-- Select Rule --" },
+                          ...rosterRules.map(r => ({ value: r.id, label: r.name }))
+                        ]}
+                      />
                     </div>
                     <div>
                       <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
-                      <input 
-                        type="date"
+                      <CustomDatePicker
                         value={empAnchorDate}
-                        onChange={(e) => setEmpAnchorDate(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
+                        onChange={(val) => setEmpAnchorDate(val)}
+                        placeholder="Select Date"
                         required
                       />
                     </div>
@@ -1742,15 +1738,14 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
-                    <input
-                      type="date"
+                    <CustomDatePicker
                       value={empAnchorDate}
-                      onChange={(e) => setEmpAnchorDate(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-855 cursor-pointer focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold"
+                      onChange={(val) => setEmpAnchorDate(val)}
+                      placeholder="Select Date"
                       required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
                     />
                   </div>
-                  <div className="flex items-end text-[9px] text-slate-500 italic pb-2 font-medium">
+                  <div className="flex items-end text-[9px] text-slate-505 italic pb-2 font-medium">
                     This anchor date determines when "Week 1" cycle begins.
                   </div>
                 </div>
@@ -1765,20 +1760,21 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
                           <div key={day} className="flex flex-col gap-0.5">
                             <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                            <select
+                            <CustomSelect
                               value={empWeeklySchedule[day] || 'G'}
-                              onChange={(e) => setEmpWeeklySchedule(prev => ({
+                              onChange={(val) => setEmpWeeklySchedule(prev => ({
                                 ...prev,
-                                [day]: e.target.value
+                                [day]: val
                               }))}
-                              className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                            >
-                              <option value="G">G (Gen)</option>
-                              <option value="M">M (Morn)</option>
-                              <option value="E">E (Eve)</option>
-                              <option value="N">N (Night)</option>
-                              <option value="R">R (Rest)</option>
-                            </select>
+                              options={[
+                                { value: 'G', label: 'G' },
+                                { value: 'M', label: 'M' },
+                                { value: 'E', label: 'E' },
+                                { value: 'N', label: 'N' },
+                                { value: 'R', label: 'R' }
+                              ]}
+                              className="w-16 text-[10px]"
+                            />
                           </div>
                         ))}
                       </div>
@@ -1803,23 +1799,24 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                         {getWeekdaysStartingFrom(empAnchorDate).map(day => (
                           <div key={day} className="flex flex-col gap-0.5">
                             <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                            <select
+                            <CustomSelect
                               value={rotatingSchedule[activeRotatingWeek]?.[day] || 'G'}
-                              onChange={(e) => setRotatingSchedule(prev => ({
+                              onChange={(val) => setRotatingSchedule(prev => ({
                                 ...prev,
                                 [activeRotatingWeek]: {
                                   ...prev[activeRotatingWeek],
-                                  [day]: e.target.value
+                                  [day]: val
                                 }
                               }))}
-                              className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                            >
-                              <option value="G">G (Gen)</option>
-                              <option value="M">M (Morn)</option>
-                              <option value="E">E (Eve)</option>
-                              <option value="N">N (Night)</option>
-                              <option value="R">R (Rest)</option>
-                            </select>
+                              options={[
+                                { value: 'G', label: 'G' },
+                                { value: 'M', label: 'M' },
+                                { value: 'E', label: 'E' },
+                                { value: 'N', label: 'N' },
+                                { value: 'R', label: 'R' }
+                              ]}
+                              className="w-16 text-[10px]"
+                            />
                           </div>
                         ))}
                       </div>
@@ -1834,34 +1831,32 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                 <div className="grid grid-cols-4 gap-1.5 items-end">
                   <div>
                     <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">From Date</label>
-                    <input
-                      type="date"
+                    <CustomDatePicker
                       value={overrideFrom}
-                      onChange={(e) => setOverrideFrom(e.target.value)}
-                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-[var(--theme-icon-bg)]"
+                      onChange={(val) => setOverrideFrom(val)}
+                      placeholder="Select Date"
                     />
                   </div>
                   <div>
                     <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">To Date</label>
-                    <input
-                      type="date"
+                    <CustomDatePicker
                       value={overrideTo}
-                      onChange={(e) => setOverrideTo(e.target.value)}
-                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-[var(--theme-icon-bg)]"
+                      onChange={(val) => setOverrideTo(val)}
+                      placeholder="Select Date"
                     />
                   </div>
                   <div>
                     <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">Override Shift</label>
-                    <select
+                    <CustomSelect
                       value={overrideShift}
-                      onChange={(e) => setOverrideShift(e.target.value)}
-                      className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-[var(--theme-icon-bg)] font-semibold cursor-pointer"
-                    >
-                      <option value="N">N (Night)</option>
-                      <option value="E">E (Eve)</option>
-                      <option value="G">G (Gen)</option>
-                      <option value="M">M (Morn)</option>
-                    </select>
+                      onChange={(val) => setOverrideShift(val)}
+                      options={[
+                        { value: 'N', label: 'N (Night)' },
+                        { value: 'E', label: 'E (Eve)' },
+                        { value: 'G', label: 'G (Gen)' },
+                        { value: 'M', label: 'M (Morn)' }
+                      ]}
+                    />
                   </div>
                   <button
                     type="button"
@@ -1907,25 +1902,23 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
               <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                 <div>
                   <label className="block mb-1 text-[10px] uppercase text-slate-400 tracking-wider">Weekly Rest Day</label>
-                  <select
+                  <CustomSelect
                     value={empRestDay}
-                    onChange={(e) => {
-                      const newRest = e.target.value;
-                      setEmpRestDay(newRest);
-                      setEmpWeeklySchedule(getWeeklyScheduleDefault(newRest));
+                    onChange={(val) => {
+                      setEmpRestDay(val);
+                      setEmpWeeklySchedule(getWeeklyScheduleDefault(val));
                       setRotatingSchedule({
-                        week1: getWeeklyScheduleDefault(newRest),
-                        week2: getWeeklyScheduleDefault(newRest),
-                        week3: getWeeklyScheduleDefault(newRest),
-                        week4: getWeeklyScheduleDefault(newRest),
+                        week1: getWeeklyScheduleDefault(val),
+                        week2: getWeeklyScheduleDefault(val),
+                        week3: getWeeklyScheduleDefault(val),
+                        week4: getWeeklyScheduleDefault(val),
                       });
                     }}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer font-semibold focus:outline-none focus:border-[var(--theme-icon-bg)]"
-                  >
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible'].map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
+                    options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible'].map(d => ({
+                      value: d,
+                      label: d
+                    }))}
+                  />
                 </div>
               </div>
 
@@ -2337,50 +2330,45 @@ function StaffDirectory() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Pay Level')}</label>
-                  <select
+                  <CustomSelect
                     value={level}
-                    onChange={(e) => setLevel(Number(e.target.value))}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(l => (
-                      <option key={l} value={l}>{getTranslation(lang, 'Level')} {l}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setLevel(Number(val))}
+                    options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(l => ({
+                      value: l,
+                      label: `${getTranslation(lang, 'Level')} ${l}`
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Primary Section')}</label>
-                  <select
+                  <CustomSelect
                     value={sectionId || ""}
-                    onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- {getTranslation(lang, 'No Section')} --</option>
-                    {sections.map(s => (
-                      <option key={s.id} value={s.id}>{s.section_code} - {s.section_name}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSectionId(val ? Number(val) : null)}
+                    options={[
+                      { value: "", label: `-- ${getTranslation(lang, 'No Section')} --` },
+                      ...sections.map(s => ({ value: s.id, label: `${s.section_code} - ${s.section_name}` }))
+                    ]}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Weekly Rest Day')}</label>
-                  <select
+                  <CustomSelect
                     value={restDay}
-                    onChange={(e) => setRestDay(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                  >
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
-                      <option key={d} value={d}>{getTranslation(lang, d)}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setRestDay(val)}
+                    options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => ({
+                      value: d,
+                      label: getTranslation(lang, d)
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">{getTranslation(lang, 'Joining Date')}</label>
-                  <input
-                    type="date"
+                  <CustomDatePicker
                     value={joiningDate}
-                    onChange={(e) => setJoiningDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 cursor-pointer"
+                    onChange={(val) => setJoiningDate(val)}
+                    placeholder="Select Date"
                   />
                 </div>
               </div>

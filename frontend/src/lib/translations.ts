@@ -12,6 +12,7 @@ export const translations = {
     'JOINT VIEW': 'JOINT VIEW',
     'SEC.': 'SEC.',
     'Joint View': 'Joint View',
+    'Include Sections': 'Include Sections',
     
     // Top Bar
     'S&T STAFF OPERATIONS ERP': 'S&T STAFF OPERATIONS ERP',
@@ -139,6 +140,7 @@ export const translations = {
     'JOINT VIEW': 'যৌথ ভিউ',
     'SEC.': 'সেকশন',
     'Joint View': 'যৌথ ভিউ',
+    'Include Sections': 'সেকশন অন্তর্ভুক্ত করুন',
 
     // Top Bar
     'S&T STAFF OPERATIONS ERP': 'এস অ্যান্ড টি স্টাফ অপারেশনস ইআরপি',
@@ -266,6 +268,7 @@ export const translations = {
     'JOINT VIEW': 'संयुक्त व्यू',
     'SEC.': 'अनुभाग',
     'Joint View': 'संयुक्त व्यू',
+    'Include Sections': 'अनुभाग शामिल करें',
 
     // Top Bar
     'S&T STAFF OPERATIONS ERP': 'एस एंड टी स्टाफ ऑपरेशन्स ईआरपी',

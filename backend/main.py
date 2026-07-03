@@ -2915,8 +2915,8 @@ class TAEntrySchema(BaseModel):
     stay_details: Optional[str] = ""
     days_nights: Optional[str] = ""
     object_journey: Optional[str] = ""
-    rate: float
-    amount: float
+    rate: int
+    amount: int
 
 class TABillSchema(BaseModel):
     id: Optional[int] = None
@@ -3104,184 +3104,19 @@ def get_ta_config():
     return json.loads(row[0])
 
 @app.post("/api/settings/save-ta-config")
-def save_ta_config(payload: TAConfigSchema, recalculate_history: bool = False):
-    import math
+def save_ta_config(payload: TAConfigSchema):
     conn = get_db()
     cursor = conn.cursor()
-    try:
-        config_data = {
-            "rates": payload.rates,
-            "thresholds": payload.thresholds,
-            "rounding_mode": payload.rounding_mode
-        }
-        cursor.execute("UPDATE system_settings SET value = ? WHERE key = 'ta_config'", (json.dumps(config_data),))
-        
-        if recalculate_history:
-            # Fetch all existing TA bills
-            bills = cursor.execute("SELECT id, emp_id, journey_type FROM ta_bills").fetchall()
-            for b_id, emp_id, j_type in bills:
-                # Fetch employee level
-                emp_row = cursor.execute("SELECT level FROM employees WHERE emp_id = ?", (emp_id,)).fetchone()
-                if not emp_row:
-                    continue
-                level = emp_row[0]
-                
-                # Determine rate for employee level based on new settings
-                rate = 650
-                for r in payload.rates:
-                    try:
-                        min_l = int(r.get("min_level", 1))
-                        max_l = int(r.get("max_level", 12))
-                        r_val = float(r.get("rate", 650))
-                        if level >= min_l and level <= max_l:
-                            rate = r_val
-                            break
-                    except Exception:
-                        pass
-                
-                if j_type == "NORMAL":
-                    # Recalculate entries for this bill in pairs (Outward + Inward)
-                    entries = cursor.execute("SELECT id, is_stay, time_left, time_arrived, days_nights FROM ta_entries WHERE bill_id = ? ORDER BY id ASC", (b_id,)).fetchall()
-                    num_pairs = (len(entries) + 1) // 2
-                    for i in range(num_pairs):
-                        leg_out = entries[2 * i]
-                        leg_in = entries[2 * i + 1] if (2 * i + 1) < len(entries) else None
-                        
-                        new_rate = rate
-                        
-                        t_left = leg_out["time_left"]
-                        t_arr = leg_in["time_arrived"] if leg_in else leg_out["time_arrived"]
-                        
-                        mult = 0.0
-                        if t_left and t_arr:
-                            try:
-                                t_left_clean = str(t_left).lower().replace("hrs", "").replace("hr", "").strip()
-                                t_arr_clean = str(t_arr).lower().replace("hrs", "").replace("hr", "").strip()
-                                h_out, m_out = map(int, t_left_clean.split(":"))
-                                h_in, m_in = map(int, t_arr_clean.split(":"))
-                                out_mins = h_out * 60 + m_out
-                                in_mins = h_in * 60 + m_in
-                                diff = in_mins - out_mins
-                                if diff < 0:
-                                    diff += 24 * 60
-                                hours = diff / 60.0
-                                
-                                # Find multiplier based on new thresholds
-                                sorted_th = sorted(payload.thresholds, key=lambda x: float(x.get("max_hours", 24)))
-                                mult = 1.0
-                                for th in sorted_th:
-                                    if hours <= float(th.get("max_hours", 24)):
-                                        mult = float(th.get("multiplier", 1.0))
-                                        break
-                            except Exception:
-                                pass
-                        
-                        # Apply new rounding mode for Outward Leg
-                        base_amt = mult * new_rate
-                        mode = payload.rounding_mode
-                        if mode == "none":
-                            final_amt = round(base_amt, 2)
-                        elif mode == "nearest_05":
-                            final_amt = round(base_amt * 2) / 2.0
-                        elif mode == "ceiling":
-                            final_amt = math.ceil(base_amt)
-                        elif mode == "floor":
-                            final_amt = math.floor(base_amt)
-                        else:
-                            final_amt = round(base_amt)
-                            
-                        # Update Outward Leg
-                        cursor.execute("""
-                            UPDATE ta_entries 
-                            SET rate = ?, amount = ?, days_nights = ? 
-                            WHERE id = ?
-                        """, (new_rate, final_amt, str(mult), leg_out["id"]))
-                        
-                        # Update Inward Leg to rate=0, amount=0, days_nights=''
-                        if leg_in:
-                            cursor.execute("""
-                                UPDATE ta_entries 
-                                SET rate = 0, amount = 0, days_nights = '' 
-                                WHERE id = ?
-                            """, (leg_in["id"],))
-                else:
-                    # Recalculate entries individually (TRAINING)
-                    entries = cursor.execute("SELECT id, is_stay, time_left, time_arrived, days_nights FROM ta_entries WHERE bill_id = ? ORDER BY id ASC", (b_id,)).fetchall()
-                    for entry in entries:
-                        new_rate = rate
-                        new_days_nights = entry["days_nights"]
-                        
-                        if entry["is_stay"]:
-                            days = 1.0
-                            days_nights_str = str(entry["days_nights"] or "")
-                            if "X" in days_nights_str:
-                                parts = days_nights_str.split("X")
-                                if len(parts) > 1:
-                                    try:
-                                        days = float(parts[1].strip())
-                                    except Exception:
-                                        pass
-                            else:
-                                try:
-                                    days = float(days_nights_str)
-                                except Exception:
-                                    pass
-                            base_amt = days * new_rate
-                        else:
-                            mult = 0.0
-                            t_left = entry["time_left"]
-                            t_arr = entry["time_arrived"]
-                            if t_left and t_arr:
-                                try:
-                                    t_left_clean = str(t_left).lower().replace("hrs", "").replace("hr", "").strip()
-                                    t_arr_clean = str(t_arr).lower().replace("hrs", "").replace("hr", "").strip()
-                                    h_out, m_out = map(int, t_left_clean.split(":"))
-                                    h_in, m_in = map(int, t_arr_clean.split(":"))
-                                    out_mins = h_out * 60 + m_out
-                                    in_mins = h_in * 60 + m_in
-                                    diff = in_mins - out_mins
-                                    if diff < 0:
-                                        diff += 24 * 60
-                                    hours = diff / 60.0
-                                    
-                                    sorted_th = sorted(payload.thresholds, key=lambda x: float(x.get("max_hours", 24)))
-                                    mult = 1.0
-                                    for th in sorted_th:
-                                        if hours <= float(th.get("max_hours", 24)):
-                                            mult = float(th.get("multiplier", 1.0))
-                                            break
-                                except Exception:
-                                    pass
-                            new_days_nights = str(mult)
-                            base_amt = mult * new_rate
-                            
-                        # Apply new rounding mode
-                        mode = payload.rounding_mode
-                        if mode == "none":
-                            final_amt = round(base_amt, 2)
-                        elif mode == "nearest_05":
-                            final_amt = round(base_amt * 2) / 2.0
-                        elif mode == "ceiling":
-                            final_amt = math.ceil(base_amt)
-                        elif mode == "floor":
-                            final_amt = math.floor(base_amt)
-                        else:
-                            final_amt = round(base_amt)
-                            
-                        cursor.execute("""
-                            UPDATE ta_entries 
-                            SET rate = ?, amount = ?, days_nights = ? 
-                            WHERE id = ?
-                        """, (new_rate, final_amt, new_days_nights, entry["id"]))
-                    
-        conn.commit()
-        log_audit("Update", "Settings", f"Travelling Allowance config updated successfully (recalculate_history={recalculate_history}).")
-        return {"status": "success"}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    config_data = {
+        "rates": payload.rates,
+        "thresholds": payload.thresholds,
+        "rounding_mode": payload.rounding_mode
+    }
+    cursor.execute("UPDATE system_settings SET value = ? WHERE key = 'ta_config'", (json.dumps(config_data),))
+    conn.commit()
+    conn.close()
+    log_audit("Update", "Settings", "Travelling Allowance config updated successfully.")
+    return {"status": "success"}
 
 def num_to_words(n):
     n = int(round(n))
@@ -3397,13 +3232,7 @@ def export_ta_bill_excel(id: int):
     import re
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     
-    def apply_premium_styling(ws, journey_type, required_rows, rounding_mode="nearest_integer"):
-        # Determine amount number format based on rounding settings
-        if rounding_mode in ["none", "nearest_05"]:
-            amt_format = '#,##0.00'
-        else:
-            amt_format = '#,##0'
-
+    def apply_premium_styling(ws, journey_type, required_rows):
         # Fonts
         title_font = Font(name="Segoe UI", size=14, bold=True, color="1B365D")
         meta_font = Font(name="Segoe UI", size=9.5, bold=False, color="333333")
@@ -3592,33 +3421,19 @@ def export_ta_bill_excel(id: int):
                 elif c == 9:
                     if journey_type == "NORMAL":
                         cell.alignment = Alignment(horizontal="right", vertical="center")
-                        val = cell.value
-                        try:
-                            if val is not None and float(val) % 1 != 0:
-                                cell.number_format = '#,##0.00'
-                            else:
-                                cell.number_format = '#,##0'
-                        except Exception:
-                            cell.number_format = '#,##0'
+                        cell.number_format = '#,##0'
                     else:
                         cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
                 elif c == 10:
                     if journey_type == "NORMAL":
                         cell.alignment = Alignment(horizontal="right", vertical="center")
-                        cell.number_format = amt_format
+                        cell.number_format = '#,##0'
                     else:
                         cell.alignment = Alignment(horizontal="right", vertical="center")
-                        val = cell.value
-                        try:
-                            if val is not None and float(val) % 1 != 0:
-                                cell.number_format = '#,##0.00'
-                            else:
-                                cell.number_format = '#,##0'
-                        except Exception:
-                            cell.number_format = '#,##0'
+                        cell.number_format = '#,##0'
                 elif c == 11:
                     cell.alignment = Alignment(horizontal="right", vertical="center")
-                    cell.number_format = amt_format
+                    cell.number_format = '#,##0'
 
         # Row height auto-adjustment for data rows in pairs
         num_pairs = required_rows // 2
@@ -4033,22 +3848,16 @@ def export_ta_bill_excel(id: int):
             ws.cell(row=r1_idx, column=9).value = leg_out.get("rate", 0)
             
             formula_base = f"G{r1_idx} * I{r1_idx}"
-            cell_amt = ws.cell(row=r1_idx, column=10)
             if rounding_mode == "nearest_integer":
-                cell_amt.value = f"=ROUND({formula_base}, 0)"
-                cell_amt.number_format = '0'
+                ws.cell(row=r1_idx, column=10).value = f"=ROUND({formula_base}, 0)"
             elif rounding_mode == "nearest_05":
-                cell_amt.value = f"=MROUND({formula_base}, 0.5)"
-                cell_amt.number_format = '0.00'
+                ws.cell(row=r1_idx, column=10).value = f"=MROUND({formula_base}, 0.5)"
             elif rounding_mode == "ceiling":
-                cell_amt.value = f"=ROUNDUP({formula_base}, 0)"
-                cell_amt.number_format = '0'
+                ws.cell(row=r1_idx, column=10).value = f"=ROUNDUP({formula_base}, 0)"
             elif rounding_mode == "floor":
-                cell_amt.value = f"=ROUNDDOWN({formula_base}, 0)"
-                cell_amt.number_format = '0'
+                ws.cell(row=r1_idx, column=10).value = f"=ROUNDDOWN({formula_base}, 0)"
             else:
-                cell_amt.value = f"={formula_base}"
-                cell_amt.number_format = '0.00'
+                ws.cell(row=r1_idx, column=10).value = f"={formula_base}"
                 
             total_amount += leg_out.get("amount", 0)
             
@@ -4080,12 +3889,7 @@ def export_ta_bill_excel(id: int):
         total_row_idx = 9 + required_rows
         ws.cell(row=total_row_idx, column=8).value = f"Total :Rupees {num_to_words(total_amount)} only"
         ws.cell(row=total_row_idx, column=9).value = "Rs."
-        cell_tot = ws.cell(row=total_row_idx, column=10)
-        cell_tot.value = f"=SUM(J9:J{total_row_idx-1})"
-        if rounding_mode in ["none", "nearest_05"]:
-            cell_tot.number_format = '0.00'
-        else:
-            cell_tot.number_format = '0'
+        ws.cell(row=total_row_idx, column=10).value = f"=SUM(J9:J{total_row_idx-1})"
 
 
     else:
@@ -4140,22 +3944,18 @@ def export_ta_bill_excel(id: int):
             else:
                 formula_base = f"H{r1_idx} * J{r1_idx}"
                 
-            cell_amt = ws.cell(row=r1_idx, column=11)
             if rounding_mode == "nearest_integer":
-                cell_amt.value = f"=ROUND({formula_base}, 0)"
-                cell_amt.number_format = '0'
+                amt_formula = f"=ROUND({formula_base}, 0)"
             elif rounding_mode == "nearest_05":
-                cell_amt.value = f"=MROUND({formula_base}, 0.5)"
-                cell_amt.number_format = '0.00'
+                amt_formula = f"=MROUND({formula_base}, 0.5)"
             elif rounding_mode == "ceiling":
-                cell_amt.value = f"=ROUNDUP({formula_base}, 0)"
-                cell_amt.number_format = '0'
+                amt_formula = f"=ROUNDUP({formula_base}, 0)"
             elif rounding_mode == "floor":
-                cell_amt.value = f"=ROUNDDOWN({formula_base}, 0)"
-                cell_amt.number_format = '0'
+                amt_formula = f"=ROUNDDOWN({formula_base}, 0)"
             else:
-                cell_amt.value = f"={formula_base}"
-                cell_amt.number_format = '0.00'
+                amt_formula = f"={formula_base}"
+                
+            ws.cell(row=r1_idx, column=11).value = amt_formula
             ws.merge_cells(start_row=r1_idx, start_column=11, end_row=r2_idx, end_column=11)
             total_amount += entry.get("amount", 0)
             
@@ -4191,12 +3991,7 @@ def export_ta_bill_excel(id: int):
         total_row_idx = 9 + required_rows
         ws.cell(row=total_row_idx, column=9).value = f"Total :Rupees {num_to_words(total_amount)} only"
         ws.cell(row=total_row_idx, column=10).value = "Rs."
-        cell_tot = ws.cell(row=total_row_idx, column=11)
-        cell_tot.value = f"=SUM(K9:K{total_row_idx-1})"
-        if rounding_mode in ["none", "nearest_05"]:
-            cell_tot.number_format = '0.00'
-        else:
-            cell_tot.number_format = '0'
+        ws.cell(row=total_row_idx, column=11).value = f"=SUM(K9:K{total_row_idx-1})"
 
 
     for r in range(1, ws.max_row + 1):
@@ -4211,7 +4006,7 @@ def export_ta_bill_excel(id: int):
                 ws.cell(row=r, column=c).value = new_text
 
     # Apply dynamic premium layout styling
-    apply_premium_styling(ws, journey_type, required_rows, rounding_mode)
+    apply_premium_styling(ws, journey_type, required_rows)
 
     sheet_name_clean = emp_name[:30].strip()
     ws.title = sheet_name_clean

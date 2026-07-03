@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getEmployees, getAttendanceLogs, Employee, AttendanceLog, getSections, Section } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
+import CustomSelect from '../components/CustomSelect';
 
 interface NDAStaffRow {
   sl: number;
@@ -429,7 +430,7 @@ export default function NightDutyNDA() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             {getTranslation(lang, 'Night Duty Allowance (NDA) Calculator')}
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active font-bold uppercase tracking-wider">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-theme-active text-theme-active border border-theme-active font-bold uppercase tracking-wider whitespace-nowrap">
               {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
@@ -441,34 +442,29 @@ export default function NightDutyNDA() {
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Period selector */}
-          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-sm text-slate-800">
-            <CalendarDays size={16} className="text-slate-500 ml-1" />
-            <select 
-              value={selectedMonth} 
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer text-xs"
-            >
-              {monthsList.map((m) => {
+          <div className="flex items-center gap-2 text-sm text-slate-800">
+            <CustomSelect
+              value={selectedMonth}
+              onChange={(val) => setSelectedMonth(Number(val))}
+              options={monthsList.map((m) => {
                 let prevM = m.val - 1;
                 if (prevM < 0) prevM = 11;
                 const prevName = monthsList[prevM].name.substring(0, 3);
                 const currName = m.name.substring(0, 3);
-                return (
-                  <option key={m.val} value={m.val} className="bg-white text-slate-800">
-                    {prevName} - {currName}
-                  </option>
-                );
+                return { value: m.val, label: `${prevName} - ${currName}` };
               })}
-            </select>
-            
-            <select
+              className="w-40 shrink-0"
+            />
+
+            <CustomSelect
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer ml-1 text-xs"
-            >
-              <option value={2026} className="bg-white text-slate-800">2026</option>
-              <option value={2025} className="bg-white text-slate-800">2025</option>
-            </select>
+              onChange={(val) => setSelectedYear(Number(val))}
+              options={[
+                { value: 2026, label: '2026' },
+                { value: 2025, label: '2025' }
+              ]}
+              className="w-28 shrink-0"
+            />
           </div>
           
           {/* Dates Format Selector */}
@@ -520,10 +516,9 @@ export default function NightDutyNDA() {
           <div className="flex flex-col gap-1.5 col-span-1 md:col-span-2">
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Left Signatory (SSE In-Charge)</label>
             <div className="flex gap-2">
-              <select
+              <CustomSelect
                 value={employees.some(e => e.name === signatoryLeftName) ? signatoryLeftName : ""}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(val) => {
                   if (val) {
                     setSignatoryLeftName(val);
                     const matched = employees.find(emp => emp.name === val);
@@ -535,13 +530,12 @@ export default function NightDutyNDA() {
                     setSignatoryLeftTitle("");
                   }
                 }}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="">-- Custom/Manual --</option>
-                {employees.map(e => (
-                  <option key={e.emp_id} value={e.name}>{e.name} ({e.designation})</option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "-- Custom/Manual --" },
+                  ...employees.map(e => ({ value: e.name, label: `${e.name} (${e.designation})` }))
+                ]}
+                className="w-48 shrink-0"
+              />
               <input
                 type="text"
                 value={signatoryLeftName}
@@ -601,9 +595,9 @@ export default function NightDutyNDA() {
       )}
 
       {/* NDA Weightage Guide Card */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[var(--theme-active-bg)]/75 to-[var(--theme-active-bg)]/35 border border-theme-active/60 rounded-2xl p-5 flex items-start gap-4 shadow-xs select-none">
+      <div className="relative overflow-hidden bg-gradient-to-r from-[var(--theme-active-bg)]/80 to-[var(--theme-active-bg)]/45 rounded-2xl p-5 flex items-start gap-4 shadow-md shadow-slate-100/50 select-none">
         <div className="absolute top-0 left-0 w-1.5 h-full bg-theme-primary opacity-80"></div>
-        <div className="w-9 h-9 rounded-xl bg-theme-active border border-theme-active flex items-center justify-center text-theme-primary shadow-sm shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-theme-active flex items-center justify-center text-theme-primary shadow-sm shrink-0">
           <Info size={18} className="stroke-[2.5]" />
         </div>
         <div className="text-xs text-slate-700 space-y-2 flex-1 font-semibold">
@@ -612,13 +606,13 @@ export default function NightDutyNDA() {
             The system extracts shift data matching the code <strong className="text-theme-primary bg-theme-active px-1.5 py-0.5 rounded font-mono">P/N</strong> (Present with Night Duty) and applies the following computations:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-            <div className="bg-white/80 border border-theme-active/60 rounded-xl p-3 flex flex-col gap-1">
+            <div className="bg-white/90 rounded-xl p-3.5 flex flex-col gap-1 shadow-sm">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Working Hours</span>
               <span className="text-xs font-black text-slate-800">
                 Total Shifts <span className="text-theme-primary font-extrabold">×</span> 8 Hours
               </span>
             </div>
-            <div className="bg-white/80 border border-theme-active/60 rounded-xl p-3 flex flex-col gap-1">
+            <div className="bg-white/90 rounded-xl p-3.5 flex flex-col gap-1 shadow-sm">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Weightage Allowance</span>
               <span className="text-xs font-black text-slate-800">
                 Total Shifts <span className="text-theme-primary font-extrabold">×</span> 80 Minutes <span className="text-slate-400 font-bold">(1h 20m per shift)</span>

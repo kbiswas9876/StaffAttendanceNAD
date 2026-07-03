@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, 
   TrendingUp, 
@@ -23,11 +23,15 @@ import {
   RefreshCw,
   Clock,
   ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  Check,
   Info,
   AlertTriangle,
   Lock
 } from 'lucide-react';
 import { getTranslation } from '../../lib/translations';
+import CustomTimePicker from '../components/CustomTimePicker';
 import { 
   getEmployees, createEmployee, updateEmployee, deleteEmployee, Employee,
   getLines, createLine, updateLine, deleteLine, MetroLine,
@@ -200,6 +204,285 @@ const monthsList = [
   { name: 'November', val: 10 },
   { name: 'December', val: 11 },
 ];
+
+interface Option {
+  value: string | number;
+  label: string;
+}
+
+interface CustomSelectProps {
+  value: any;
+  onChange: (val: any) => void;
+  options: Option[];
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+function CustomSelect({ value, onChange, options, placeholder, className = "", disabled = false }: CustomSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  
+  const selectedOption = options.find(o => o.value === value);
+  
+  return (
+    <div ref={containerRef} className={`relative ${className.includes('w-') ? '' : 'w-full'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm text-slate-800 text-left font-semibold cursor-pointer focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 hover:bg-[#FAF9F6]/85 transition duration-150 shadow-2xs flex justify-between items-center select-none disabled:opacity-50 disabled:cursor-not-allowed border-solid"
+      >
+        <span className="truncate">{selectedOption ? selectedOption.label : (placeholder || 'Select Option')}</span>
+        <ChevronDown size={16} className={`text-slate-500 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      
+      {isOpen && !disabled && (
+        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white border border-slate-200/80 rounded-xl shadow-xl animate-scale-up py-1 border-solid">
+          {options.length === 0 ? (
+            <div className="px-3.5 py-2 text-xs text-slate-400 font-semibold text-center">No options available</div>
+          ) : (
+            options.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3.5 py-2 text-xs font-bold transition duration-100 flex items-center justify-between cursor-pointer border-none ${
+                  option.value === value 
+                    ? 'bg-theme-active text-theme-active' 
+                    : 'text-slate-655 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <span>{option.label}</span>
+                {option.value === value && <Check size={12} className="text-theme-primary" />}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CustomDatePickerProps {
+  value: string;
+  onChange: (val: string) => void;
+  className?: string;
+  placeholder?: string;
+  required?: boolean;
+}
+
+function CustomDatePicker({ value, onChange, className = "", placeholder = "Select Date", required = false }: CustomDatePickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (value) {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        setCurrentMonth(parsed);
+      }
+    }
+  }, [value]);
+
+  const daysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const startDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const getDaysArray = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const totalDays = daysInMonth(currentMonth);
+    const startDay = startDayOfMonth(currentMonth);
+    
+    const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
+    
+    const prevMonth = new Date(year, month - 1, 1);
+    const prevTotalDays = daysInMonth(prevMonth);
+    for (let i = startDay - 1; i >= 0; i--) {
+      const day = prevTotalDays - i;
+      const prevDate = new Date(year, month - 1, day);
+      days.push({
+        dateStr: formatDateISO(prevDate),
+        dayNum: day,
+        isCurrentMonth: false
+      });
+    }
+
+    for (let i = 1; i <= totalDays; i++) {
+      const curDate = new Date(year, month, i);
+      days.push({
+        dateStr: formatDateISO(curDate),
+        dayNum: i,
+        isCurrentMonth: true
+      });
+    }
+
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      const nextDate = new Date(year, month + 1, i);
+      days.push({
+        dateStr: formatDateISO(nextDate),
+        dayNum: i,
+        isCurrentMonth: false
+      });
+    }
+
+    return days;
+  };
+
+  const formatDateISO = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const changeMonth = (offset: number) => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
+
+  const changeYear = (yearVal: number) => {
+    setCurrentMonth(new Date(yearVal, currentMonth.getMonth(), 1));
+  };
+
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const years = Array.from({ length: 20 }, (_, i) => new Date().getFullYear() - 10 + i);
+
+  const displayValue = value ? (() => {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  })() : '';
+
+  return (
+    <div ref={containerRef} className={`relative ${className.includes('w-') ? '' : 'w-full'} ${className}`}>
+      <div className="relative">
+        <input
+          type="text"
+          readOnly
+          value={displayValue}
+          onClick={() => setIsOpen(!isOpen)}
+          placeholder={placeholder}
+          required={required}
+          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 pr-10 text-sm text-slate-800 font-semibold cursor-pointer focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 hover:bg-[#FAF9F6]/85 transition duration-150 shadow-2xs text-left border-solid"
+        />
+        <Calendar 
+          size={16} 
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-slate-650 transition-colors"
+        />
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 mt-1.5 p-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-xl w-64 animate-scale-up border-solid">
+          <div className="flex justify-between items-center mb-3">
+            <button
+              type="button"
+              onClick={() => changeMonth(-1)}
+              className="p-1 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-850 cursor-pointer transition flex items-center justify-center border-none"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div className="flex gap-1 text-[11px] font-bold">
+              <select
+                value={currentMonth.getMonth()}
+                onChange={(e) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(e.target.value), 1))}
+                className="bg-transparent border-none text-xs font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-0 p-0 text-[11px]"
+              >
+                {months.map((m, idx) => (
+                  <option key={m} value={idx}>{m}</option>
+                ))}
+              </select>
+              <select
+                value={currentMonth.getFullYear()}
+                onChange={(e) => changeYear(Number(e.target.value))}
+                className="bg-transparent border-none text-xs font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-0 p-0 text-[11px]"
+              >
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => changeMonth(1)}
+              className="p-1 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-855 cursor-pointer transition flex items-center justify-center border-none"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
+              <div key={d}>{d}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {getDaysArray().map((day, idx) => {
+              const isSelected = day.dateStr === value;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    onChange(day.dateStr);
+                    setIsOpen(false);
+                  }}
+                  className={`h-7 w-7 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer border-none ${
+                    isSelected
+                      ? 'bg-theme-primary text-white shadow-sm'
+                      : day.isCurrentMonth
+                        ? 'text-slate-800 hover:bg-slate-50 hover:text-slate-950'
+                        : 'text-slate-300 hover:bg-slate-50/50'
+                  }`}
+                >
+                  {day.dayNum}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<'employees' | 'lines' | 'shifts' | 'roster' | 'codes' | 'holidays' | 'backups' | 'audit' | 'updates' | 'settings' | 'roster-rules' | 'security'>('employees');
@@ -1648,22 +1931,20 @@ export default function AdminPanel() {
       {/* Title */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
+          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-slate-900 via-slate-850 to-indigo-950 bg-clip-text text-transparent flex items-center gap-2.5">
             Admin Control & System Settings
           </h1>
-          <p className="text-xs text-slate-505 mt-1">
-            Configure calendar events, database copies, transaction audit trails, metro lines, roster sections, and signaller profiles.
+          <p className="text-[11px] text-slate-500 font-semibold tracking-wide uppercase mt-1.5 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-theme-primary animate-pulse"></span>
+            Manage system events, database backups, audit records, metro lines, roster configurations, and signaller profiles.
           </p>
         </div>
         <div className="flex items-center gap-3 no-print">
-          <div className="bg-theme-active text-theme-active px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-theme-active shadow-sm animate-pulse">
-            Super Admin Mode
-          </div>
           <button
             onClick={handleLockConsole}
-            className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer border-none"
           >
-            <Lock size={11} /> Lock Console
+            <Lock size={12} className="stroke-[2.5]" /> Lock Console
           </button>
         </div>
       </div>
@@ -1713,7 +1994,7 @@ export default function AdminPanel() {
           {/* Left Column Sidebar */}
           <div className="w-full xl:w-64 shrink-0 flex flex-col gap-4 no-print">
             {tabCategories.map(category => (
-              <div key={category.title} className="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-2.5 shadow-sm">
+              <div key={category.title} className="bg-white rounded-2xl p-4 space-y-2.5 shadow-md shadow-slate-100/30">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">
                   {getTranslation(lang, category.title)}
                 </span>
@@ -1733,8 +2014,8 @@ export default function AdminPanel() {
                         }}
                         className={`flex items-center gap-3 w-auto xl:w-full px-3.5 py-2.5 rounded-xl transition duration-150 font-bold text-xs select-none cursor-pointer ${
                           isActive
-                            ? 'tab-theme-active border border-theme-active shadow-2xs'
-                            : 'text-slate-655 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
+                            ? 'tab-theme-active shadow-sm'
+                            : 'text-slate-655 hover:bg-slate-50/80 hover:text-slate-900'
                         }`}
                       >
                         <tab.icon size={15} className={`shrink-0 ${isActive ? 'text-theme-active-icon' : 'text-slate-405'}`} />
@@ -1754,52 +2035,53 @@ export default function AdminPanel() {
               {/* Add & Transfer Forms Column */}
               <div className="space-y-6">
                 {/* Employee Form */}
-                <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b">
+                <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2.5 border-b border-slate-100">
                     <PlusCircle size={15} className="text-theme-primary" />
                     {editingEmployeeId !== null ? "Update Staff Details" : "Enroll Signalling Staff"}
                   </h3>
                   <form onSubmit={handleAddEmployee} className="space-y-4 text-xs font-bold text-slate-600">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">P.F. Number</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">P.F. Number</label>
                       <input 
                         type="text" 
                         value={empPF}
                         onChange={(e) => setEmpPF(e.target.value)}
                         placeholder="e.g. 22177721093"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme font-mono"
+                        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white font-mono transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Staff Name</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Staff Name</label>
                       <input 
                         type="text" 
                         value={empName}
                         onChange={(e) => setEmpName(e.target.value)}
                         placeholder="e.g. Tonmoy Naskar"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                         required
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Designation</label>
-                        <select 
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Designation</label>
+                        <CustomSelect 
                           value={empDesig}
-                          onChange={(e) => handleDesignationChange(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                        >
-                          <option value="SSE/Sig/IC">SSE/Sig/IC</option>
-                          <option value="SSE/Sig">SSE/Sig</option>
-                          <option value="JE/Sig">JE/Sig</option>
-                          <option value="Sr. Tech">Sr. Tech</option>
-                          <option value="Tech-I">Tech-I</option>
-                          <option value="Tech-II">Tech-II</option>
-                          <option value="Tech-III">Tech-III</option>
-                          <option value="Assistant">Assistant</option>
-                          <option value="Custom">Custom...</option>
-                        </select>
+                          onChange={(val) => handleDesignationChange(val)}
+                          options={[
+                            { value: "SSE/Sig/IC", label: "SSE/Sig/IC" },
+                            { value: "SSE/Sig", label: "SSE/Sig" },
+                            { value: "JE/Sig", label: "JE/Sig" },
+                            { value: "Sr. Tech", label: "Sr. Tech" },
+                            { value: "Tech-I", label: "Tech-I" },
+                            { value: "Tech-II", label: "Tech-II" },
+                            { value: "Tech-III", label: "Tech-III" },
+                            { value: "Assistant", label: "Assistant" },
+                            { value: "Custom", label: "Custom..." }
+                          ]}
+                          placeholder="Select Designation"
+                        />
                         {isCustomDesig && (
                           <div className="mt-2 animate-fade-in">
                             <label className="block mb-1 uppercase tracking-wider text-[10px] text-theme-primary">Custom Name</label>
@@ -1808,63 +2090,61 @@ export default function AdminPanel() {
                               value={customDesigText}
                               onChange={(e) => setCustomDesigText(e.target.value)}
                               placeholder="e.g. Helper"
-                              className="w-full border border-theme-active rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme font-semibold"
+                              className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85 font-semibold"
                               required
                             />
                           </div>
                         )}
                       </div>
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Pay Level</label>
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Pay Level</label>
                         <input 
                           type="number" 
                           min={1} 
                           max={12}
                           value={empLevel}
                           onChange={(e) => setEmpLevel(Number(e.target.value))}
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none"
+                          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                           required
                         />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Roster Section</label>
-                        <select 
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Roster Section</label>
+                        <CustomSelect
                           value={empSection || ""}
-                          onChange={(e) => setEmpSection(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                        >
-                          <option value="">-- No Section --</option>
-                          {sections.map(sec => (
-                            <option key={sec.id} value={sec.section_code}>{sec.section_code}</option>
-                          ))}
-                        </select>
+                          onChange={(val) => setEmpSection(val)}
+                          options={[
+                            { value: "", label: "-- No Section --" },
+                            ...sections.map(sec => ({ value: sec.section_code, label: sec.section_code }))
+                          ]}
+                          placeholder="Select Section"
+                        />
                       </div>
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Joining Date (Optional)</label>
-                        <input 
-                          type="date" 
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Joining Date (Optional)</label>
+                        <CustomDatePicker 
                           value={empJoiningDate}
-                          onChange={(e) => setEmpJoiningDate(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
+                          onChange={(val) => setEmpJoiningDate(val)}
+                          placeholder="Select Joining Date"
                         />
                       </div>
                     </div>
 
                     {/* Weekly Schedule template button & summary */}
-                    <div className="bg-slate-50 p-3.5 border border-slate-200 rounded-xl space-y-2">
+                    <div className="bg-[#FAF9F6]/30 border border-slate-200/50 p-4 rounded-xl space-y-2.5 shadow-3xs">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Roster Schedule Pattern</span>
                         <button
                           type="button"
                           onClick={() => setIsScheduleModalOpen(true)}
-                          className="bg-theme-primary hover-opacity-85 text-white rounded-lg text-[10px] font-extrabold py-1.5 px-3 uppercase tracking-wider transition-colors cursor-pointer shadow-sm"
+                          className="bg-theme-primary hover-opacity-85 text-white rounded-lg text-[10px] font-extrabold py-1.5 px-3 uppercase tracking-wider transition-colors cursor-pointer shadow-sm border-none"
                         >
                           Configure
                         </button>
                       </div>
-                       <div className="text-[11px] font-semibold text-slate-700">
+                       <div className="text-[11px] font-bold text-slate-700">
                         {scheduleType === 'simple' && (() => {
                           const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                           const rDay = days.find(d => empWeeklySchedule[d] === 'R') || empRestDay;
@@ -1903,98 +2183,93 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Transfer Form */}
-                <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b">
+                <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2.5 border-b border-slate-100">
                     <ArrowLeftRight size={15} className="text-theme-primary" />
                     Transfer Staff Section
                   </h3>
                   <form onSubmit={handleTransferEmployee} className="space-y-4 text-xs font-bold text-slate-600">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Select Employee</label>
-                      <select 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Select Employee</label>
+                      <CustomSelect 
                         value={transferEmpId}
-                        onChange={(e) => setTransferEmpId(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                        required
-                      >
-                        <option value="">-- Choose Employee --</option>
-                        {employees.map(emp => (
-                          <option key={emp.emp_id} value={emp.emp_id}>{emp.name} ({emp.designation} - {emp.section_code})</option>
-                        ))}
-                      </select>
+                        onChange={(val) => setTransferEmpId(val)}
+                        options={employees.map(emp => ({
+                          value: emp.emp_id,
+                          label: `${emp.name} (${emp.designation} - ${emp.section_code || 'Unassigned'})`
+                        }))}
+                        placeholder="Choose Employee"
+                      />
                     </div>
                     {transferEmpId && (
-                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg animate-fade-in flex justify-between items-center text-xs">
+                      <div className="p-3 bg-[#FAF9F6]/40 border border-slate-200/50 rounded-xl animate-fade-in flex justify-between items-center text-xs shadow-2xs">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">From Section (Current):</span>
-                        <span className="px-2 py-0.5 rounded bg-theme-active text-theme-active font-extrabold border border-theme-active uppercase">
+                        <span className="px-2.5 py-1 rounded-lg bg-theme-active text-theme-active font-extrabold uppercase shadow-2xs">
                           {employees.find(e => e.emp_id === Number(transferEmpId))?.section_code || 'Unassigned'}
                         </span>
                       </div>
                     )}
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Target Section (To Section)</label>
-                      <select 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Target Section (To Section)</label>
+                      <CustomSelect 
                         value={transferSecCode}
-                        onChange={(e) => setTransferSecCode(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                        required
-                      >
-                        <option value="">-- Choose Target Section --</option>
-                        {sections.map(sec => (
-                          <option key={sec.id} value={sec.section_code}>{sec.section_code} - {sec.section_name}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => setTransferSecCode(val)}
+                        options={sections.map(sec => ({
+                          value: sec.section_code,
+                          label: `${sec.section_code} - ${sec.section_name}`
+                        }))}
+                        placeholder="Choose Target Section"
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Transfer Date</label>
-                        <input 
-                          type="date" 
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Transfer Date</label>
+                        <CustomDatePicker
                           value={transferDate}
-                          onChange={(e) => setTransferDate(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
+                          onChange={(val) => setTransferDate(val)}
+                          placeholder="Select Date"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Office Order Number</label>
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Office Order Number</label>
                         <input 
                           type="text" 
                           value={transferOrderNo}
                           onChange={(e) => setTransferOrderNo(e.target.value)}
                           placeholder="e.g. SSE/T/2026/04"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme"
+                          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                           required
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 border-t pt-3.5 mt-2">
+                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 mt-2.5">
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Signatory Name</label>
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Signatory Name</label>
                         <input 
                           type="text" 
                           value={transferSignatoryName}
                           onChange={(e) => setTransferSignatoryName(e.target.value)}
                           placeholder="e.g. Koushik Saha"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme"
+                          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Signatory Designation</label>
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Signatory Designation</label>
                         <input 
                           type="text" 
                           value={transferSignatoryDesig}
                           onChange={(e) => setTransferSignatoryDesig(e.target.value)}
                           placeholder="e.g. SSE/Sig/IC"
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus-border-theme"
+                          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                           required
                         />
                       </div>
                     </div>
                     <button 
                       type="submit" 
-                      className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                      className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-900 hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-white font-bold text-xs uppercase tracking-wider cursor-pointer border-none"
                     >
                       Execute Section Transfer
                     </button>
@@ -2003,40 +2278,40 @@ export default function AdminPanel() {
               </div>
 
               {/* Staff directory directory table */}
-              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                <div className="px-5 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
-                  <h3 className="font-bold text-slate-855">Registered Signaller Directory</h3>
+              <div className="lg:col-span-2 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
+                  <h3 className="font-bold text-slate-855 text-sm uppercase tracking-wider">Registered Signaller Directory</h3>
                   
-                  <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
+                  <div className="flex flex-row items-center gap-2.5 w-full xl:w-auto flex-nowrap">
                     {/* Line Filter */}
-                    <select
+                    <CustomSelect
                       value={directoryLineFilter}
-                      onChange={(e) => {
-                        setDirectoryLineFilter(e.target.value);
+                      onChange={(val) => {
+                        setDirectoryLineFilter(val);
                         setDirectorySectionFilter('ALL');
                       }}
-                      className="bg-slate-50 border border-slate-250 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none font-bold text-slate-650 cursor-pointer"
-                    >
-                      <option value="ALL">All Lines</option>
-                      {lines.map(line => (
-                        <option key={line.id} value={line.id}>{line.line_name}</option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: 'ALL', label: 'All Lines' },
+                        ...lines.map(line => ({ value: String(line.id), label: line.line_name }))
+                      ]}
+                      className="w-36 sm:w-40 shrink-0"
+                    />
 
                     {/* Section Filter */}
-                    <select
+                    <CustomSelect
                       value={directorySectionFilter}
-                      onChange={(e) => setDirectorySectionFilter(e.target.value)}
-                      className="bg-slate-50 border border-slate-250 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none font-bold text-slate-650 cursor-pointer"
-                    >
-                      <option value="ALL">All Sections</option>
-                      {sections.filter(s => directoryLineFilter === 'ALL' || s.line_id === Number(directoryLineFilter)).map(sec => (
-                        <option key={sec.id} value={sec.section_code}>{sec.section_code}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => setDirectorySectionFilter(val)}
+                      options={[
+                        { value: 'ALL', label: 'All Sections' },
+                        ...sections
+                          .filter(s => directoryLineFilter === 'ALL' || s.line_id === Number(directoryLineFilter))
+                          .map(sec => ({ value: sec.section_code, label: sec.section_code }))
+                      ]}
+                      className="w-36 sm:w-40 shrink-0"
+                    />
 
                     {/* Directory Search */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full sm:w-64">
+                    <div className="flex items-center gap-2.5 px-3 py-2 bg-[#FAF9F6]/40 border border-slate-200 rounded-xl text-xs w-full sm:w-60 shadow-2xs focus-within:bg-white transition duration-150 shrink-0 border-solid">
                       <Search size={14} className="text-slate-400" />
                       <input 
                         type="text" 
@@ -2052,14 +2327,14 @@ export default function AdminPanel() {
                 <div className="overflow-y-auto max-h-[660px]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                        <th className="py-2.5 px-5">PF Number</th>
-                        <th className="py-2.5 px-5">Name</th>
-                        <th className="py-2.5 px-5">Designation</th>
-                        <th className="py-2.5 px-5">Level</th>
-                        <th className="py-2.5 px-5">Section</th>
-                        <th className="py-2.5 px-5">Rest Day</th>
-                        <th className="py-2.5 px-5 text-center">Actions</th>
+                      <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold bg-slate-50/50">
+                        <th className="py-3 px-5">PF Number</th>
+                        <th className="py-3 px-5">Name</th>
+                        <th className="py-3 px-5">Designation</th>
+                        <th className="py-3 px-5">Level</th>
+                        <th className="py-3 px-5">Section</th>
+                        <th className="py-3 px-5">Rest Day</th>
+                        <th className="py-3 px-5 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -2071,25 +2346,25 @@ export default function AdminPanel() {
                         </tr>
                       ) : (
                         filteredEmployees.map(emp => (
-                          <tr key={emp.emp_id} className="hover:bg-slate-50/50">
+                          <tr key={emp.emp_id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-3 px-5 font-mono text-slate-500">{emp.pf_number}</td>
                             <td className="py-3 px-5 font-bold text-slate-855">{emp.name}</td>
-                            <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100 text-slate-655">{emp.designation}</span></td>
+                            <td className="py-3 px-5"><span className="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-655 font-bold shadow-3xs">{emp.designation}</span></td>
                             <td className="py-3 px-5 text-theme-primary font-extrabold">Level {emp.level}</td>
-                            <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold uppercase">{emp.section_code || "Unassigned"}</span></td>
+                            <td className="py-3 px-5"><span className="px-2.5 py-1 rounded-lg bg-[#FAF9F6] text-slate-505 font-extrabold uppercase shadow-3xs">{emp.section_code || "Unassigned"}</span></td>
                             <td className="py-3 px-5">{emp.default_rest_day}</td>
                             <td className="py-3 px-5 text-center flex items-center justify-center gap-1.5">
                               <button 
                                 onClick={() => handleEditEmployeeClick(emp)} 
                                 title="Edit Employee"
-                                className="p-1.5 rounded-lg bg-theme-active text-theme-active hover:opacity-85 border border-theme-active/30 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-2 rounded-xl bg-theme-active text-theme-active hover:opacity-85 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
                               >
                                 <Edit size={11} />
                               </button>
                               <button 
                                 onClick={() => handleDeleteEmployeeClick(emp.emp_id)} 
                                 title="Delete Employee"
-                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
                               >
                                 <Trash2 size={11} />
                               </button>
@@ -2110,25 +2385,25 @@ export default function AdminPanel() {
               {/* Form columns */}
               <div className="space-y-6">
                 {/* Line Form */}
-                <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+                <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
                     <PlusCircle size={15} className="text-blue-600" />
                     {editingLineId !== null ? "Update Metro Line" : "Register Metro Line"}
                   </h3>
                   <form onSubmit={handleSaveLine} className="space-y-4 text-xs font-bold text-slate-600">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Line Name</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Line Name</label>
                       <input 
                         type="text" 
                         value={lineName}
                         onChange={(e) => setLineName(e.target.value)}
                         placeholder="e.g. Blue Line"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Theme Color Code</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Theme Color Code</label>
                       <div className="flex gap-2 items-center">
                         <input 
                           type="color" 
@@ -2140,7 +2415,7 @@ export default function AdminPanel() {
                           type="text" 
                           value={lineColor}
                           onChange={(e) => setLineColor(e.target.value)}
-                          className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          className="flex-1 bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-mono"
                         />
                       </div>
                     </div>
@@ -2156,7 +2431,7 @@ export default function AdminPanel() {
                       )}
                       <button 
                         type="submit" 
-                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px] font-bold"
                       >
                         {editingLineId !== null ? "Update Line" : "Create Line"}
                       </button>
@@ -2165,55 +2440,52 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Section Form */}
-                <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+                <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
                     <PlusCircle size={15} className="text-blue-600" />
                     {editingSectionId !== null ? "Update Roster Section" : "Register Roster Section"}
                   </h3>
                   <form onSubmit={handleSaveSection} className="space-y-4 text-xs font-bold text-slate-600">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Belongs to Line</label>
-                      <select 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Belongs to Line</label>
+                      <CustomSelect 
                         value={secLineId}
-                        onChange={(e) => setSecLineId(Number(e.target.value))}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                      >
-                        {lines.map(l => (
-                          <option key={l.id} value={l.id}>{l.line_name}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => setSecLineId(Number(val))}
+                        options={lines.map(l => ({ value: l.id, label: l.line_name }))}
+                        placeholder="Select Line"
+                      />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Section Code (e.g. KKVS)</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Section Code (e.g. KKVS)</label>
                       <input 
                         type="text" 
                         value={secCode}
                         onChange={(e) => setSecCode(e.target.value)}
                         placeholder="e.g. KKVS"
                         maxLength={8}
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 uppercase focus:outline-none focus:border-blue-500 font-mono font-bold"
+                        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 uppercase focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-mono font-bold"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Section Name</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Section Name</label>
                       <input 
                         type="text" 
                         value={secName}
                         onChange={(e) => setSecName(e.target.value)}
                         placeholder="e.g. Kavi Subhash Station Section"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none"
+                        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Base Location</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Base Location</label>
                       <input 
                         type="text" 
                         value={secBase}
                         onChange={(e) => setSecBase(e.target.value)}
                         placeholder="e.g. Kavi Subhash"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none"
+                        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80"
                       />
                     </div>
                     <div className="pt-2 flex justify-end gap-2.5">
@@ -2228,7 +2500,7 @@ export default function AdminPanel() {
                       )}
                       <button 
                         type="submit" 
-                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px] font-bold"
                       >
                         {editingSectionId !== null ? "Update Section" : "Register Section"}
                       </button>
@@ -2240,16 +2512,16 @@ export default function AdminPanel() {
               {/* Lists column */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Metro Lines list cards */}
-                <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-3">
-                  <h3 className="font-bold text-slate-850 text-xs uppercase tracking-wider border-b pb-2 flex items-center justify-between">
+                <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-4">
+                  <h3 className="font-bold text-slate-850 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center justify-between">
                     Active Metro Lines
-                    <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">{lines.length} Registered</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded bg-slate-50 text-slate-500 font-bold shadow-3xs">{lines.length} Registered</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto p-1">
                     {lines.map(line => (
-                      <div key={line.id} className="p-3 border rounded-xl flex justify-between items-center bg-white shadow-sm hover:scale-[1.01] transition-transform">
+                      <div key={line.id} className="p-3.5 rounded-xl bg-[#FAF9F6]/40 hover:bg-[#FAF9F6]/85 flex justify-between items-center transition-all duration-200 shadow-2xs">
                         <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                          <span className="w-3.5 h-3.5 rounded-full border shadow-inner block" style={{ backgroundColor: line.color_code }}></span>
+                          <span className="w-3.5 h-3.5 rounded-full border border-slate-200/50 shadow-inner block animate-pulse" style={{ backgroundColor: line.color_code }}></span>
                           {line.line_name}
                         </span>
                         <div className="flex items-center gap-2">
@@ -2257,14 +2529,14 @@ export default function AdminPanel() {
                           <button 
                             onClick={() => handleEditLineClick(line)} 
                             title="Edit Metro Line"
-                            className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                            className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition hover:scale-105 active:scale-95 cursor-pointer"
                           >
                             <Edit size={11} />
                           </button>
                           <button 
                             onClick={() => handleDeleteLineClick(line.id)} 
                             title="Delete Metro Line"
-                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition hover:scale-105 active:scale-95 cursor-pointer"
                           >
                             <Trash2 size={11} />
                           </button>
@@ -2275,38 +2547,38 @@ export default function AdminPanel() {
                 </div>
  
                 {/* Sections cards list */}
-                <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-3">
-                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center justify-between">
+                <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-4">
+                  <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center justify-between">
                     Registered Roster Sections
-                    <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">{sections.length} Sections</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded bg-slate-50 text-slate-500 font-bold shadow-3xs">{sections.length} Sections</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto p-1">
                     {sections.map(sec => {
                       const line = lines.find(l => l.id === sec.line_id);
                       return (
-                        <div key={sec.id} className="p-3.5 border rounded-xl space-y-2 relative overflow-hidden bg-white shadow-sm hover:scale-[1.01] transition-transform">
+                        <div key={sec.id} className="p-4 rounded-xl space-y-2 relative overflow-hidden bg-[#FAF9F6]/40 hover:bg-[#FAF9F6]/85 transition-all duration-200 shadow-2xs">
                           <span 
                             className="absolute top-0 left-0 bottom-0 w-1" 
                             style={{ backgroundColor: line?.color_code || '#e2e8f0' }}
                           ></span>
                           <div className="flex justify-between items-center pl-2">
                             <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{sec.section_name}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-655 font-bold uppercase">{sec.section_code}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-50 text-slate-655 font-bold uppercase shadow-3xs">{sec.section_code}</span>
                           </div>
-                          <div className="flex justify-between items-center pl-2 pt-1 border-t border-slate-55">
+                          <div className="flex justify-between items-center pl-2 pt-1 border-t border-slate-100/80">
                             <span className="text-[10px] text-slate-450">Base: <strong>{sec.base_location}</strong></span>
                             <div className="flex gap-1.5">
                               <button 
                                 onClick={() => handleEditSectionClick(sec)} 
                                 title="Edit Section"
-                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition hover:scale-105 active:scale-95 cursor-pointer"
                               >
                                 <Edit size={11} />
                               </button>
                               <button 
                                 onClick={() => handleDeleteSectionClick(sec.id)} 
                                 title="Delete Section"
-                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition hover:scale-105 active:scale-95 cursor-pointer"
                               >
                                 <Trash2 size={11} />
                               </button>
@@ -2325,64 +2597,58 @@ export default function AdminPanel() {
           {activeTab === 'shifts' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Form columns */}
-              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+              <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
                   <PlusCircle size={15} className="text-blue-600" />
                   {editingShiftRuleId ? "Edit Shift Timing Rule" : "Define Shift Timing Rule"}
                 </h3>
                 <form onSubmit={handleAddShift} className="space-y-4 text-xs font-bold text-slate-600">
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Roster Section</label>
-                    <select 
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Roster Section</label>
+                    <CustomSelect 
                       value={shiftSecCode}
-                      onChange={(e) => setShiftSecCode(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                    >
-                      {sections.map(sec => (
-                        <option key={sec.id} value={sec.section_code}>{sec.section_code} - {sec.section_name}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => setShiftSecCode(val)}
+                      options={sections.map(sec => ({ value: sec.section_code, label: `${sec.section_code} - ${sec.section_name}` }))}
+                      placeholder="Select Section"
+                    />
                   </div>
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Shift Code Symbol (e.g. M, G, N)</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Shift Code Symbol (e.g. M, G, N)</label>
                     <input 
                       type="text" 
                       value={shiftCode}
                       onChange={(e) => setShiftCode(e.target.value)}
                       placeholder="e.g. M"
                       maxLength={6}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500 font-extrabold uppercase"
+                      className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-extrabold uppercase"
                       required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Start Time</label>
-                      <input 
-                        type="time" 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Start Time</label>
+                      <CustomTimePicker
                         value={shiftStart}
-                        onChange={(e) => setShiftStart(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
+                        onChange={(val) => setShiftStart(val)}
+                        placeholder="Start Time"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">End Time</label>
-                      <input 
-                        type="time" 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">End Time</label>
+                      <CustomTimePicker
                         value={shiftEnd}
-                        onChange={(e) => setShiftEnd(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
+                        onChange={(val) => setShiftEnd(val)}
+                        placeholder="End Time"
                         required
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Duty Type</label>
-                    <select 
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Duty Type</label>
+                    <CustomSelect 
                       value={isCustomDutyType ? 'Custom' : (shiftNight ? 'Night Shift' : 'General / Day Shift')}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      onChange={(val) => {
                         if (val === 'Custom') {
                           setIsCustomDutyType(true);
                           setShiftNight(false);
@@ -2392,12 +2658,13 @@ export default function AdminPanel() {
                           setShiftNight(val === 'Night Shift');
                         }
                       }}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
-                    >
-                      <option value="General / Day Shift">General / Day Shift</option>
-                      <option value="Night Shift">Night Shift</option>
-                      <option value="Custom">Custom...</option>
-                    </select>
+                      options={[
+                        { value: 'General / Day Shift', label: 'General / Day Shift' },
+                        { value: 'Night Shift', label: 'Night Shift' },
+                        { value: 'Custom', label: 'Custom...' }
+                      ]}
+                      placeholder="Select Duty Type"
+                    />
 
                     {isCustomDutyType && (
                       <div className="mt-3.5 space-y-3.5 border-t border-slate-100 pt-3 animate-fade-in">
@@ -2408,7 +2675,7 @@ export default function AdminPanel() {
                             value={customDutyTypeText}
                             onChange={(e) => setCustomDutyTypeText(e.target.value)}
                             placeholder="e.g. Evening Shift"
-                            className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm text-slate-805 focus:outline-none focus:border-blue-500 font-semibold"
+                            className="w-full bg-[#FAF9F6]/40 border border-theme-active/30 rounded-xl px-3.5 py-2.5 text-sm text-slate-808 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-semibold"
                             required
                           />
                         </div>
@@ -2439,7 +2706,7 @@ export default function AdminPanel() {
                     )}
                     <button 
                       type="submit" 
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]"
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px] font-bold"
                     >
                       {editingShiftRuleId ? "Save Updates" : "Create Shift Rule"}
                     </button>
@@ -2448,21 +2715,21 @@ export default function AdminPanel() {
               </div>
 
               {/* Rules List table */}
-              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                <div className="px-5 py-4 border-b flex justify-between items-center">
-                  <h3 className="font-bold text-slate-850">Shift rules list</h3>
-                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">{shifts.length} Shift Rules</span>
+              <div className="lg:col-span-2 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/20">
+                  <h3 className="font-bold text-slate-850 text-sm uppercase tracking-wider">Shift rules list</h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-slate-50 text-slate-500 font-bold shadow-3xs">{shifts.length} Shift Rules</span>
                 </div>
                 <div className="overflow-y-auto max-h-[460px]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                        <th className="py-2.5 px-5">Section</th>
-                        <th className="py-2.5 px-5">Shift Code</th>
-                        <th className="py-2.5 px-5">Start Time</th>
-                        <th className="py-2.5 px-5">End Time</th>
-                        <th className="py-2.5 px-5 text-center">Duty Type</th>
-                        <th className="py-2.5 px-5 text-center">Actions</th>
+                      <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold bg-slate-50/50">
+                        <th className="py-3 px-5">Section</th>
+                        <th className="py-3 px-5">Shift Code</th>
+                        <th className="py-3 px-5">Start Time</th>
+                        <th className="py-3 px-5">End Time</th>
+                        <th className="py-3 px-5 text-center">Duty Type</th>
+                        <th className="py-3 px-5 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -2476,27 +2743,27 @@ export default function AdminPanel() {
                         shifts.map(s => {
                           const sec = sections.find(sec => sec.id === s.section_id);
                           return (
-                            <tr key={s.id} className="hover:bg-slate-50/50">
-                              <td className="py-3 px-5 font-bold">{sec ? `${sec.section_code} - ${sec.section_name}` : `Section ID ${s.section_id}`}</td>
+                            <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="py-3 px-5 font-bold text-slate-855">{sec ? `${sec.section_code} - ${sec.section_name}` : `Section ID ${s.section_id}`}</td>
                               <td className="py-3 px-5 text-blue-600 font-extrabold">{s.shift_code}</td>
-                              <td className="py-3 px-5 font-mono">{s.start_time}</td>
-                              <td className="py-3 px-5 font-mono">{s.end_time}</td>
+                              <td className="py-3 px-5 font-mono text-slate-500">{s.start_time}</td>
+                              <td className="py-3 px-5 font-mono text-slate-500">{s.end_time}</td>
                               <td className="py-3 px-5 text-center">
                                 {s.duty_type ? (
                                   s.is_night_duty ? (
-                                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase">{s.duty_type}</span>
+                                    <span className="px-2.5 py-1 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase shadow-3xs">Night Duty ({s.duty_type})</span>
                                   ) : (
-                                    <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${
+                                    <span className={`px-2.5 py-1 rounded font-bold text-[9px] uppercase shadow-3xs ${
                                       s.duty_type === 'General / Day Shift' 
                                         ? 'bg-slate-100 text-slate-500' 
-                                        : 'bg-indigo-50 text-indigo-600 border border-indigo-200/50'
+                                        : 'bg-indigo-50 text-indigo-650'
                                     }`}>{s.duty_type}</span>
                                   )
                                 ) : (
                                   s.is_night_duty ? (
-                                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase">Night Shift</span>
+                                    <span className="px-2.5 py-1 rounded bg-purple-100 text-purple-700 font-bold text-[9px] uppercase shadow-3xs">Night Shift</span>
                                   ) : (
-                                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold text-[9px] uppercase">General / Day</span>
+                                    <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[9px] uppercase shadow-3xs">General / Day</span>
                                   )
                                 )}
                               </td>
@@ -2504,14 +2771,14 @@ export default function AdminPanel() {
                                 <button 
                                   onClick={() => handleEditShiftClick(s)} 
                                   title="Edit Shift Rule"
-                                  className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                  className="p-2 rounded-xl bg-theme-active text-theme-active hover:opacity-85 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
                                 >
                                   <Edit size={11} />
                                 </button>
                                 <button 
                                   onClick={() => handleDeleteShiftClick(s.id)} 
                                   title="Delete Shift Rule"
-                                  className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                  className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
                                 >
                                   <Trash2 size={11} />
                                 </button>
@@ -2529,9 +2796,9 @@ export default function AdminPanel() {
 
           {/* TAB 4: ROSTER PLANNER */}
           {activeTab === 'roster' && (
-            <div className="page-transition lg:col-span-3 glass-panel p-6 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col space-y-6">
+            <div className="page-transition lg:col-span-3 glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-6 border-none">
               {/* Header selectors */}
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                     <Calendar className="text-blue-600 font-bold" size={18} /> Roster Planner
@@ -2540,49 +2807,49 @@ export default function AdminPanel() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                  <select 
+                  <CustomSelect
                     value={plannerEmpId}
-                    onChange={(e) => setPlannerEmpId(e.target.value)}
-                    className="bg-slate-105 border border-slate-200 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
-                  >
-                    <option value="">-- Select Employee --</option>
-                    {employees.map(e => (
-                      <option key={e.emp_id} value={e.emp_id}>{e.name} ({e.designation})</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setPlannerEmpId(val)}
+                    options={[
+                      { value: "", label: "-- Select Employee --" },
+                      ...employees.map(e => ({ value: String(e.emp_id), label: `${e.name} (${e.designation})` }))
+                    ]}
+                    placeholder="Select Employee"
+                    className="w-48 sm:w-52 shrink-0"
+                  />
 
-                  <select 
+                  <CustomSelect
                     value={plannerMonth}
-                    onChange={(e) => setPlannerMonth(Number(e.target.value))}
-                    className="bg-slate-105 border border-slate-200 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
-                  >
-                    {monthsList.map(m => (
-                      <option key={m.val} value={m.val}>{m.name}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setPlannerMonth(Number(val))}
+                    options={monthsList.map(m => ({ value: m.val, label: m.name }))}
+                    placeholder="Select Month"
+                    className="w-36 shrink-0"
+                  />
 
-                  <select 
+                  <CustomSelect
                     value={plannerYear}
-                    onChange={(e) => setPlannerYear(Number(e.target.value))}
-                    className="bg-slate-105 border border-slate-200 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
-                  >
-                    <option value={2026}>2026</option>
-                    <option value={2025}>2025</option>
-                  </select>
+                    onChange={(val) => setPlannerYear(Number(val))}
+                    options={[
+                      { value: 2026, label: "2026" },
+                      { value: 2025, label: "2025" }
+                    ]}
+                    placeholder="Select Year"
+                    className="w-28 shrink-0"
+                  />
 
                   {plannerEmpId && (
                     <>
                       <button 
                         type="button" 
                         onClick={handlePlannerAutoFill}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-105 text-blue-600 font-bold text-[10px] uppercase tracking-wider transition cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-[10px] uppercase tracking-wider transition cursor-pointer shadow-sm"
                       >
                         <Sparkles size={13} /> Auto-Fill
                       </button>
                       <button 
                         type="button" 
                         onClick={handleSavePlannerRoster}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase tracking-wider transition cursor-pointer shadow-sm shadow-emerald-500/10"
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase tracking-wider transition cursor-pointer shadow-sm shadow-emerald-500/10"
                       >
                         <Save size={13} /> Save Roster
                       </button>
@@ -2593,60 +2860,55 @@ export default function AdminPanel() {
 
               {/* Roster remarks */}
               {plannerEmpId && (
-                <div className="flex flex-col gap-1 bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
+                <div className="flex flex-col gap-1.5 bg-[#FAF9F6]/30 rounded-xl p-4 shadow-2xs border border-slate-200/50">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Roster Remarks / Office Order Reference:</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Working temporary night shifts or sick leaves details"
                     value={plannerRemarks}
                     onChange={(e) => setPlannerRemarks(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 transition duration-150"
                   />
                 </div>
               )}
 
               {/* Date range batch selector */}
               {plannerEmpId && (
-                <div className="flex flex-col gap-3.5 bg-blue-50/20 border border-blue-100 p-4 rounded-xl">
+                <div className="flex flex-col gap-3.5 bg-[#FAF9F6]/30 border border-slate-200/60 p-4.5 rounded-xl shadow-2xs">
                   <div className="text-blue-800 font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <Sparkles size={14} className="text-blue-600" />
                     Quick Date-Range Shift Applicator
                   </div>
                   <div className="flex flex-wrap items-end gap-3.5 text-xs font-bold text-slate-655">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 w-44">
                       <label className="text-[9px] uppercase tracking-wider text-slate-450">From Date</label>
-                      <input 
-                        type="date" 
+                      <CustomDatePicker 
                         value={rangeStartDate}
-                        onChange={(e) => setRangeStartDate(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none"
+                        onChange={(val) => setRangeStartDate(val)}
+                        placeholder="Select Date"
                       />
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 w-44">
                       <label className="text-[9px] uppercase tracking-wider text-slate-450">To Date</label>
-                      <input 
-                        type="date" 
+                      <CustomDatePicker 
                         value={rangeEndDate}
-                        onChange={(e) => setRangeEndDate(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none"
+                        onChange={(val) => setRangeEndDate(val)}
+                        placeholder="Select Date"
                       />
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 w-48">
                       <label className="text-[9px] uppercase tracking-wider text-slate-450">Shift status Code</label>
-                      <select 
+                      <CustomSelect 
                         value={rangeShift}
-                        onChange={(e) => setRangeShift(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 cursor-pointer"
-                      >
-                        {allCodes.map(c => (
-                          <option key={c.code} value={c.code}>{c.code} - {c.description}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => setRangeShift(val)}
+                        options={allCodes.map(c => ({ value: c.code, label: `${c.code} - ${c.description}` }))}
+                        placeholder="Select Code"
+                      />
                     </div>
                     <button 
                       type="button" 
                       onClick={handleApplyRangeShift}
-                      className="px-4 py-2 bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer rounded-lg h-[34px] shadow-sm"
+                      className="px-4 py-2 bg-theme-primary hover-bg-theme-primary text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer rounded-xl h-[36px] shadow-sm"
                     >
                       Apply Range
                     </button>
@@ -2658,7 +2920,7 @@ export default function AdminPanel() {
               {isPlannerLoading ? (
                 <div className="text-center text-slate-400 py-16 text-sm font-semibold">Loading roster grid matrix...</div>
               ) : !plannerEmpId ? (
-                <div className="text-center text-slate-400 py-20 bg-slate-50 border border-dashed rounded-xl font-semibold text-xs uppercase tracking-widest text-slate-500">
+                <div className="text-center text-slate-400 py-24 bg-[#FAF9F6]/40 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400/80 shadow-2xs">
                   Please select an employee above to start planning.
                 </div>
               ) : (
@@ -2666,8 +2928,8 @@ export default function AdminPanel() {
                   {plannerDays.map(day => {
                     const status = plannerGrid[day.dateStr] || '';
                     return (
-                      <div key={day.dateStr} className={`p-3 border rounded-xl flex flex-col justify-between items-center shadow-sm relative ${
-                        day.isSunday ? 'bg-red-50/20 border-red-100' : 'bg-[#FAF9F6] border-slate-200'
+                      <div key={day.dateStr} className={`p-4 rounded-xl flex flex-col justify-between items-center shadow-2xs relative transition-all duration-200 hover:scale-[1.03] ${
+                        day.isSunday ? 'bg-red-50/15 border border-red-100/50' : 'bg-[#FAF9F6]/40 border border-slate-200/50'
                       }`}>
                         <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
                           day.isSunday ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'
@@ -2677,16 +2939,15 @@ export default function AdminPanel() {
                         <span className="text-lg font-black text-slate-800 mt-2">{day.dayNum}</span>
                         <span className="text-[9px] text-slate-400 font-mono mt-0.5">{day.dateStr.slice(5)}</span>
                         
-                        <select 
+                        <CustomSelect
                           value={status}
-                          onChange={(e) => setPlannerGrid(prev => ({ ...prev, [day.dateStr]: e.target.value }))}
-                          className="w-full mt-3 bg-white border border-slate-200 rounded-lg py-1 text-center font-bold text-xs text-slate-800 focus:outline-none cursor-pointer"
-                        >
-                          <option value="">-- Empty --</option>
-                          {allCodes.map(codeObj => (
-                            <option key={codeObj.code} value={codeObj.code}>{codeObj.code}</option>
-                          ))}
-                        </select>
+                          onChange={(val) => setPlannerGrid(prev => ({ ...prev, [day.dateStr]: val }))}
+                          options={[
+                            { value: "", label: "-- Empty --" },
+                            ...allCodes.map(codeObj => ({ value: codeObj.code, label: codeObj.code }))
+                          ]}
+                          placeholder="-- Empty --"
+                        />
                       </div>
                     );
                   })}
@@ -2699,14 +2960,14 @@ export default function AdminPanel() {
           {activeTab === 'codes' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Add form */}
-              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+              <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
                   <PlusCircle size={15} className="text-theme-primary" />
                   {editingCode ? "Edit Code Details" : "Register Roster Status Code"}
                 </h3>
                 <form onSubmit={handleSaveCode} className="space-y-4 text-xs font-bold text-slate-605">
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Roster Code Status</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Roster Code Status</label>
                     <input 
                       type="text" 
                       value={codeVal}
@@ -2714,67 +2975,67 @@ export default function AdminPanel() {
                       placeholder="e.g. TRG"
                       disabled={editingCode !== null}
                       maxLength={10}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 uppercase focus:outline-none focus-border-theme font-extrabold"
+                      className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 uppercase focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-extrabold"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Description</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Description</label>
                     <input 
                       type="text" 
                       value={codeDesc}
                       onChange={(e) => setCodeDesc(e.target.value)}
                       placeholder="e.g. Training / Classroom Session"
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80"
                       required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Background Color</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Background Color</label>
                       <input 
                         type="color" 
                         value={codeBg}
                         onChange={(e) => setCodeBg(e.target.value)}
-                        className="w-full h-9 p-0.5 rounded-lg border border-slate-200 bg-white cursor-pointer"
+                        className="w-full h-9 p-0.5 rounded-xl border border-slate-200 bg-[#FAF9F6]/40 cursor-pointer shadow-3xs"
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Text Color</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Text Color</label>
                       <input 
                         type="color" 
                         value={codeFg}
                         onChange={(e) => setCodeFg(e.target.value)}
-                        className="w-full h-9 p-0.5 rounded-lg border border-slate-200 bg-white cursor-pointer"
+                        className="w-full h-9 p-0.5 rounded-xl border border-slate-200 bg-[#FAF9F6]/40 cursor-pointer shadow-3xs"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Is Leave Type?</label>
-                      <select 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Is Leave Type?</label>
+                      <CustomSelect 
                         value={codeIsLeave ? 'true' : 'false'}
-                        onChange={(e) => setCodeIsLeave(e.target.value === 'true')}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                      >
-                        <option value="false">No (Shift Code)</option>
-                        <option value="true">Yes (Accrued Leave)</option>
-                      </select>
+                        onChange={(val) => setCodeIsLeave(val === 'true')}
+                        options={[
+                          { value: "false", label: "No (Shift Code)" },
+                          { value: "true", label: "Yes (Accrued Leave)" }
+                        ]}
+                      />
                     </div>
                     {codeIsLeave && (
                       <div>
-                        <label className="block mb-1 uppercase tracking-wider text-[10px]">Leave Bank Category</label>
-                        <select 
+                        <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Leave Bank Category</label>
+                        <CustomSelect 
                           value={codeLeaveType}
-                          onChange={(e) => setCodeLeaveType(e.target.value as any)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                        >
-                          <option value="CL">CL Bank</option>
-                          <option value="LAP">LAP Bank</option>
-                          <option value="CR">CR Balance</option>
-                          <option value="Sick">Sick Bank</option>
-                          <option value="None">Special Leave</option>
-                        </select>
+                          onChange={(val) => setCodeLeaveType(val as any)}
+                          options={[
+                            { value: "CL", label: "CL Bank" },
+                            { value: "LAP", label: "LAP Bank" },
+                            { value: "CR", label: "CR Balance" },
+                            { value: "Sick", label: "Sick Bank" },
+                            { value: "None", label: "Special Leave" }
+                          ]}
+                        />
                       </div>
                     )}
                   </div>
@@ -2799,27 +3060,27 @@ export default function AdminPanel() {
               </div>
 
               {/* Codes list */}
-              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                <div className="px-5 py-4 border-b flex items-center justify-between">
-                  <h3 className="font-bold text-slate-855">Roster Codes Config</h3>
-                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-655 font-bold">{allCodes.length} Codes</span>
+              <div className="lg:col-span-2 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+                  <h3 className="font-bold text-slate-855 text-sm uppercase tracking-wider">Roster Codes Config</h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-slate-50 text-slate-655 font-bold shadow-3xs">{allCodes.length} Codes</span>
                 </div>
                 <div className="overflow-y-auto max-h-[460px]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                        <th className="py-2.5 px-5">Code</th>
-                        <th className="py-2.5 px-5">Description</th>
-                        <th className="py-2.5 px-5">Preview</th>
-                        <th className="py-2.5 px-5">Is Leave</th>
-                        <th className="py-2.5 px-5 text-center">Actions</th>
+                      <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold bg-slate-50/50">
+                        <th className="py-3 px-5">Code</th>
+                        <th className="py-3 px-5">Description</th>
+                        <th className="py-3 px-5">Preview</th>
+                        <th className="py-3 px-5">Is Leave</th>
+                        <th className="py-3 px-5 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {allCodes.map(code => (
-                        <tr key={code.code} className="hover:bg-slate-50/50">
+                        <tr key={code.code} className="hover:bg-slate-50/50 transition-colors">
                           <td className="py-3 px-5 font-bold text-slate-800">{code.code}</td>
-                          <td className="py-3 px-5 text-slate-600">{code.description}</td>
+                          <td className="py-3 px-5 text-slate-600 font-medium">{code.description}</td>
                           <td className="py-3 px-5">
                             <span 
                               className="px-3 py-1 text-[10px] font-black rounded-lg uppercase tracking-wide border shadow-inner"
@@ -2829,7 +3090,7 @@ export default function AdminPanel() {
                             </span>
                           </td>
                           <td className="py-3 px-5">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${code.is_leave ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-500'}`}>
+                            <span className={`px-2.5 py-1 rounded text-[10px] font-bold shadow-3xs ${code.is_leave ? 'bg-amber-50 text-amber-700' : 'bg-slate-105 text-slate-500'}`}>
                               {code.is_leave ? `Leave (${code.leave_type})` : 'Work Shift'}
                             </span>
                           </td>
@@ -2837,14 +3098,14 @@ export default function AdminPanel() {
                             <button 
                               onClick={() => handleEditCodeClick(code)} 
                               title="Edit Code"
-                              className="p-1.5 rounded-lg bg-theme-active text-theme-active hover:opacity-85 border border-theme-active/30 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer font-bold"
+                              className="p-2 rounded-xl bg-theme-active text-theme-active hover:opacity-85 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer font-bold"
                             >
                               <Edit size={11} />
                             </button>
                             <button 
                               onClick={() => handleDeleteCode(code.code)} 
                               title="Delete Code"
-                              className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer font-bold"
+                              className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer font-bold"
                             >
                               <Trash2 size={11} />
                             </button>
@@ -2862,57 +3123,56 @@ export default function AdminPanel() {
           {activeTab === 'holidays' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Form */}
-              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b">
+              <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2.5 border-b border-slate-100">
                   <PlusCircle size={15} className="text-theme-primary" />
                   {editingHolidayId ? "Edit Holiday Date" : "Add Official Holiday"}
                 </h3>
                 <form onSubmit={handleSaveHoliday} className="space-y-4 text-xs font-bold text-slate-600">
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Holiday Date</label>
-                    <input 
-                      type="date" 
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Holiday Date</label>
+                    <CustomDatePicker 
                       value={hDate}
-                      onChange={(e) => setHDate(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
+                      onChange={(val) => setHDate(val)}
+                      placeholder="Select Date"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Holiday Name</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Holiday Name</label>
                     <input 
                       type="text" 
                       value={hName}
                       onChange={(e) => setHName(e.target.value)}
                       placeholder="e.g. Independence Day"
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80"
                       required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Holiday Type</label>
-                      <select 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Holiday Type</label>
+                      <CustomSelect
                         value={hType}
-                        onChange={(e) => setHType(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                      >
-                        <option value="National">National</option>
-                        <option value="Gazetted">Gazetted</option>
-                        <option value="Restricted">Restricted</option>
-                      </select>
+                        onChange={(val) => setHType(val)}
+                        options={[
+                          { value: "National", label: "National" },
+                          { value: "Gazetted", label: "Gazetted" },
+                          { value: "Restricted", label: "Restricted" }
+                        ]}
+                      />
                     </div>
                     <div>
-                      <label className="block mb-1 uppercase tracking-wider text-[10px]">Applicability</label>
-                      <select 
+                      <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Applicability</label>
+                      <CustomSelect
                         value={hApplicability}
-                        onChange={(e) => setHApplicability(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer"
-                      >
-                        <option value="ALL">ALL Lines</option>
-                        <option value="KKVS">KKVS Only</option>
-                        <option value="KMUK">KMUK Only</option>
-                      </select>
+                        onChange={(val) => setHApplicability(val)}
+                        options={[
+                          { value: "ALL", label: "ALL Lines" },
+                          { value: "KKVS", label: "KKVS Only" },
+                          { value: "KMUK", label: "KMUK Only" }
+                        ]}
+                      />
                     </div>
                   </div>
                   <div className="pt-2 flex justify-end gap-2.5">
@@ -2936,20 +3196,20 @@ export default function AdminPanel() {
               </div>
 
               {/* Holidays list */}
-              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                <div className="px-5 py-4 border-b flex items-center justify-between">
-                  <h3 className="font-bold text-slate-855">Holiday Calendar Master</h3>
-                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-650 font-bold">{holidays.length} Registered</span>
+              <div className="lg:col-span-2 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+                  <h3 className="font-bold text-slate-855 text-sm uppercase tracking-wider">Holiday Calendar Master</h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-slate-50 text-slate-650 font-bold shadow-3xs">{holidays.length} Registered</span>
                 </div>
                 <div className="overflow-y-auto max-h-[420px]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                        <th className="py-2.5 px-5">Date</th>
-                        <th className="py-2.5 px-5">Holiday Name</th>
-                        <th className="py-2.5 px-5">Type</th>
-                        <th className="py-2.5 px-5">Applicability</th>
-                        <th className="py-2.5 px-5 text-center">Actions</th>
+                      <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold bg-slate-50/50">
+                        <th className="py-3 px-5">Date</th>
+                        <th className="py-3 px-5">Holiday Name</th>
+                        <th className="py-3 px-5">Type</th>
+                        <th className="py-3 px-5">Applicability</th>
+                        <th className="py-3 px-5 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -2961,23 +3221,23 @@ export default function AdminPanel() {
                         </tr>
                       ) : (
                         holidays.map(h => (
-                          <tr key={h.id} className="hover:bg-slate-50/50">
-                            <td className="py-3 px-5 font-mono">{h.holiday_date}</td>
+                          <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-5 font-mono text-slate-500">{h.holiday_date}</td>
                             <td className="py-3 px-5 font-bold text-slate-800">{h.name}</td>
-                            <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100">{h.holiday_type}</span></td>
+                            <td className="py-3 px-5"><span className="px-2.5 py-1 rounded bg-slate-50 font-bold text-[10px] shadow-3xs">{h.holiday_type}</span></td>
                             <td className="py-3 px-5 font-bold text-theme-primary">{h.applicability || 'ALL'}</td>
                             <td className="py-3 px-5 text-center flex justify-center items-center gap-1.5">
                               <button 
                                 onClick={() => handleEditHoliday(h)} 
                                 title="Edit Holiday"
-                                className="p-1.5 rounded-lg bg-theme-active text-theme-active hover:opacity-85 border border-theme-active/30 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-2 rounded-xl bg-theme-active text-theme-active hover:opacity-85 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
                               >
                                 <Edit size={11} />
                               </button>
                               <button 
                                 onClick={() => handleDeleteHoliday(h.id!)} 
                                 title="Delete Holiday"
-                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200/50 shadow-sm transition hover:scale-105 active:scale-95 cursor-pointer"
+                                className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 shadow-sm hover:shadow transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
                               >
                                 <Trash2 size={11} />
                               </button>
@@ -2996,25 +3256,25 @@ export default function AdminPanel() {
           {activeTab === 'backups' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* SQLite Health metrics check */}
-              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+              <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
                   <Database size={15} className="text-theme-primary" />
                   Database Health Check
                 </h3>
                 {backupStatus ? (
                   <div className="space-y-4 text-xs font-semibold">
-                    <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100/50">
                       <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">SQLite Integrity:</span>
                       <span className={`flex items-center gap-1 font-bold ${backupStatus.integrity === 'ok' ? 'text-emerald-600' : 'text-rose-600'}`}>
                         <CheckCircle size={14} />
                         {backupStatus.integrity.toUpperCase()}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100/50">
                       <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Database Size:</span>
                       <span className="font-mono text-slate-850">{(backupStatus.database_size_bytes / 1024).toFixed(2)} KB</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100/50">
                       <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Last Snapshot Copy:</span>
                       <span className="font-mono text-[9px] text-slate-500 truncate max-w-[130px]">{backupStatus.last_backup}</span>
                     </div>
@@ -3026,7 +3286,7 @@ export default function AdminPanel() {
                 <button
                   onClick={handleCreateBackup}
                   disabled={isBackupRunning}
-                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-sm shadow-blue-500/10"
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-md hover:shadow-lg duration-200"
                 >
                   <PlusCircle size={14} />
                   {isBackupRunning ? "Creating Copy..." : "Create Backup Snapshot"}
@@ -3034,10 +3294,10 @@ export default function AdminPanel() {
               </div>
 
               {/* Snapshot history list */}
-              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                <div className="px-5 py-4 border-b flex items-center justify-between">
-                  <h3 className="font-bold text-slate-855">Historical Snapshots list</h3>
-                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-655 font-bold">{backups.length} Available</span>
+              <div className="lg:col-span-2 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+                  <h3 className="font-bold text-slate-855 text-sm uppercase tracking-wider">Historical Snapshots list</h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-slate-50 text-slate-655 font-bold shadow-3xs">{backups.length} Available</span>
                 </div>
                 
                 <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100">
@@ -3047,7 +3307,7 @@ export default function AdminPanel() {
                     </div>
                   ) : (
                     backups.map(file => (
-                      <div key={file} className="flex justify-between items-center p-4 hover:bg-slate-50/50">
+                      <div key={file} className="flex justify-between items-center p-4 hover:bg-slate-50/50 transition-colors">
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-slate-700 font-mono">{file}</span>
                           <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">SQLite database copy</span>
@@ -3055,13 +3315,13 @@ export default function AdminPanel() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleRestoreBackup(file)}
-                            className="px-3.5 py-1.5 rounded bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 text-xs font-bold transition cursor-pointer uppercase tracking-wider text-[10px]"
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-xs font-bold transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer uppercase tracking-wider text-[9px] shadow-3xs"
                           >
                             Restore State
                           </button>
                           <button
                             onClick={() => handleDeleteBackup(file)}
-                            className="px-3.5 py-1.5 rounded bg-rose-50 hover:bg-rose-100 border border-rose-250 text-rose-700 text-xs font-bold transition cursor-pointer uppercase tracking-wider text-[10px]"
+                            className="px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer uppercase tracking-wider text-[9px] shadow-3xs"
                           >
                             Delete Snapshot
                           </button>
@@ -3076,49 +3336,50 @@ export default function AdminPanel() {
 
           {/* TAB 8: AUDIT TRAIL LOGS */}
           {activeTab === 'audit' && (
-            <div className="page-transition lg:col-span-3 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-              <div className="px-5 py-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h3 className="font-bold text-slate-855 flex items-center gap-1.5">
+            <div className="page-transition lg:col-span-3 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col overflow-hidden border-none">
+              <div className="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/20">
+                <h3 className="font-bold text-slate-855 text-sm uppercase tracking-wider flex items-center gap-1.5">
                   <Clock size={16} className="text-slate-500" />
                   Roster Activity Audit Trail Logs
                 </h3>
                 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 bg-[#FAF9F6]/40 border border-slate-200 rounded-xl text-xs shadow-2xs focus-within:border-theme focus-within:bg-white transition-all duration-150">
                     <Search size={14} className="text-slate-400" />
                     <input 
                       type="text" 
                       placeholder="Search audit trail..." 
                       value={auditSearch}
                       onChange={(e) => setAuditSearch(e.target.value)}
-                      className="bg-transparent border-none text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                      className="bg-transparent border-none text-slate-800 placeholder-slate-400 focus:outline-none w-full font-medium"
                     />
                   </div>
 
-                  <select
+                  <CustomSelect
                     value={auditModuleFilter}
-                    onChange={(e) => setAuditModuleFilter(e.target.value)}
-                    className="bg-slate-50 border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 cursor-pointer"
-                  >
-                    <option value="ALL">ALL Modules</option>
-                    <option value="Attendance">Attendance</option>
-                    <option value="Employees">Employees</option>
-                    <option value="Holidays">Holidays</option>
-                    <option value="System">System</option>
-                  </select>
+                    onChange={(val) => setAuditModuleFilter(val)}
+                    options={[
+                      { value: "ALL", label: "ALL Modules" },
+                      { value: "Attendance", label: "Attendance" },
+                      { value: "Employees", label: "Employees" },
+                      { value: "Holidays", label: "Holidays" },
+                      { value: "System", label: "System" }
+                    ]}
+                    className="w-36 shrink-0"
+                  />
                 </div>
               </div>
 
               <div className="overflow-y-auto max-h-[460px]">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b text-slate-500 uppercase font-bold bg-slate-50">
-                      <th className="py-2.5 px-5">Timestamp</th>
-                      <th className="py-2.5 px-5">User</th>
-                      <th className="py-2.5 px-5">Module</th>
-                      <th className="py-2.5 px-5">Action</th>
-                      <th className="py-2.5 px-5">Details</th>
+                    <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold bg-slate-50/50">
+                      <th className="py-3 px-5">Timestamp</th>
+                      <th className="py-3 px-5">User</th>
+                      <th className="py-3 px-5">Module</th>
+                      <th className="py-3 px-5">Action</th>
+                      <th className="py-3 px-5">Details</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -3130,12 +3391,12 @@ export default function AdminPanel() {
                       </tr>
                     ) : (
                       filteredAudits.map(log => (
-                        <tr key={log.id} className="hover:bg-slate-50/50">
-                          <td className="py-3 px-5 font-mono text-slate-500">{log.timestamp}</td>
+                        <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3 px-5 font-mono text-slate-450">{log.timestamp}</td>
                           <td className="py-3 px-5 font-bold text-slate-850">{log.user}</td>
-                          <td className="py-3 px-5"><span className="px-2 py-0.5 rounded bg-slate-100 text-slate-655">{log.module}</span></td>
+                          <td className="py-3 px-5"><span className="px-2.5 py-1 rounded bg-slate-50 text-slate-655 shadow-3xs">{log.module}</span></td>
                           <td className="py-3 px-5 font-bold text-blue-600">{log.action}</td>
-                          <td className="py-3 px-5 text-slate-600 max-w-md truncate" title={log.details}>{log.details}</td>
+                          <td className="py-3 px-5 text-slate-550 max-w-md truncate" title={log.details}>{log.details}</td>
                         </tr>
                       ))
                     )}
@@ -3148,22 +3409,22 @@ export default function AdminPanel() {
           {activeTab === 'updates' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column: Version & Info */}
-              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
-                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+              <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5 animate-scale-up">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
                   <RefreshCw size={15} className="text-blue-600 animate-spin" style={{ animationDuration: '3s' }} />
                   Software Update Center
                 </h3>
                 
-                <div className="space-y-4 text-xs font-semibold">
-                  <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                <div className="space-y-4 text-xs font-semibold text-slate-600">
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100/50">
                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Installed Version:</span>
-                    <span className="font-mono text-slate-850 bg-slate-100 px-2 py-0.5 rounded font-bold">{currentVersion}</span>
+                    <span className="font-mono text-slate-850 bg-slate-100 px-2 py-0.5 rounded font-bold shadow-3xs">{currentVersion}</span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100/50">
                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Release Channel:</span>
                     <span className="font-bold text-emerald-600">Stable (Production)</span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100/50">
                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Hosting Platform:</span>
                     <span className="font-mono text-slate-500">GitHub Releases</span>
                   </div>
@@ -3172,7 +3433,7 @@ export default function AdminPanel() {
                 <button
                   onClick={checkSystemUpdates}
                   disabled={updateStatus === 'checking'}
-                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-sm shadow-blue-500/10"
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-md hover:shadow-lg duration-200"
                 >
                   <RefreshCw size={14} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
                   {updateStatus === 'checking' ? "Checking GitHub..." : "Check for Updates"}
@@ -3180,8 +3441,8 @@ export default function AdminPanel() {
               </div>
 
               {/* Right Column: Update details (spans 2 columns) */}
-              <div className="lg:col-span-2 glass-panel rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col p-5 space-y-4 animate-scale-up">
-                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b">
+              <div className="lg:col-span-2 glass-panel rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col p-6 space-y-5 animate-scale-up">
+                <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-2.5 border-b border-slate-100">
                   Release Information
                 </h3>
                 
@@ -3194,7 +3455,7 @@ export default function AdminPanel() {
                 )}
 
                 {updateStatus === 'latest' && (
-                  <div className="h-48 flex flex-col items-center justify-center text-center text-emerald-600 bg-emerald-50/30 rounded-xl border border-emerald-100 p-4">
+                  <div className="h-48 flex flex-col items-center justify-center text-center text-emerald-600 bg-emerald-50/20 rounded-2xl border border-emerald-100/50 p-4">
                     <CheckCircle size={32} className="text-emerald-500 mb-2 animate-bounce" />
                     <p className="text-xs font-bold uppercase tracking-wider">System is up to date!</p>
                     <p className="text-[10px] text-slate-500 mt-1">You are currently running the latest version of KM S&T ERP ({currentVersion}).</p>
@@ -3203,7 +3464,7 @@ export default function AdminPanel() {
 
                 {updateStatus === 'available' && latestRelease && (
                   <div className="space-y-4">
-                    <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-200 flex justify-between items-center animate-fade-in">
+                    <div className="p-4 bg-blue-50/20 rounded-xl border border-blue-200/50 flex justify-between items-center animate-fade-in">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-xs font-extrabold text-blue-700 uppercase tracking-wide">New Update Available!</span>
                         <span className="text-[10px] text-slate-500 font-bold">{latestRelease.name} ({latestRelease.tag_name})</span>
@@ -3215,13 +3476,13 @@ export default function AdminPanel() {
                             href={latestRelease.html_url} 
                             target="_blank" 
                             rel="noreferrer"
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[10px] uppercase tracking-wider transition text-center"
+                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-[10px] uppercase tracking-wider transition text-center shadow-3xs border border-slate-200/50"
                           >
                             GitHub Page
                           </a>
                           <button 
                             onClick={startUpdateDownload}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition shadow-md shadow-blue-500/10 text-center cursor-pointer"
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition shadow-md hover:shadow-lg duration-200 text-center cursor-pointer"
                           >
                             Download Update
                           </button>
@@ -3283,7 +3544,7 @@ export default function AdminPanel() {
                         <span>Release Log</span>
                         <span>Date: {latestRelease.published_at}</span>
                       </div>
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-[180px] overflow-y-auto font-mono text-[10px] leading-relaxed text-slate-700 whitespace-pre-wrap">
+                      <div className="bg-[#FAF9F6]/45 border border-slate-200 rounded-xl p-4.5 max-h-[220px] overflow-y-auto font-mono text-[10px] leading-relaxed text-slate-650 whitespace-pre-wrap shadow-2xs">
                         {latestRelease.body || "No release notes provided."}
                       </div>
                     </div>
@@ -3302,31 +3563,29 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'settings' && (
-            <div className="page-transition glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
-              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+            <div className="page-transition glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5 animate-scale-up border-none">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
                 <Settings size={15} className="text-blue-600" />
                 {getTranslation(lang, 'System Preferences & Settings')}
               </h3>
               
               <div className="space-y-4 text-xs font-bold text-slate-600 max-w-sm">
                 <div>
-                  <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-500">{getTranslation(lang, 'Preferred Default Section (My Section)')}</label>
-                  <select 
+                  <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-505">{getTranslation(lang, 'Preferred Default Section (My Section)')}</label>
+                  <CustomSelect
                     value={mySection}
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       setMySection(val);
                       localStorage.setItem('erp_my_section', val);
                       showToast("Preferred default section updated successfully.", "success");
                       window.dispatchEvent(new Event('erp_my_section_changed'));
                     }}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {sections.map(sec => (
-                      <option key={sec.id} value={sec.section_code}>{sec.section_code} - {sec.section_name}</option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed font-semibold">
+                    options={sections.map(sec => ({
+                      value: sec.section_code,
+                      label: `${sec.section_code} - ${sec.section_name}`
+                    }))}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-2.5 leading-relaxed font-semibold">
                     Choosing a section here sets it as your default "My Section". The ERP will load this section by default on startup.
                   </p>
                 </div>
@@ -3335,58 +3594,58 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'security' && (
-            <div className="page-transition glass-panel p-6 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4 animate-scale-up">
-              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-3 border-b flex items-center gap-1.5">
+            <div className="page-transition glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5 animate-scale-up border-none">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
                 <Lock size={15} className="text-indigo-600" />
                 Security & Authentication Settings
               </h3>
 
               <form onSubmit={handlePasswordChangeSubmit} className="space-y-4 max-w-sm text-xs font-bold text-slate-600">
-                <p className="text-slate-500 font-medium text-[11px]">
+                <p className="text-slate-500 font-medium text-[11px] leading-relaxed">
                   Use this form to change the administrative password. Changing this will affect all password-protected operational actions across the system.
                 </p>
 
                 <div className="space-y-1.5">
-                  <label className="block uppercase tracking-wider text-[10px] text-slate-500">Current Admin Password</label>
+                  <label className="block uppercase tracking-wider text-[10px] text-slate-400">Current Admin Password</label>
                   <input
                     type="password"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
                     placeholder="Enter current password"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
+                    className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-805 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-mono"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block uppercase tracking-wider text-[10px] text-slate-500">New Password</label>
+                  <label className="block uppercase tracking-wider text-[10px] text-slate-400">New Password</label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
+                    className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-805 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-mono"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block uppercase tracking-wider text-[10px] text-slate-500">Confirm New Password</label>
+                  <label className="block uppercase tracking-wider text-[10px] text-slate-400">Confirm New Password</label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
+                    className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-805 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-mono"
                   />
                 </div>
 
                 {passwordError && (
-                  <div className="p-2.5 bg-rose-50 border border-rose-150 text-[11px] text-rose-600 rounded-xl">
+                  <div className="p-3 bg-rose-50 border border-rose-100 text-[11px] text-rose-600 rounded-xl font-bold">
                     {passwordError}
                   </div>
                 )}
 
                 {passwordSuccess && (
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-150 text-[11px] text-emerald-600 rounded-xl">
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 text-[11px] text-emerald-600 rounded-xl font-bold">
                     {passwordSuccess}
                   </div>
                 )}
@@ -3394,7 +3653,7 @@ export default function AdminPanel() {
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="px-4 py-2.5 text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 rounded-xl font-bold transition shadow-sm cursor-pointer"
+                  className="px-4 py-2.5 text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 rounded-xl font-bold transition shadow-md hover:shadow-lg duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer border-none"
                 >
                   {isChangingPassword ? 'Updating Password...' : 'Change Password'}
                 </button>
@@ -3405,40 +3664,40 @@ export default function AdminPanel() {
           {activeTab === 'roster-rules' && (
             <div className="page-transition lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-scale-up">
               {/* Form Column */}
-              <div className="glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col space-y-4">
-                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+              <div className="glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 flex flex-col space-y-5 border-none">
+                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
                   <PlusCircle size={15} className="text-blue-600" />
                   Define Roster Rotation Rule
                 </h3>
                 <form onSubmit={handleAddRosterRule} className="space-y-4 text-xs font-bold text-slate-600">
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Rule Name</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Rule Name</label>
                     <input 
                       type="text" 
                       value={ruleName}
                       onChange={(e) => setRuleName(e.target.value)}
                       placeholder="e.g. KKVS Rotating Cycle"
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-semibold"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 uppercase tracking-wider text-[10px]">Rotation Pattern (Comma-Separated)</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[10px] text-slate-400">Rotation Pattern (Comma-Separated)</label>
                     <textarea 
                       value={rulePattern}
                       onChange={(e) => setRulePattern(e.target.value)}
                       placeholder="e.g. E,E,E,E,E,E,E,R,M,M,M,M,N,N,N,N,N,N,N,R,R"
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-805 focus:outline-none focus:border-blue-500 font-mono h-24 resize-none uppercase"
+                      className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-805 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/80 font-mono h-24 resize-none uppercase font-bold"
                       required
                     />
-                    <p className="text-[9.5px] text-slate-400 mt-1 leading-normal font-semibold">
+                    <p className="text-[9.5px] text-slate-400 mt-1.5 leading-normal font-semibold">
                       Input shift symbols separated by commas. Valid symbols: G (General), M (Morning), E (Evening), N (Night), R (Rest).
                     </p>
                   </div>
                   <div className="pt-2 flex justify-end">
                     <button 
                       type="submit" 
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px] cursor-pointer shadow-sm font-bold flex items-center gap-1.5"
+                      className="px-4 py-2.5 rounded-xl bg-blue-650 hover:bg-blue-700 text-white uppercase text-[10px] cursor-pointer shadow-md hover:shadow-lg transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 font-bold flex items-center gap-1.5 border-none"
                     >
                       <Save size={13} />
                       Save Rule
@@ -3448,8 +3707,8 @@ export default function AdminPanel() {
               </div>
 
               {/* Roster Rules List Column */}
-              <div className="lg:col-span-2 glass-panel p-5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-4">
-                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+              <div className="lg:col-span-2 glass-panel p-6 rounded-2xl bg-white shadow-md shadow-slate-100/30 space-y-5 border-none">
+                <h3 className="font-bold text-slate-855 text-xs uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
                   <Sliders size={15} className="text-blue-600" />
                   Roster Rotation Rules List
                 </h3>
@@ -3461,27 +3720,27 @@ export default function AdminPanel() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-200 text-slate-455 uppercase tracking-widest text-[9.5px]">
-                          <th className="py-2 px-3">Rule Name</th>
-                          <th className="py-2 px-3">Pattern</th>
-                          <th className="py-2 px-3 text-center">Cycle Length</th>
-                          <th className="py-2 px-3 text-center">Actions</th>
+                        <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-widest text-[9.5px]">
+                          <th className="py-2.5 px-3">Rule Name</th>
+                          <th className="py-2.5 px-3">Pattern</th>
+                          <th className="py-2.5 px-3 text-center">Cycle Length</th>
+                          <th className="py-2.5 px-3 text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {rosterRules.map(rule => (
                           <tr key={rule.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                            <td className="py-3 px-3 font-extrabold text-slate-800">{rule.name}</td>
-                            <td className="py-3 px-3 font-mono font-bold text-slate-600 break-all select-all">
+                            <td className="py-3.5 px-3 font-extrabold text-slate-800">{rule.name}</td>
+                            <td className="py-3.5 px-3 font-mono font-bold text-slate-550 break-all select-all">
                               {rule.pattern}
                             </td>
-                            <td className="py-3 px-3 text-center font-bold text-blue-650">
+                            <td className="py-3.5 px-3 text-center font-bold text-blue-650">
                               {rule.pattern.split(',').length} Days
                             </td>
-                            <td className="py-3 px-3 text-center">
+                            <td className="py-3.5 px-3 text-center">
                               <button
                                 onClick={() => handleDeleteRosterRule(rule.id)}
-                                className="text-red-500 hover:text-red-700 font-bold bg-transparent border-none cursor-pointer p-1"
+                                className="text-rose-500 hover:text-rose-700 font-bold bg-transparent border-none cursor-pointer p-1 transition-transform active:scale-95"
                                 title="Delete Rule"
                               >
                                 <Trash2 size={15} />
@@ -3500,8 +3759,8 @@ export default function AdminPanel() {
           {/* Schedule Configuration Modal (Relocated to root level for viewport centering and backdrop blur) */}
           {isScheduleModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40 animate-fade-in">
-              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
-                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="bg-white rounded-2xl shadow-2xl border-none w-full max-w-lg overflow-hidden animate-scale-up">
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                   <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                     <CalendarDays size={16} className="text-blue-600" />
                     Roster Schedule Configuration
@@ -3509,7 +3768,7 @@ export default function AdminPanel() {
                   <button 
                     type="button"
                     onClick={() => setIsScheduleModalOpen(false)} 
-                    className="text-slate-400 hover:text-slate-650 font-bold text-sm transition"
+                    className="text-slate-400 hover:text-slate-650 font-bold text-sm transition border-none bg-transparent cursor-pointer"
                   >
                     ✕
                   </button>
@@ -3518,7 +3777,7 @@ export default function AdminPanel() {
                 <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
                   <div className="space-y-1">
                     <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Schedule Type</label>
-                    <div className="grid grid-cols-5 gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                    <div className="grid grid-cols-5 gap-1.5 p-1 bg-[#FAF9F6] border border-slate-200/60 rounded-xl shadow-3xs">
                       {([ 'simple', 'rotating-3week', 'rotating', 'flexible', 'custom-rotation' ] as const).map(type => (
                         <button
                           key={type}
@@ -3529,7 +3788,7 @@ export default function AdminPanel() {
                               setActiveRotatingWeek('week1');
                             }
                           }}
-                          className={`py-1.5 rounded text-[8px] font-extrabold uppercase transition-all duration-200 text-center ${scheduleType === type ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-800'}`}
+                          className={`py-1.5 rounded-lg text-[8px] font-extrabold uppercase transition-all duration-200 text-center cursor-pointer ${scheduleType === type ? 'bg-blue-650 text-white shadow-sm border-none' : 'text-slate-505 hover:text-slate-800 border-none bg-transparent'}`}
                         >
                           {type === 'simple' && '1-Week'}
                           {type === 'rotating-3week' && '3-Week'}
@@ -3542,7 +3801,7 @@ export default function AdminPanel() {
                   </div>
 
                   {scheduleType === 'flexible' && (
-                    <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg text-slate-650 text-[10px] font-semibold leading-relaxed">
+                    <div className="p-4 bg-blue-50/20 border border-blue-200/50 rounded-xl text-slate-655 text-[10px] font-semibold leading-relaxed">
                       <strong>Flexible / No Fixed Roster Mode:</strong> This employee (e.g. SSE/JE/IC) does not follow a strict weekly or rotating duty cycle. Shift rules will be left blank by default in the attendance sheet and can be manually inputted.
                     </div>
                   )}
@@ -3552,25 +3811,21 @@ export default function AdminPanel() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Rotation Rule</label>
-                          <select
-                            value={selectedRuleId || ''}
-                            onChange={(e) => setSelectedRuleId(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-850 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
-                            required
-                          >
-                            <option value="">-- Select Rule --</option>
-                            {rosterRules.map(r => (
-                              <option key={r.id} value={r.id}>{r.name}</option>
-                            ))}
-                          </select>
+                          <CustomSelect
+                            value={selectedRuleId || ""}
+                            onChange={(val) => setSelectedRuleId(val ? Number(val) : null)}
+                            options={[
+                              { value: "", label: "-- Select Rule --" },
+                              ...rosterRules.map(r => ({ value: r.id, label: r.name }))
+                            ]}
+                          />
                         </div>
                         <div>
                           <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
-                          <input 
-                            type="date"
+                          <CustomDatePicker
                             value={empAnchorDate}
-                            onChange={(e) => setEmpAnchorDate(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                            onChange={(val) => setEmpAnchorDate(val)}
+                            placeholder="Select Date"
                             required
                           />
                         </div>
@@ -3579,14 +3834,14 @@ export default function AdminPanel() {
                         const r = rosterRules.find(rule => rule.id === Number(selectedRuleId));
                         if (!r) return null;
                         return (
-                          <div className="p-3.5 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 text-[10px]">
+                          <div className="p-3.5 bg-blue-50/20 border border-blue-200/50 rounded-xl space-y-1.5 text-[10px]">
                             <div className="flex justify-between items-center text-slate-500 font-bold uppercase tracking-wider">
                               <span>Rule Pattern Details</span>
-                              <span className="text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
+                              <span className="text-blue-650 bg-blue-100/50 px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
                                 {r.pattern.split(',').length} Days Cycle
                               </span>
                             </div>
-                            <p className="text-slate-700 font-bold leading-normal font-mono break-all bg-white/70 p-2 rounded-lg border border-slate-100">
+                            <p className="text-slate-700 font-bold leading-normal font-mono break-all bg-white/70 p-2 rounded-lg border border-slate-100/80">
                               {r.pattern}
                             </p>
                           </div>
@@ -3599,22 +3854,21 @@ export default function AdminPanel() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Roster Anchor Date</label>
-                        <input 
-                          type="date"
+                        <CustomDatePicker
                           value={empAnchorDate}
-                          onChange={(e) => setEmpAnchorDate(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                          onChange={(val) => setEmpAnchorDate(val)}
+                          placeholder="Select Date"
                           required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
                         />
                       </div>
-                      <div className="flex items-end text-[9px] text-slate-500 italic pb-2 font-medium">
+                      <div className="flex items-end text-[9px] text-slate-400 italic pb-2 font-medium">
                         This anchor date determines when "Week 1" cycle begins.
                       </div>
                     </div>
                   )}
 
                   {scheduleType !== 'flexible' && scheduleType !== 'custom-rotation' && (
-                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="space-y-3 p-3.5 bg-[#FAF9F6]/30 border border-slate-200/60 rounded-xl shadow-3xs">
                       {scheduleType === 'simple' ? (
                         <div className="space-y-1">
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Days Shift Settings</span>
@@ -3622,20 +3876,21 @@ export default function AdminPanel() {
                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
                               <div key={day} className="flex flex-col gap-0.5">
                                 <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                                <select
+                                <CustomSelect
                                   value={empWeeklySchedule[day] || 'G'}
-                                  onChange={(e) => setEmpWeeklySchedule(prev => ({
+                                  onChange={(val) => setEmpWeeklySchedule(prev => ({
                                     ...prev,
-                                    [day]: e.target.value
+                                    [day]: val
                                   }))}
-                                  className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                                >
-                                  <option value="G">G (Gen)</option>
-                                  <option value="M">M (Morn)</option>
-                                  <option value="E">E (Eve)</option>
-                                  <option value="N">N (Night)</option>
-                                  <option value="R">R (Rest)</option>
-                                </select>
+                                  options={[
+                                    { value: 'G', label: 'G' },
+                                    { value: 'M', label: 'M' },
+                                    { value: 'E', label: 'E' },
+                                    { value: 'N', label: 'N' },
+                                    { value: 'R', label: 'R' }
+                                  ]}
+                                  className="w-16 text-[10px]"
+                                />
                               </div>
                             ))}
                           </div>
@@ -3643,13 +3898,13 @@ export default function AdminPanel() {
                       ) : (
                         <div className="space-y-3">
                           {/* Week Tabs */}
-                          <div className="flex gap-1 border-b border-slate-200 pb-1">
+                          <div className="flex gap-1 border-b border-slate-100 pb-1.5">
                             {(scheduleType === 'rotating-3week' ? ['week1', 'week2', 'week3'] : ['week1', 'week2', 'week3', 'week4']).map(wk => (
                               <button
                                 key={wk}
                                 type="button"
                                 onClick={() => setActiveRotatingWeek(wk as any)}
-                                className={`px-3 py-1 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
+                                className={`px-3 py-1 rounded-lg text-[9px] font-extrabold uppercase cursor-pointer transition ${activeRotatingWeek === wk ? 'bg-blue-650 text-white shadow-xs' : 'bg-slate-105 text-slate-500 hover:text-slate-800'}`}
                               >
                                 {wk.replace('week', 'W')}
                               </button>
@@ -3660,23 +3915,24 @@ export default function AdminPanel() {
                             {getWeekdaysStartingFrom(empAnchorDate).map(day => (
                               <div key={day} className="flex flex-col gap-0.5">
                                 <label className="text-[9px] font-bold text-slate-400 truncate">{day.slice(0, 3)}</label>
-                                <select
+                                <CustomSelect
                                   value={rotatingSchedule[activeRotatingWeek]?.[day] || 'G'}
-                                  onChange={(e) => setRotatingSchedule(prev => ({
+                                  onChange={(val) => setRotatingSchedule(prev => ({
                                     ...prev,
                                     [activeRotatingWeek]: {
                                       ...prev[activeRotatingWeek],
-                                      [day]: e.target.value
+                                      [day]: val
                                     }
                                   }))}
-                                  className="border border-slate-200 rounded px-1.5 py-1 text-[10px] bg-white font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                                >
-                                  <option value="G">G (Gen)</option>
-                                  <option value="M">M (Morn)</option>
-                                  <option value="E">E (Eve)</option>
-                                  <option value="N">N (Night)</option>
-                                  <option value="R">R (Rest)</option>
-                                </select>
+                                  options={[
+                                    { value: 'G', label: 'G' },
+                                    { value: 'M', label: 'M' },
+                                    { value: 'E', label: 'E' },
+                                    { value: 'N', label: 'N' },
+                                    { value: 'R', label: 'R' }
+                                  ]}
+                                  className="w-16 text-[10px]"
+                                />
                               </div>
                             ))}
                           </div>
@@ -3691,20 +3947,18 @@ export default function AdminPanel() {
                     <div className="grid grid-cols-4 gap-1.5 items-end">
                       <div>
                         <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">From Date</label>
-                        <input 
-                          type="date"
+                        <CustomDatePicker
                           value={overrideFrom}
-                          onChange={(e) => setOverrideFrom(e.target.value)}
-                          className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
+                          onChange={(val) => setOverrideFrom(val)}
+                          placeholder="Select Date"
                         />
                       </div>
                       <div>
                         <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">To Date</label>
-                        <input 
-                          type="date"
+                        <CustomDatePicker
                           value={overrideTo}
-                          onChange={(e) => setOverrideTo(e.target.value)}
-                          className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500"
+                          onChange={(val) => setOverrideTo(val)}
+                          placeholder="Select Date"
                         />
                       </div>
                       <div>
@@ -3712,7 +3966,7 @@ export default function AdminPanel() {
                         <select
                           value={overrideShift}
                           onChange={(e) => setOverrideShift(e.target.value)}
-                          className="w-full border border-slate-200 bg-white rounded px-2 py-1 text-[10px] focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
+                          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-2.5 py-1.5 text-[10px] focus:outline-none focus:border-theme transition duration-150 font-semibold cursor-pointer shadow-3xs select-premium"
                         >
                           <option value="N">N (Night)</option>
                           <option value="E">E (Eve)</option>
@@ -3736,21 +3990,21 @@ export default function AdminPanel() {
                           setOverrideTo('');
                           setOverrideShift('N');
                         }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer"
+                        className="bg-blue-650 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold py-2 px-3.5 uppercase shadow-md transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer border-none h-[32px]"
                       >
                         Add Override
                       </button>
                     </div>
 
                     {customNightWeeks.length > 0 && (
-                      <div className="max-h-24 overflow-y-auto bg-slate-100 border border-slate-200 rounded-lg p-2 space-y-1">
+                      <div className="max-h-24 overflow-y-auto bg-[#FAF9F6]/40 border border-slate-200/60 rounded-xl p-3 space-y-1.5 shadow-2xs">
                         {customNightWeeks.map((w, index) => (
-                          <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-200/50 pb-0.5">
+                          <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-100 pb-1">
                             <span>{w.from_date} to {w.to_date} ({w.shift || 'N'})</span>
                             <button
                               type="button"
                               onClick={() => setCustomNightWeeks(prev => prev.filter((_, idx) => idx !== index))}
-                              className="text-red-500 hover:text-red-700 font-extrabold cursor-pointer bg-transparent border-none"
+                              className="text-red-500 hover:text-red-700 font-extrabold cursor-pointer bg-transparent border-none transition active:scale-95"
                             >
                               Remove
                             </button>
@@ -3760,11 +4014,11 @@ export default function AdminPanel() {
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-150 flex justify-end gap-2 text-xs">
+                  <div className="pt-4 border-t border-slate-100 flex justify-end gap-2 text-xs">
                     <button 
                       type="button" 
                       onClick={() => setIsScheduleModalOpen(false)} 
-                      className="px-4 py-2 border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 font-bold transition cursor-pointer"
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer shadow-md hover:shadow-lg border-none"
                     >
                       Apply & Close
                     </button>

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Menu,
   X,
   Search,
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react';
 import { getLines, getSections, getEmployees, createBackup, getAuditLogs, MetroLine, Section, Employee, AuditLog } from '../lib/api';
 import { getTranslation, translations } from '../lib/translations';
+import CustomSelect from './components/CustomSelect';
 
 interface ThemeColors {
   activeBg: string;
@@ -52,6 +54,8 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<number>(1); // Blue Line default
   const [selectedJoinSections, setSelectedJoinSections] = useState<string[]>([]);
+  const [isJointSectionsOpen, setIsJointSectionsOpen] = useState(false);
+  const jointSectionsRef = useRef<HTMLDivElement>(null);
 
   // Compute theme dynamically based on active section's Metro Line
   const theme = useMemo<ThemeColors>(() => {
@@ -511,6 +515,19 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isNotificationsOpen]);
 
+  // Click outside Joint View sections dropdown to close
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (jointSectionsRef.current && !jointSectionsRef.current.contains(e.target as Node)) {
+        setIsJointSectionsOpen(false);
+      }
+    };
+    if (isJointSectionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isJointSectionsOpen]);
+
   const triggerQuickBackup = async () => {
     setBackupStatusText("Creating backup...");
     try {
@@ -631,29 +648,21 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             {pathname !== '/admin' && (
               <div className="flex items-center gap-3 animate-in fade-in duration-200">
                 {lines.length > 0 && (
-                  <div className="relative flex items-center border border-slate-200/80 bg-slate-50 hover:bg-slate-100/80 rounded-xl transition-colors select-none">
-                    <select
-                      value={selectedLineId}
-                      onChange={(e) => {
-                        const lineId = Number(e.target.value);
-                        setSelectedLineId(lineId);
-                        localStorage.setItem('erp_active_line_id', String(lineId));
-                        // Find first section of this line and switch
-                        const firstSec = sections.find(s => s.line_id === lineId);
-                        if (firstSec) {
-                          handleSectionChange(firstSec.section_code);
-                        }
-                      }}
-                      className="bg-transparent border-none text-[11px] font-black text-slate-700 pl-3.5 pr-8 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wider"
-                    >
-                      {lines.map(l => (
-                        <option key={l.id} value={l.id}>{l.line_name.toUpperCase()}</option>
-                      ))}
-                    </select>
-                    <div className="absolute right-2.5 pointer-events-none text-slate-400 flex items-center">
-                      <ChevronRight size={11} className="rotate-90" />
-                    </div>
-                  </div>
+                  <CustomSelect
+                    value={selectedLineId}
+                    onChange={(val) => {
+                      const lineId = Number(val);
+                      setSelectedLineId(lineId);
+                      localStorage.setItem('erp_active_line_id', String(lineId));
+                      // Find first section of this line and switch
+                      const firstSec = sections.find(s => s.line_id === lineId);
+                      if (firstSec) {
+                        handleSectionChange(firstSec.section_code);
+                      }
+                    }}
+                    options={lines.map(l => ({ value: l.id, label: l.line_name.toUpperCase() }))}
+                    className="w-36 shrink-0"
+                  />
                 )}
 
                 <div className="bg-slate-50 border border-slate-200/80 p-0.5 rounded-xl flex items-center gap-0.5 shadow-2xs">
@@ -683,46 +692,61 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                 </div>
 
 
-                {/* Inline Checklist for selecting active sections under Joint View */}
+                {/* Checklist for selecting active sections under Joint View in a Popover */}
                 {activeSection === 'ALL' && (
-                  <div className="flex flex-wrap items-center gap-4 ml-2 px-3.5 py-1.5 bg-[#FDFDFD] border border-slate-200/80 rounded-xl shadow-2xs animate-in fade-in duration-200 select-none">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{getTranslation(lang, 'Include')}:</span>
-                    {lines.map((line) => {
-                      const lineSections = sections.filter(s => s.line_id === line.id);
-                      if (lineSections.length === 0) return null;
-                      return (
-                        <div key={line.id} className="flex items-center gap-2 border-r border-slate-100 pr-3.5 last:border-r-0 mr-1 shrink-0">
-                          <span
-                            className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs leading-none shrink-0"
-                            style={{
-                              backgroundColor: line.color_code || '#64748B',
-                              color: '#FFFFFF'
-                            }}
-                          >
-                            {line.line_name.replace(' Line', '')}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {lineSections.map((sec) => {
-                              const isChecked = selectedJoinSections.includes(sec.section_code);
-                              return (
-                                <label
-                                  key={sec.section_code}
-                                  className="flex items-center gap-1 cursor-pointer text-[10.5px] font-black text-slate-750 hover:text-slate-900 select-none transition-colors"
+                  <div className="relative select-none" ref={jointSectionsRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsJointSectionsOpen(!isJointSectionsOpen)}
+                      className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-extrabold rounded-lg bg-slate-100 hover:bg-slate-200/50 text-slate-700 hover:text-slate-800 transition duration-150 flex items-center gap-1.5 cursor-pointer shadow-2xs border border-slate-200/80"
+                    >
+                      <span>{getTranslation(lang, 'Include Sections')}</span>
+                      <ChevronDown size={12} className={`text-slate-500 transition-transform duration-200 ${isJointSectionsOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isJointSectionsOpen && (
+                      <div className="absolute left-0 mt-2 p-4 bg-white border border-slate-200 rounded-xl shadow-xl z-50 flex flex-col gap-3 min-w-[300px] max-w-[340px] animate-scale-up border-solid">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{getTranslation(lang, 'Include')}:</span>
+                        <div className="flex flex-col gap-3.5 max-h-64 overflow-y-auto pr-1">
+                          {lines.map((line) => {
+                            const lineSections = sections.filter(s => s.line_id === line.id);
+                            if (lineSections.length === 0) return null;
+                            return (
+                              <div key={line.id} className="flex flex-col gap-2 pb-2.5 border-b border-slate-100 last:border-b-0 last:pb-0 last:border-none">
+                                <span
+                                  className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs leading-none w-fit shrink-0"
+                                  style={{
+                                    backgroundColor: line.color_code || '#64748B',
+                                    color: '#FFFFFF'
+                                  }}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => toggleJoinSection(sec.section_code)}
-                                    className="w-3 h-3 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
-                                  />
-                                  {sec.section_code}
-                                </label>
-                              );
-                            })}
-                          </div>
+                                  {line.line_name.toUpperCase()}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-3">
+                                  {lineSections.map((sec) => {
+                                    const isChecked = selectedJoinSections.includes(sec.section_code);
+                                    return (
+                                      <label
+                                        key={sec.section_code}
+                                        className="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-black text-slate-750 hover:text-slate-900 select-none transition-colors"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => toggleJoinSection(sec.section_code)}
+                                          className="w-3.5 h-3.5 text-blue-650 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        {sec.section_code}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -733,11 +757,11 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             {/* Quick Search and Command Palette Button */}
             <button
               onClick={() => setIsPaletteOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-250/60 shadow-2xs transition cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl shadow-sm hover:shadow transition duration-200 cursor-pointer"
             >
               <Search size={13} className="text-slate-400" />
               <span className="hidden sm:inline">{getTranslation(lang, 'Search / Actions')}</span>
-              <kbd className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-450 font-mono shadow-xs ml-1 flex items-center gap-0.5">
+              <kbd className="bg-white border border-slate-200/60 px-1.5 py-0.5 rounded text-[10px] text-slate-450 font-mono shadow-xs ml-1 flex items-center gap-0.5 animate-pulse">
                 <Keyboard size={9} />
                 Ctrl+K
               </kbd>
@@ -746,32 +770,29 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
             {/* Help Button */}
             <Link
               href="/help"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-extrabold text-slate-650 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-250/60 shadow-2xs transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-extrabold text-slate-655 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/90 rounded-xl shadow-sm hover:shadow transition duration-200 cursor-pointer"
             >
               <BookOpen size={13} className="text-slate-405" />
               <span>{getTranslation(lang, 'Help')}</span>
             </Link>
 
-            {/* Language Flag Dropdown */}
-            <div className="relative flex items-center border border-slate-250/60 bg-slate-50 hover:bg-slate-100/90 rounded-xl shadow-2xs transition-colors select-none">
-              <span className="pl-2.5 text-xs">🇮🇳</span>
-              <select
-                className="bg-transparent border-none text-[10px] font-black text-slate-605 pl-1.5 pr-6 py-2 focus:outline-none cursor-pointer appearance-none uppercase tracking-wide"
+            <div className="flex items-center gap-1 select-none">
+              <span className="text-xs">🇮🇳</span>
+              <CustomSelect
                 value={lang}
-                onChange={(e) => {
-                  const val = e.target.value as 'en' | 'bn' | 'hi';
-                  setLang(val);
-                  localStorage.setItem('erp_lang', val);
+                onChange={(val) => {
+                  const valTyped = val as 'en' | 'bn' | 'hi';
+                  setLang(valTyped);
+                  localStorage.setItem('erp_lang', valTyped);
                   window.dispatchEvent(new Event('erp_lang_changed'));
                 }}
-              >
-                <option value="en">EN (IN)</option>
-                <option value="bn">BN (IN)</option>
-                <option value="hi">HI (IN)</option>
-              </select>
-              <div className="absolute right-2 pointer-events-none text-slate-400 flex items-center">
-                <ChevronRight size={9} className="rotate-90" />
-              </div>
+                options={[
+                  { value: 'en', label: 'EN' },
+                  { value: 'bn', label: 'BN' },
+                  { value: 'hi', label: 'HI' }
+                ]}
+                className="w-24 shrink-0"
+              />
             </div>
 
             {/* Notification Bell Dropdown wrapper */}
@@ -782,7 +803,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                   setHasUnreadNotifications(false);
                   loadNotifications();
                 }}
-                className="relative w-8.5 h-8.5 flex items-center justify-center rounded-xl border border-slate-250/60 bg-slate-50 hover:bg-slate-105 transition text-slate-505 hover:text-slate-800 shadow-2xs cursor-pointer"
+                className="relative w-8.5 h-8.5 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-105 transition text-slate-550 hover:text-slate-800 shadow-sm hover:shadow cursor-pointer"
               >
                 <Bell size={15} />
                 {hasUnreadNotifications && (

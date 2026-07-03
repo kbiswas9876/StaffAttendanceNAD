@@ -37,6 +37,8 @@ import {
   TAThresholdRule
 } from '../../lib/api';
 import AdminAuthModal from '../components/AdminAuthModal';
+import CustomSelect from '../components/CustomSelect';
+import CustomDatePicker from '../components/CustomDatePicker';
 
 function LatexRenderer({ math }: { math: string }) {
   const containerRef = React.useRef<HTMLSpanElement>(null);
@@ -1003,23 +1005,15 @@ export default function TravellingAllowancePage() {
           {/* Staff selection */}
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-slate-700">Select Employee</label>
-            <div className="relative">
-              <select
-                value={selectedEmpId}
-                onChange={(e) => setSelectedEmpId(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 transition-all appearance-none"
-              >
-                <option value="">-- Choose Employee --</option>
-                {employees.map(emp => (
-                  <option key={emp.emp_id} value={emp.emp_id}>
-                    {emp.name} ({emp.designation})
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                <User className="w-4 h-4" />
-              </div>
-            </div>
+            <CustomSelect
+              value={selectedEmpId}
+              onChange={(val) => setSelectedEmpId(val === '' ? '' : Number(val))}
+              options={[
+                { value: '', label: '-- Choose Employee --' },
+                ...employees.map(emp => ({ value: emp.emp_id, label: `${emp.name} (${emp.designation})` }))
+              ]}
+              placeholder="Choose Employee"
+            />
           </div>
 
           {/* Dynamic staff details panel */}
@@ -1058,53 +1052,41 @@ export default function TravellingAllowancePage() {
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-slate-700">Month & Year</label>
             <div className="grid grid-cols-2 gap-2">
-              <div className="relative">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => {
-                    handleMonthChange(e.target.value);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 transition-all cursor-pointer appearance-none"
-                >
-                  <option value="">Month</option>
-                  <option value="01">January</option>
-                  <option value="02">February</option>
-                  <option value="03">March</option>
-                  <option value="04">April</option>
-                  <option value="05">May</option>
-                  <option value="06">June</option>
-                  <option value="07">July</option>
-                  <option value="08">August</option>
-                  <option value="09">September</option>
-                  <option value="10">October</option>
-                  <option value="11">November</option>
-                  <option value="12">December</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                  <Calendar className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="relative">
-                <select
-                  value={selectedYearVal}
-                  onChange={(e) => {
-                    handleYearChange(e.target.value);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-750 outline-none focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 transition-all cursor-pointer appearance-none font-mono"
-                >
-                  <option value="">Year</option>
-                  <option value="2024">2024</option>
-                  <option value="2025">2025</option>
-                  <option value="2026">2026</option>
-                  <option value="2027">2027</option>
-                  <option value="2028">2028</option>
-                  <option value="2029">2029</option>
-                  <option value="2030">2030</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                  <Calendar className="w-3.5 h-3.5" />
-                </div>
-              </div>
+              <CustomSelect
+                value={selectedMonth}
+                onChange={(val) => handleMonthChange(val)}
+                options={[
+                  { value: "", label: "Month" },
+                  { value: "01", label: "January" },
+                  { value: "02", label: "February" },
+                  { value: "03", label: "March" },
+                  { value: "04", label: "April" },
+                  { value: "05", label: "May" },
+                  { value: "06", label: "June" },
+                  { value: "07", label: "July" },
+                  { value: "08", label: "August" },
+                  { value: "09", label: "September" },
+                  { value: "10", label: "October" },
+                  { value: "11", label: "November" },
+                  { value: "12", label: "December" }
+                ]}
+                placeholder="Month"
+              />
+              <CustomSelect
+                value={selectedYearVal}
+                onChange={(val) => handleYearChange(val)}
+                options={[
+                  { value: "", label: "Year" },
+                  { value: "2024", label: "2024" },
+                  { value: "2025", label: "2025" },
+                  { value: "2026", label: "2026" },
+                  { value: "2027", label: "2027" },
+                  { value: "2028", label: "2028" },
+                  { value: "2029", label: "2029" },
+                  { value: "2030", label: "2030" }
+                ]}
+                placeholder="Year"
+              />
             </div>
           </div>
 
@@ -1297,12 +1279,13 @@ export default function TravellingAllowancePage() {
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Duty Date:</span>
-                            <input
-                              type="date"
-                              value={legOut.entry_date}
-                              onChange={(e) => handleEntryChange(outIdx, 'entry_date', e.target.value)}
-                              className="bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3 py-1 text-xs font-bold text-slate-800 transition-all cursor-pointer"
-                            />
+                            <div className="w-32 shrink-0">
+                              <CustomDatePicker
+                                value={legOut.entry_date}
+                                onChange={(val) => handleEntryChange(outIdx, 'entry_date', val)}
+                                placeholder="Select Date"
+                              />
+                            </div>
                           </div>
                           
                           <button
@@ -1518,22 +1501,20 @@ export default function TravellingAllowancePage() {
                         {/* Stay Start Date */}
                         <div className="space-y-1">
                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stay Start Date</label>
-                          <input
-                            type="date"
+                          <CustomDatePicker
                             value={entry.entry_date}
-                            onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                            className="w-full bg-white border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                            onChange={(val) => handleEntryChange(idx, 'entry_date', val)}
+                            placeholder="Select Date"
                           />
                         </div>
                         
                         {/* Stay End Date */}
                         <div className="space-y-1">
                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stay End Date</label>
-                          <input
-                            type="date"
+                          <CustomDatePicker
                             value={entry.time_left || ''}
-                            onChange={(e) => handleEntryChange(idx, 'time_left', e.target.value)}
-                            className="w-full bg-white border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                            onChange={(val) => handleEntryChange(idx, 'time_left', val)}
+                            placeholder="Select Date"
                           />
                         </div>
                       </div>
@@ -1575,11 +1556,10 @@ export default function TravellingAllowancePage() {
                         {/* Travel Date */}
                         <div className="space-y-1">
                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Travel Date</label>
-                          <input
-                            type="date"
+                          <CustomDatePicker
                             value={entry.entry_date}
-                            onChange={(e) => handleEntryChange(idx, 'entry_date', e.target.value)}
-                            className="w-full bg-white border border-slate-200 focus:border-[var(--theme-icon-bg)] focus:ring-1 focus:ring-[var(--theme-icon-bg)]/20 outline-none rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 transition-all cursor-pointer"
+                            onChange={(val) => handleEntryChange(idx, 'entry_date', val)}
+                            placeholder="Select Date"
                           />
                         </div>
                         
@@ -1887,17 +1867,18 @@ export default function TravellingAllowancePage() {
               {/* Section 3: Amount Rounding Rule */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">3. Amount Rounding Rule</label>
-                <select
+                <CustomSelect
                   value={tempRoundingMode}
-                  onChange={(e) => setTempRoundingMode(e.target.value as any)}
-                  className="w-full bg-white border border-slate-205 rounded-xl px-4 py-3 text-xs text-slate-800 cursor-pointer font-bold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-3xs"
-                >
-                  <option value="none">No Rounding (Exact Decimals)</option>
-                  <option value="nearest_integer">Round to Nearest Integer (e.g. 437.49 =&gt; 437, 437.5 =&gt; 438)</option>
-                  <option value="nearest_05">Round to Nearest 0.5 (e.g. 437.45 =&gt; 437.5, 437.2 =&gt; 437.0)</option>
-                  <option value="ceiling">Ceiling - Round Up (e.g. 437.05 =&gt; 438)</option>
-                  <option value="floor">Floor - Round Down (e.g. 437.95 =&gt; 437)</option>
-                </select>
+                  onChange={(val) => setTempRoundingMode(val as any)}
+                  options={[
+                    { value: "none", label: "No Rounding (Exact Decimals)" },
+                    { value: "nearest_integer", label: "Round to Nearest Integer (e.g. 437.49 => 437, 437.5 => 438)" },
+                    { value: "nearest_05", label: "Round to Nearest 0.5 (e.g. 437.45 => 437.5, 437.2 => 437.0)" },
+                    { value: "ceiling", label: "Ceiling - Round Up (e.g. 437.05 => 438)" },
+                    { value: "floor", label: "Floor - Round Down (e.g. 437.95 => 437)" }
+                  ]}
+                  placeholder="Select Rounding Mode"
+                />
               </div>
 
               {/* Action Buttons */}

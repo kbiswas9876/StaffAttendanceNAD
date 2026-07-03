@@ -63,8 +63,9 @@ body {
 /* Premium Claude-style Clean Card Panel */
 .glass-panel {
   background: #FFFFFF;
-  border: 1px solid #E2E0D9;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(226, 224, 217, 0.45);
+  box-shadow: 0 10px 25px -8px rgba(0, 0, 0, 0.03), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 /* Grid Cell Styles */
@@ -291,7 +292,34 @@ body {
   border-color: var(--theme-icon-bg) !important;
   color: #FFFFFF !important;
   box-shadow: var(--theme-icon-glow) !important;
+}/* Premium Custom Dropdown styling wrapper */
+.select-premium {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+  background-position: right 14px center !important;
+  background-size: 18px 18px !important;
+  background-repeat: no-repeat !important;
+  padding-right: 2.5rem !important;
 }
 
-
-
+/* Modern Calendar Picker Indicator styling override for native dates */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3e%3c/rect%3e%3cline x1='16' y1='2' x2='16' y2='6'%3e%3c/line%3e%3cline x1='8' y1='2' x2='8' y2='6'%3e%3c/line%3e%3cline x1='3' y1='10' x2='21' y2='10'%3e%3c/line%3e%3c/svg%3e") !important;
+  background-position: center !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  cursor: pointer !important;
+  width: 15px !important;
+  height: 15px !important;
+  opacity: 0.65 !important;
+  transition: opacity 0.15s ease !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1 !important;
+}
+input[type="date"] {
+  position: relative;
+  cursor: pointer;
+}

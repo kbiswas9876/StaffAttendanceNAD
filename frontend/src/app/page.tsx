@@ -22,6 +22,7 @@ import {
   Clock
 } from 'lucide-react';
 import { getEmployees, getAttendanceLogs, getSpecialEvents, getSections, Employee, AttendanceLog, SpecialEvent, parseLocalDate } from '../lib/api';
+import CustomDatePicker from './components/CustomDatePicker';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -503,13 +504,11 @@ export default function Dashboard() {
               })()}
             </div>
             
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 shadow-2xs">
-              <Calendar size={13} className="text-slate-400" />
-              <input
-                type="date"
+            <div className="w-44 shrink-0">
+              <CustomDatePicker
                 value={selectedDate}
-                onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-                className="bg-transparent border-none focus:outline-none cursor-pointer text-slate-800 font-extrabold text-[11px]"
+                onChange={(val) => val && setSelectedDate(val)}
+                placeholder="Select Date"
               />
             </div>
           </div>

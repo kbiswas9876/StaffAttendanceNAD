@@ -38,6 +38,8 @@ import {
   parseLocalDate
 } from '../../lib/api';
 import { getTranslation } from '../../lib/translations';
+import CustomSelect from '../components/CustomSelect';
+import CustomDatePicker from '../components/CustomDatePicker';
 
 interface DayInfo {
   dateStr: string;
@@ -1200,7 +1202,7 @@ export default function AttendanceGrid() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-850 flex items-center gap-2">
             {getTranslation(lang, 'Smart Attendance Roster')}
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00c2b2]/10 text-[#00c2b2] border border-[#00c2b2]/20 font-black uppercase tracking-wider">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00c2b2]/10 text-[#00c2b2] border border-[#00c2b2]/20 font-black uppercase tracking-wider whitespace-nowrap">
               {activeSection === 'ALL' ? getTranslation(lang, 'Joint View') : `${activeSection} ${getTranslation(lang, 'Section')}`}
             </span>
           </h2>
@@ -1212,34 +1214,29 @@ export default function AttendanceGrid() {
         {/* Toolbar controls */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Period selector */}
-          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-sm text-slate-800 no-print">
-            <CalendarDays size={16} className="text-slate-500 ml-1" />
-            <select
+          <div className="flex items-center gap-2 text-sm text-slate-800 no-print">
+            <CustomSelect
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer text-xs"
-            >
-              {monthsList.map((m) => {
+              onChange={(val) => setSelectedMonth(Number(val))}
+              options={monthsList.map((m) => {
                 let prevM = m.val - 1;
                 if (prevM < 0) prevM = 11;
                 const prevName = monthsList[prevM].name.substring(0, 3);
                 const currName = m.name.substring(0, 3);
-                return (
-                  <option key={m.val} value={m.val} className="bg-white text-slate-800">
-                    {prevName} - {currName}
-                  </option>
-                );
+                return { value: m.val, label: `${prevName} - ${currName}` };
               })}
-            </select>
+              className="w-40 shrink-0"
+            />
 
-            <select
+            <CustomSelect
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-transparent border-none focus:outline-none text-slate-800 font-bold cursor-pointer ml-1"
-            >
-              <option value={2026} className="bg-white text-slate-800">2026</option>
-              <option value={2025} className="bg-white text-slate-800">2025</option>
-            </select>
+              onChange={(val) => setSelectedYear(Number(val))}
+              options={[
+                { value: 2026, label: '2026' },
+                { value: 2025, label: '2025' }
+              ]}
+              className="w-28 shrink-0"
+            />
           </div>
 
           <button
@@ -1319,23 +1316,22 @@ export default function AttendanceGrid() {
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold text-slate-750 no-print animate-scale-up">
           <div>
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Left Signatory (SSE In-Charge)</label>
-            <div className="flex gap-2">
-              <select
+            <div className="flex gap-2 items-center">
+              <CustomSelect
                 value={signatoryLeftName}
-                onChange={(e) => {
-                  setSignatoryLeftName(e.target.value);
-                  const matched = employees.find(emp => emp.name === e.target.value);
+                onChange={(val) => {
+                  setSignatoryLeftName(val);
+                  const matched = employees.find(emp => emp.name === val);
                   if (matched) {
                     setSignatoryLeftTitle(matched.designation);
                   }
                 }}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="">-- Custom/Manual --</option>
-                {employees.map(e => (
-                  <option key={e.emp_id} value={e.name}>{e.name} ({e.designation})</option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "-- Custom/Manual --" },
+                  ...employees.map(e => ({ value: e.name, label: `${e.name} (${e.designation})` }))
+                ]}
+                className="w-48 shrink-0"
+              />
               <input
                 type="text"
                 value={signatoryLeftName}
@@ -1367,26 +1363,28 @@ export default function AttendanceGrid() {
           </div>
           <div>
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Excel Export Print Scale</label>
-            <div className="flex gap-2">
-              <select
+            <div className="flex gap-2 items-center">
+              <CustomSelect
                 value={printScaleMode}
-                onChange={(e) => {
-                  setPrintScaleMode(e.target.value);
-                  if (e.target.value !== 'custom') {
-                    setPrintScaleValue(Number(e.target.value));
+                onChange={(val) => {
+                  setPrintScaleMode(val);
+                  if (val !== 'custom') {
+                    setPrintScaleValue(Number(val));
                   }
                 }}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="0">Default (Fit Width)</option>
-                <option value="100">100% Scale</option>
-                <option value="95">95% Scale</option>
-                <option value="90">90% Scale</option>
-                <option value="85">85% Scale</option>
-                <option value="80">80% Scale</option>
-                <option value="75">75% Scale</option>
-                <option value="custom">Custom %...</option>
-              </select>
+                options={[
+                  { value: "0", label: "Default (Fit Width)" },
+                  { value: "100", label: "100% Scale" },
+                  { value: "95", label: "95% Scale" },
+                  { value: "90", label: "90% Scale" },
+                  { value: "85", label: "85% Scale" },
+                  { value: "80", label: "80% Scale" },
+                  { value: "75", label: "75% Scale" },
+                  { value: "70", label: "70% Scale" },
+                  { value: "custom", label: "Custom Scale..." }
+                ]}
+                className="w-48 shrink-0"
+              />
               {printScaleMode === 'custom' && (
                 <input
                   type="number"
@@ -1651,37 +1649,34 @@ export default function AttendanceGrid() {
               {/* Target Employee */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Target Employee</label>
-                <select
+                <CustomSelect
                   value={bulkEmpId}
-                  onChange={(e) => setBulkEmpId(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="all">All Employees ({employees.length})</option>
-                  {employees.map(e => (
-                    <option key={e.emp_id} value={e.emp_id}>{e.name} ({e.designation})</option>
-                  ))}
-                </select>
+                  onChange={(val) => setBulkEmpId(val)}
+                  options={[
+                    { value: "all", label: `All Employees (${employees.length})` },
+                    ...employees.map(e => ({ value: String(e.emp_id), label: `${e.name} (${e.designation})` }))
+                  ]}
+                  placeholder="Select Employee"
+                />
               </div>
 
               {/* Date range */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Date</label>
-                  <input
-                    type="date"
+                  <CustomDatePicker
                     value={bulkStartDate}
-                    onChange={(e) => setBulkStartDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                    onChange={(val) => setBulkStartDate(val)}
+                    placeholder="Start Date"
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">End Date</label>
-                  <input
-                    type="date"
+                  <CustomDatePicker
                     value={bulkEndDate}
-                    onChange={(e) => setBulkEndDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                    onChange={(val) => setBulkEndDate(val)}
+                    placeholder="End Date"
                     required
                   />
                 </div>
@@ -1690,18 +1685,15 @@ export default function AttendanceGrid() {
               {/* Status Code */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Roster Code Status</label>
-                <select
+                <CustomSelect
                   value={bulkStatus}
-                  onChange={(e) => setBulkStatus(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  {allCodes.map((code) => (
-                    <option key={code.code} value={code.code}>
-                      {code.code} - {code.description}
-                    </option>
-                  ))}
-                  <option value="CUSTOM_CODE" className="text-blue-600 font-bold">Custom...</option>
-                </select>
+                  onChange={(val) => setBulkStatus(val)}
+                  options={[
+                    ...allCodes.map(code => ({ value: code.code, label: `${code.code} - ${code.description}` })),
+                    { value: "CUSTOM_CODE", label: "Custom..." }
+                  ]}
+                  placeholder="Select Code"
+                />
               </div>
 
               {/* Custom Code Input when selected */}
@@ -2040,14 +2032,14 @@ export default function AttendanceGrid() {
                 {/* Manual Picker */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Or Enter Earned Date Manually:</span>
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={manualCrDate}
-                      onChange={(e) => setManualCrDate(e.target.value)}
-                      max={crModal.dateStr}
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
-                    />
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1">
+                      <CustomDatePicker
+                        value={manualCrDate}
+                        onChange={(val) => setManualCrDate(val)}
+                        placeholder="Manual Date"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleApplyEarnedDate(manualCrDate)}
