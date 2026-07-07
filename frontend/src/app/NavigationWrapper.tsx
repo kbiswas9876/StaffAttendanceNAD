@@ -162,7 +162,9 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
 
   // Filter and sort eligible staff for In-Charge selection (SSE, JE, In-Charge)
   const eligibleInCharges = employees.filter(emp => {
-    const isCorrectSec = emp.section_code === activeSection;
+    const isCorrectSec = activeSection === 'ALL'
+      ? (emp.section_code && selectedJoinSections.includes(emp.section_code))
+      : (emp.section_code === activeSection);
     if (!isCorrectSec) return false;
     const desig = (emp.designation || '').toUpperCase();
     return desig.includes('SSE') || desig.includes('JE') || desig.includes('IN-CHARGE') || desig.includes('IN CHARGE');
@@ -197,7 +199,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     } else {
       setActiveInCharge(null);
     }
-  }, [activeSection, employees]);
+  }, [activeSection, employees, selectedJoinSections]);
 
   // Handle profile dropdown outside click
   useEffect(() => {
@@ -221,7 +223,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
     }
   };
 
-  const displayedName = activeInCharge ? activeInCharge.name : "Koushik Saha";
+  const displayedName = activeInCharge ? activeInCharge.name : "SSE In-Charge";
   const displayedDesig = activeInCharge ? activeInCharge.designation : "SSE In-Charge";
   const initials = displayedName
     .split(' ')

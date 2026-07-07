@@ -2250,7 +2250,7 @@ export default function AdminPanel() {
                           type="text" 
                           value={transferSignatoryName}
                           onChange={(e) => setTransferSignatoryName(e.target.value)}
-                          placeholder="e.g. Koushik Saha"
+                          placeholder="e.g. Tonmoy Naskar"
                           className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 focus:bg-white transition duration-150 shadow-2xs hover:bg-[#FAF9F6]/85"
                           required
                         />

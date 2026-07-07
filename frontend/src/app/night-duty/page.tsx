@@ -426,7 +426,7 @@ export default function NightDutyNDA() {
     <div className="p-6 space-y-6">
       
       {/* Title */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-40">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             {getTranslation(lang, 'Night Duty Allowance (NDA) Calculator')}
@@ -454,6 +454,7 @@ export default function NightDutyNDA() {
                 return { value: m.val, label: `${prevName} - ${currName}` };
               })}
               className="w-40 shrink-0"
+              btnClassName="pl-3.5 pr-2.5 py-2.5 text-xs sm:text-sm gap-1.5"
             />
 
             <CustomSelect
@@ -464,6 +465,7 @@ export default function NightDutyNDA() {
                 { value: 2025, label: '2025' }
               ]}
               className="w-28 shrink-0"
+              btnClassName="pl-3.5 pr-2.5 py-2.5 text-xs sm:text-sm gap-1.5"
             />
           </div>
           
@@ -512,7 +514,7 @@ export default function NightDutyNDA() {
 
       {/* Signatory Config Panel */}
       {showSigConfig && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-755 select-none animate-scale-up">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold text-slate-755 select-none animate-scale-up relative z-20">
           <div className="flex flex-col gap-1.5 col-span-1 md:col-span-2">
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Left Signatory (SSE In-Charge)</label>
             <div className="flex gap-2">

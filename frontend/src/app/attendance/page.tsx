@@ -68,18 +68,20 @@ const DeleteRosterModal: React.FC<DeleteRosterModalProps> = ({ isOpen, onClose, 
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-50 p-4">
-      <div className="bg-white border border-[#E2E0D9] w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 bg-rose-50 text-rose-800">
-          <AlertCircle size={18} className="text-rose-600" />
-          <h3 className="font-bold text-xs uppercase tracking-wider">Destructive Operation: Delete Month Roster</h3>
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up border-none">
+        <div className="px-5 py-4.5 flex items-center gap-3 bg-white">
+          <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
+            <AlertCircle size={18} className="shrink-0" />
+          </div>
+          <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">Delete Month Roster</h3>
         </div>
         
-        <div className="p-5 space-y-4">
-          <p className="text-xs text-slate-650 leading-relaxed font-semibold">
+        <div className="p-5 pt-0 space-y-4">
+          <p className="text-xs text-slate-550 leading-relaxed font-semibold">
             This will permanently delete all attendance logs and generated night duties for this month/section from the database.
           </p>
           <p className="text-xs text-slate-500 font-medium">
-            To confirm this change, please type <code className="bg-rose-50 border border-rose-200 text-rose-700 font-mono px-1 py-0.5 rounded font-bold">DELETE</code> in the validation input field below:
+            To confirm this change, please type <code className="bg-rose-50 text-rose-700 font-mono px-1 py-0.5 rounded font-bold border border-rose-100">DELETE</code> below:
           </p>
           
           <input 
@@ -87,27 +89,27 @@ const DeleteRosterModal: React.FC<DeleteRosterModalProps> = ({ isOpen, onClose, 
             placeholder="Type DELETE here"
             value={challengeInput}
             onChange={(e) => setChallengeInput(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold placeholder-slate-400 text-slate-800 uppercase focus:outline-none focus:border-rose-500"
+            className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold placeholder-slate-400 text-slate-805 uppercase focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-500 transition duration-150"
           />
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-150">
+          <div className="flex justify-end gap-2.5 pt-3">
             <button
               onClick={onClose}
-              className="px-3.5 py-2 rounded-lg border border-slate-250 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase cursor-pointer"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-655 hover:bg-slate-50 font-bold transition duration-150 cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
               disabled={challengeInput.trim().toUpperCase() !== 'DELETE'}
-              className={`px-3.5 py-2 rounded-lg font-bold text-xs uppercase cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-xl font-bold transition duration-150 flex items-center gap-1.5 cursor-pointer border-none shadow-sm ${
                 challengeInput.trim().toUpperCase() === 'DELETE'
-                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md'
-                  : 'bg-slate-100 text-slate-450 border border-slate-250 cursor-not-allowed'
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
               }`}
             >
               <Trash2 size={14} />
-              Delete Month Roster
+              Delete Month
             </button>
           </div>
         </div>
@@ -1198,7 +1200,7 @@ export default function AttendanceGrid() {
 
   return (
     <div ref={containerRef} className="p-6 space-y-6 flex flex-col h-full min-h-screen">      {/* Title & Toolbar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-40">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-850 flex items-center gap-2">
             {getTranslation(lang, 'Smart Attendance Roster')}
@@ -1226,6 +1228,7 @@ export default function AttendanceGrid() {
                 return { value: m.val, label: `${prevName} - ${currName}` };
               })}
               className="w-40 shrink-0"
+              btnClassName="pl-3.5 pr-2.5 py-2.5 text-xs sm:text-sm gap-1.5"
             />
 
             <CustomSelect
@@ -1236,6 +1239,7 @@ export default function AttendanceGrid() {
                 { value: 2025, label: '2025' }
               ]}
               className="w-28 shrink-0"
+              btnClassName="pl-3.5 pr-2.5 py-2.5 text-xs sm:text-sm gap-1.5"
             />
           </div>
 
@@ -1313,7 +1317,7 @@ export default function AttendanceGrid() {
 
       {/* Signatory Config Panel */}
       {showSigConfig && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold text-slate-750 no-print animate-scale-up">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold text-slate-750 no-print animate-scale-up relative z-20">
           <div>
             <label className="block text-[10px] uppercase text-slate-400 tracking-wider mb-1">Left Signatory (SSE In-Charge)</label>
             <div className="flex gap-2 items-center">

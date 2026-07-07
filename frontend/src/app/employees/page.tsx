@@ -86,7 +86,7 @@ const getWeekdaysStartingFrom = (anchorDateStr: string) => {
   }
 };
 
-function EmployeeProfile360({ empId, onClose }: ProfileProps) {
+export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => {
     setIsClient(true);
@@ -2035,7 +2035,32 @@ function StaffDirectory() {
       setSections(storedSecs);
 
       const emps = await getEmployees(section === 'ALL' ? undefined : section);
-      setEmployees(emps);
+      
+      let activeSectionsList: string[] = [];
+      if (section === 'ALL' && typeof window !== 'undefined') {
+        const stored = localStorage.getItem('erp_join_sections');
+        if (stored) {
+          try {
+            activeSectionsList = JSON.parse(stored);
+          } catch (e) {}
+        }
+      }
+      
+      const filteredEmps = section === 'ALL'
+        ? emps.filter(e => e.section_code && activeSectionsList.includes(e.section_code))
+        : emps;
+
+      if (section === 'ALL') {
+        filteredEmps.sort((a, b) => {
+          const secA = a.section_code || '';
+          const secB = b.section_code || '';
+          if (secA !== secB) {
+            return secA.localeCompare(secB);
+          }
+          return b.level - a.level;
+        });
+      }
+      setEmployees(filteredEmps);
     } catch (e) {
       console.error(e);
       showToast("Failed to fetch employees", "error");
@@ -2118,43 +2143,66 @@ function StaffDirectory() {
                   </td>
                 </tr>
               ) : (
-                employees.map((emp, index) => (
-                  <tr
-                    key={emp.emp_id}
-                    draggable={dragEnabledId === emp.emp_id}
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnter={(e) => handleDragEnter(e, index)}
-                    onDragEnd={handleDragEnd}
-                    className={`hover:bg-slate-50/50 transition-colors select-none ${draggedIndex === index ? 'opacity-40 bg-[var(--theme-active-bg)]/20' : ''
-                      }`}
-                  >
-                    <td
-                      className="py-3.5 px-2 text-center no-print cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"
-                      onMouseDown={() => setDragEnabledId(emp.emp_id)}
-                      onMouseUp={() => setDragEnabledId(null)}
-                    >
-                      <GripVertical size={16} />
-                    </td>
-                    <td className="py-3.5 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
-                    <td className="py-3.5 px-5 font-bold text-slate-800">
-                      <button
-                        onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
-                        className="hover:text-[var(--theme-icon-bg)] hover:underline font-bold text-slate-850 cursor-pointer text-left bg-transparent border-none"
+                (() => {
+                  let lastSection = '';
+                  return employees.flatMap((emp, index) => {
+                    const showSectionHeader = activeSection === 'ALL' && emp.section_code !== lastSection;
+                    if (showSectionHeader) {
+                      lastSection = emp.section_code || '';
+                    }
+
+                    const rows = [];
+                    if (showSectionHeader) {
+                      const secName = emp.section_code === 'KKVS' ? 'KKVS Section' : emp.section_code === 'KMUK' ? 'KMUK Section' : emp.section_code === 'KNAP' ? 'KNAP Section' : `${emp.section_code} Section`;
+                      rows.push(
+                        <tr key={`sec-header-${emp.section_code}`} className="bg-slate-100 font-extrabold text-[11px] tracking-wider text-slate-700 uppercase no-print select-none">
+                          <td colSpan={7} className="py-2 px-4 text-left border-y border-slate-200 bg-slate-150">
+                            <span className="bg-theme-primary text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
+                            <span className="font-black text-slate-800">{secName}</span>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    rows.push(
+                      <tr
+                        key={emp.emp_id}
+                        draggable={dragEnabledId === emp.emp_id}
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragEnd={handleDragEnd}
+                        className={`hover:bg-slate-50/50 transition-colors select-none ${draggedIndex === index ? 'opacity-40 bg-[var(--theme-active-bg)]/20' : ''}`}
                       >
-                        {emp.name}
-                      </button>
-                    </td>
-                    <td className="py-3.5 px-5 font-bold">
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800">
-                        {emp.designation}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-5 font-bold text-theme-active">Level {emp.level}</td>
-                    <td className="py-3.5 px-5 font-semibold text-slate-700">{emp.default_rest_day}</td>
-                    <td className="py-3.5 px-5 font-mono text-slate-600">{emp.joining_date || "—"}</td>
-                  </tr>
-                ))
+                        <td
+                          className="py-3.5 px-2 text-center no-print cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"
+                          onMouseDown={() => setDragEnabledId(emp.emp_id)}
+                          onMouseUp={() => setDragEnabledId(null)}
+                        >
+                          <GripVertical size={16} />
+                        </td>
+                        <td className="py-3.5 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
+                        <td className="py-3.5 px-5 font-bold text-slate-800">
+                          <button
+                            onClick={() => router.push(`/employees?id=${emp.emp_id}`)}
+                            className="hover:text-[var(--theme-icon-bg)] hover:underline font-bold text-slate-850 cursor-pointer text-left bg-transparent border-none"
+                          >
+                            {emp.name}
+                          </button>
+                        </td>
+                        <td className="py-3.5 px-5 font-bold">
+                          <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800">
+                            {emp.designation}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-5 font-bold text-theme-active">Level {emp.level}</td>
+                        <td className="py-3.5 px-5 font-semibold text-slate-700">{emp.default_rest_day}</td>
+                        <td className="py-3.5 px-5 font-mono text-slate-600">{emp.joining_date || "—"}</td>
+                      </tr>
+                    );
+                    return rows;
+                  });
+                })()
               )}
             </tbody>
           </table>

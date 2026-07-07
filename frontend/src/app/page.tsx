@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { EmployeeProfile360 } from './employees/page';
 import { 
   Users, 
   Moon, 
@@ -26,6 +27,8 @@ import CustomDatePicker from './components/CustomDatePicker';
 
 export default function Dashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const empIdStr = searchParams.get('id');
   const [activeSection, setActiveSection] = useState<string>('KKVS');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<AttendanceLog[]>([]);
@@ -78,11 +81,37 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const emps = await getEmployees(section === 'ALL' ? undefined : section);
+      
+      let activeSectionsList: string[] = [];
+      if (section === 'ALL' && typeof window !== 'undefined') {
+        const stored = localStorage.getItem('erp_join_sections');
+        if (stored) {
+          try {
+            activeSectionsList = JSON.parse(stored);
+          } catch (e) {}
+        }
+      }
+      
+      const filteredEmps = section === 'ALL'
+        ? emps.filter(e => e.section_code && activeSectionsList.includes(e.section_code))
+        : emps;
+
+      if (section === 'ALL') {
+        filteredEmps.sort((a, b) => {
+          const secA = a.section_code || '';
+          const secB = b.section_code || '';
+          if (secA !== secB) {
+            return secA.localeCompare(secB);
+          }
+          return b.level - a.level;
+        });
+      }
       const storedSections = await getSections();
       
       let jointLogs: AttendanceLog[] = [];
       if (section === 'ALL') {
         for (const sec of storedSections) {
+          if (!activeSectionsList.includes(sec.section_code)) continue;
           try {
             const logs = await getAttendanceLogs(sec.section_code, DASHBOARD_START, DASHBOARD_END);
             jointLogs = [...jointLogs, ...logs];
@@ -95,10 +124,13 @@ export default function Dashboard() {
       }
 
       const events = await getSpecialEvents(section === 'ALL' ? undefined : section);
+      const filteredEvents = section === 'ALL'
+        ? events.filter(evt => filteredEmps.some(e => e.emp_id === evt.emp_id))
+        : events;
       
-      setEmployees(emps);
+      setEmployees(filteredEmps);
       setAttendance(jointLogs);
-      setSpecialEvents(events);
+      setSpecialEvents(filteredEvents);
     } catch (e) {
       console.error("Failed to load dashboard data", e);
     } finally {
@@ -141,8 +173,18 @@ export default function Dashboard() {
       try {
         let dayLogs: AttendanceLog[] = [];
         if (activeSection === 'ALL') {
+          let activeSectionsList: string[] = [];
+          if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('erp_join_sections');
+            if (stored) {
+              try {
+                activeSectionsList = JSON.parse(stored);
+              } catch (e) {}
+            }
+          }
           const storedSections = await getSections();
           for (const sec of storedSections) {
+            if (!activeSectionsList.includes(sec.section_code)) continue;
             try {
               const logs = await getAttendanceLogs(sec.section_code, selectedDate, selectedDate);
               dayLogs = [...dayLogs, ...logs];
@@ -341,6 +383,10 @@ export default function Dashboard() {
   };
 
   const { morningList, eveningList, nightList, generalList, restOrLeaveList } = categorizeStaffAvailability();
+
+  if (empIdStr) {
+    return <EmployeeProfile360 empId={Number(empIdStr)} onClose={() => router.push('/')} />;
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -720,25 +766,49 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 ) : (
-                  employees.map((emp) => (
-                    <tr key={emp.emp_id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/employees?id=${emp.emp_id}`)}>
-                      <td className="py-3 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
-                      <td className="py-3 px-5 font-bold text-[#191919]">{emp.name}</td>
-                      <td className="py-3 px-5">
-                        <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
-                          {emp.designation}
-                        </span>
-                      </td>
-                      <td className="py-3 px-5">
-                        <span className="text-xs font-extrabold text-theme-active">Lvl {emp.level}</span>
-                      </td>
-                      <td className="py-3 px-5">
-                        <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
-                          {emp.default_rest_day}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                (() => {
+                  let lastSection = '';
+                  return employees.flatMap((emp) => {
+                    const showSectionHeader = activeSection === 'ALL' && emp.section_code !== lastSection;
+                    if (showSectionHeader) {
+                      lastSection = emp.section_code || '';
+                    }
+
+                    const rows = [];
+                    if (showSectionHeader) {
+                      const secName = emp.section_code === 'KKVS' ? 'KKVS Section' : emp.section_code === 'KMUK' ? 'KMUK Section' : emp.section_code === 'KNAP' ? 'KNAP Section' : `${emp.section_code} Section`;
+                      rows.push(
+                        <tr key={`sec-header-${emp.section_code}`} className="bg-slate-100 font-extrabold text-[11px] tracking-wider text-slate-700 uppercase no-print select-none">
+                          <td colSpan={5} className="py-2 px-4 text-left border-y border-slate-200 bg-slate-150">
+                            <span className="bg-[#00c2b2] text-white font-black px-2 py-0.5 rounded mr-2 text-[9px] uppercase tracking-widest shadow-xs">Section</span>
+                            <span className="font-black text-slate-800">{secName}</span>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    rows.push(
+                      <tr key={emp.emp_id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/?id=${emp.emp_id}`)}>
+                        <td className="py-3 px-5 font-mono text-slate-700 font-bold">{emp.pf_number}</td>
+                        <td className="py-3 px-5 font-bold text-[#191919]">{emp.name}</td>
+                        <td className="py-3 px-5">
+                          <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
+                            {emp.designation}
+                          </span>
+                        </td>
+                        <td className="py-3 px-5">
+                          <span className="text-xs font-extrabold text-theme-active">Lvl {emp.level}</span>
+                        </td>
+                        <td className="py-3 px-5">
+                          <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
+                            {emp.default_rest_day}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                    return rows;
+                  });
+                })()
                 )}
               </tbody>
             </table>

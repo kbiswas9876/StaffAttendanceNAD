@@ -14,6 +14,7 @@ interface CustomSelectProps {
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  btnClassName?: string;
   disabled?: boolean;
 }
 
@@ -23,6 +24,7 @@ export default function CustomSelect({
   options,
   placeholder = 'Select Option',
   className = '',
+  btnClassName = '',
   disabled = false
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,13 +42,16 @@ export default function CustomSelect({
 
   const selectedOption = options.find(o => o.value === value || (value !== undefined && String(o.value) === String(value)));
 
+  const defaultBtnClass = "pl-2.5 pr-1.5 py-2 text-[10.5px] gap-1";
+  const appliedBtnClass = btnClassName || defaultBtnClass;
+
   return (
     <div ref={containerRef} className={`relative ${className.includes('w-') ? '' : 'w-full'} ${className}`}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white/80 border border-slate-200 hover:bg-slate-50 rounded-xl pl-2.5 pr-1.5 py-2 text-[10.5px] text-slate-800 font-bold cursor-pointer transition flex justify-between items-center gap-1 shadow-2xs focus:outline-none focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/10 disabled:opacity-50 disabled:cursor-not-allowed border-solid"
+        className={`w-full bg-white/80 border border-slate-200 hover:bg-slate-50 rounded-xl ${appliedBtnClass} text-slate-800 font-bold cursor-pointer transition flex justify-between items-center shadow-2xs focus:outline-none focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/10 disabled:opacity-50 disabled:cursor-not-allowed border-solid`}
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         <ChevronDown
