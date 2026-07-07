@@ -64,6 +64,11 @@ export default function NightDutyNDA() {
   const [billUnit, setBillUnit] = useState<string>('');
   const [lang, setLang] = useState<'en' | 'bn' | 'hi'>('en');
   const [sections, setSections] = useState<Section[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const getSectionDisplayName = (code: string) => {
     const sec = sections.find(s => s.section_code === code);
@@ -358,7 +363,7 @@ export default function NightDutyNDA() {
   // Export to Excel / PDF Trigger
   const handleExport = async (format: 'excel' | 'pdf') => {
     if (backendStatus === 'offline') {
-      alert("Error: Python microservice backend is currently offline. Please start FastAPI backend service.");
+      showToast("Error: Python microservice backend is currently offline. Please start FastAPI backend service.", "error");
       return;
     }
 
@@ -416,7 +421,7 @@ export default function NightDutyNDA() {
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error("Export failure occurred:", e);
-      alert(`Export Failed: Could not reach the Python FastAPI service.`);
+      showToast(`Export Failed: Could not reach the Python FastAPI service.`, "error");
     } finally {
       setExporting(null);
     }
@@ -718,6 +723,13 @@ export default function NightDutyNDA() {
         </div>
       </div>
 
+      {/* Premium Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[9999] bg-slate-900 border border-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-sm transition-all duration-300">
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+          <p className="text-xs font-semibold text-slate-200">{toast.message}</p>
+        </div>
+      )}
     </div>
   );
 }

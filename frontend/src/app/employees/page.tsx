@@ -92,6 +92,12 @@ export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
     setIsClient(true);
   }, []);
 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [leaveBank, setLeaveBank] = useState<LeaveBank | null>(null);
   const [attendance, setAttendance] = useState<AttendanceLog[]>([]);
@@ -247,7 +253,7 @@ export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       setIsEditModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to update leave balances");
+      showToast("Failed to update leave balances", "error");
     } finally {
       setIsSaving(false);
     }
@@ -321,11 +327,11 @@ export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
 
     if (scheduleType === 'custom-rotation') {
       if (!selectedRuleId) {
-        alert("Please select a roster rotation rule.");
+        showToast("Please select a roster rotation rule.", "error");
         return;
       }
       if (!empAnchorDate) {
-        alert("Please select an anchor date.");
+        showToast("Please select an anchor date.", "error");
         return;
       }
     }
@@ -401,12 +407,12 @@ export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         default_rest_day: detectedRestDay,
         weekly_schedule: weeklySchedulePayload as any
       });
-      alert("Roster Schedule Pattern updated successfully!");
+      showToast("Roster Schedule Pattern updated successfully!", "success");
       setIsScheduleEditOpen(false);
       loadProfileData(); // Reload employee profile details
     } catch (err) {
       console.error(err);
-      alert("Failed to update Roster Schedule Pattern.");
+      showToast("Failed to update Roster Schedule Pattern.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -1935,11 +1941,11 @@ export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                     type="button"
                     onClick={() => {
                       if (!overrideFrom || !overrideTo) {
-                        alert("Please select both start and end dates.");
+                        showToast("Please select both start and end dates.", "error");
                         return;
                       }
                       if (overrideFrom > overrideTo) {
-                        alert("Start date cannot be after end date.");
+                        showToast("Start date cannot be after end date.", "error");
                         return;
                       }
                       setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo, shift: overrideShift }]);
@@ -2027,6 +2033,13 @@ export function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         }} 
         onSuccess={handleAuthSuccess} 
       />
+      {/* Premium Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[9999] bg-slate-900 border border-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-sm transition-all duration-300">
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+          <p className="text-xs font-semibold text-slate-200">{toast.message}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -2284,7 +2297,7 @@ function StaffDirectory() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-sm">
+        <div className="fixed top-6 right-6 z-[9999] bg-slate-900 border border-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-sm">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
           <p className="text-xs font-semibold text-slate-200">{toast.message}</p>
         </div>

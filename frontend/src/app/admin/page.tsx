@@ -4025,11 +4025,11 @@ export default function AdminPanel() {
                         type="button"
                         onClick={() => {
                           if (!overrideFrom || !overrideTo) {
-                            alert("Please select both start and end dates.");
+                            showToast("Please select both start and end dates.", "error");
                             return;
                           }
                           if (overrideFrom > overrideTo) {
-                            alert("Start date cannot be after end date.");
+                            showToast("Start date cannot be after end date.", "error");
                             return;
                           }
                           setCustomNightWeeks(prev => [...prev, { from_date: overrideFrom, to_date: overrideTo, shift: overrideShift }]);
@@ -4113,7 +4113,7 @@ export default function AdminPanel() {
 
       {/* Premium Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-sm transition-all duration-300">
+        <div className="fixed top-6 right-6 z-[9999] bg-slate-900 border border-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-sm transition-all duration-300">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
           <p className="text-xs font-semibold text-slate-200">{toast.message}</p>
         </div>
