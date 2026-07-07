@@ -46,17 +46,17 @@ export default function CustomSelect({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm text-slate-800 text-left font-semibold cursor-pointer focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 hover:bg-[#FAF9F6]/85 transition duration-150 shadow-2xs flex justify-between items-center select-none disabled:opacity-50 disabled:cursor-not-allowed border-solid"
+        className="w-full bg-white/80 border border-slate-200 hover:bg-slate-50 rounded-xl pl-2.5 pr-1.5 py-2 text-[10.5px] text-slate-800 font-bold cursor-pointer transition flex justify-between items-center gap-1 shadow-2xs focus:outline-none focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/10 disabled:opacity-50 disabled:cursor-not-allowed border-solid"
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         <ChevronDown
-          size={16}
+          size={12}
           className={`text-slate-500 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white border border-slate-200/80 rounded-xl shadow-xl animate-scale-up py-1 border-solid">
+        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-xl shadow-xl py-1 animate-in fade-in slide-in-from-top-1 duration-150 border-solid">
           {options.length === 0 ? (
             <div className="px-3.5 py-2 text-xs text-slate-400 font-semibold text-center">No options available</div>
           ) : (
@@ -70,14 +70,14 @@ export default function CustomSelect({
                     onChange(option.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3.5 py-2 text-xs font-bold transition duration-105 flex items-center justify-between cursor-pointer border-none ${
+                  className={`w-full text-left px-3 py-1.5 text-xs font-bold transition duration-100 flex items-center justify-between cursor-pointer border-none ${
                     isSelected
                       ? 'bg-theme-active text-theme-active'
                       : 'text-slate-655 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   <span>{option.label}</span>
-                  {isSelected && <Check size={12} className="text-theme-primary shrink-0 ml-1.5" />}
+                  {isSelected && <Check size={11} className="text-theme-primary shrink-0 ml-1.5" />}
                 </button>
               );
             })

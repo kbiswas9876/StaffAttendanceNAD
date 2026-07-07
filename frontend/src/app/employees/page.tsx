@@ -951,11 +951,14 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
         </div>
 
         {isFlexible && (
-          <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl flex items-start gap-3 shadow-xs">
-            <ShieldAlert className="text-amber-500 shrink-0 mt-0.5 animate-bounce" size={18} />
+          <div className="p-4.5 bg-amber-50/20 backdrop-blur-md border border-amber-200/60 rounded-2xl flex items-start gap-3.5 shadow-xs relative overflow-hidden transition-all duration-300 hover:border-amber-300/80">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+              <ShieldAlert className="text-amber-600 animate-pulse" size={16} />
+            </div>
             <div>
-              <h4 className="text-xs font-black text-amber-800 uppercase tracking-wide">Flexible / No Fixed Roster Active</h4>
-              <p className="text-[11px] text-amber-700 font-semibold mt-1 leading-relaxed">
+              <h4 className="text-xs font-black text-amber-855 uppercase tracking-wider">Flexible / No Fixed Roster Active</h4>
+              <p className="text-[10.5px] text-amber-700 font-bold mt-1.5 leading-relaxed">
                 This employee (e.g. SSE/JE) does not follow a fixed weekly roster. Shifts are entered manually in the attendance records.
               </p>
             </div>
@@ -1639,8 +1642,8 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
       )}
       {isScheduleEditOpen && isClient && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl animate-scale-up relative">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
               <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                 <CalendarDays size={16} className="text-theme-primary" />
                 Roster Schedule Configuration
@@ -1763,13 +1766,13 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                                 [day]: val
                               }))}
                               options={[
-                                { value: 'G', label: 'G' },
-                                { value: 'M', label: 'M' },
-                                { value: 'E', label: 'E' },
-                                { value: 'N', label: 'N' },
-                                { value: 'R', label: 'R' }
+                                { value: 'G', label: 'General (G)' },
+                                { value: 'M', label: 'Morning (M)' },
+                                { value: 'E', label: 'Evening (E)' },
+                                { value: 'N', label: 'Night (N)' },
+                                { value: 'R', label: 'Rest (R)' }
                               ]}
-                              className="w-16 text-[10px]"
+                              className="w-full text-[10px]"
                             />
                           </div>
                         ))}
@@ -1805,13 +1808,13 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                                 }
                               }))}
                               options={[
-                                { value: 'G', label: 'G' },
-                                { value: 'M', label: 'M' },
-                                { value: 'E', label: 'E' },
-                                { value: 'N', label: 'N' },
-                                { value: 'R', label: 'R' }
+                                { value: 'G', label: 'General (G)' },
+                                { value: 'M', label: 'Morning (M)' },
+                                { value: 'E', label: 'Evening (E)' },
+                                { value: 'N', label: 'Night (N)' },
+                                { value: 'R', label: 'Rest (R)' }
                               ]}
-                              className="w-16 text-[10px]"
+                              className="w-full text-[10px]"
                             />
                           </div>
                         ))}
@@ -1847,10 +1850,11 @@ function EmployeeProfile360({ empId, onClose }: ProfileProps) {
                       value={overrideShift}
                       onChange={(val) => setOverrideShift(val)}
                       options={[
-                        { value: 'N', label: 'N (Night)' },
-                        { value: 'E', label: 'E (Eve)' },
-                        { value: 'G', label: 'G (Gen)' },
-                        { value: 'M', label: 'M (Morn)' }
+                        { value: 'G', label: 'General (G)' },
+                        { value: 'M', label: 'Morning (M)' },
+                        { value: 'E', label: 'Evening (E)' },
+                        { value: 'N', label: 'Night (N)' },
+                        { value: 'R', label: 'Rest (R)' }
                       ]}
                     />
                   </div>

@@ -132,22 +132,22 @@ export default function CustomDatePicker({
           onClick={() => setIsOpen(!isOpen)}
           placeholder={placeholder}
           required={required}
-          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-3.5 py-2.5 pr-10 text-sm text-slate-800 font-semibold cursor-pointer focus:outline-none focus:border-theme focus:ring-2 focus:ring-theme/10 hover:bg-[#FAF9F6]/85 transition duration-150 shadow-2xs text-left border-solid"
+          className="w-full bg-white/80 border border-slate-200 hover:bg-slate-50 rounded-xl pl-3 pr-8.5 py-2 text-xs text-slate-800 font-bold cursor-pointer transition shadow-2xs text-left border-solid focus:outline-none focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <Calendar
-          size={16}
+          size={14}
           onClick={() => setIsOpen(!isOpen)}
-          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-slate-650 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-405 cursor-pointer hover:text-slate-600 transition-colors"
         />
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 left-0 mt-1.5 p-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-xl w-64 animate-scale-up border-solid">
+        <div className="absolute z-50 left-0 mt-1.5 p-3.5 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-xl w-64 animate-in fade-in slide-in-from-top-1 duration-150 border-solid">
           <div className="flex justify-between items-center mb-3">
             <button
               type="button"
               onClick={() => changeMonth(-1)}
-              className="p-1 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-850 cursor-pointer transition flex items-center justify-center border-none"
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 cursor-pointer transition flex items-center justify-center border-none"
             >
               <ChevronLeft size={14} />
             </button>
@@ -174,7 +174,7 @@ export default function CustomDatePicker({
             <button
               type="button"
               onClick={() => changeMonth(1)}
-              className="p-1 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-855 cursor-pointer transition flex items-center justify-center border-none"
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-505 hover:text-slate-800 cursor-pointer transition flex items-center justify-center border-none"
             >
               <ChevronRight size={14} />
             </button>
@@ -201,8 +201,8 @@ export default function CustomDatePicker({
                     isSelected
                       ? 'bg-theme-primary text-white shadow-sm'
                       : day.isCurrentMonth
-                        ? 'text-slate-800 hover:bg-slate-50 hover:text-slate-950'
-                        : 'text-slate-300 hover:bg-slate-50/50'
+                        ? 'text-slate-800 hover:bg-slate-100 hover:text-slate-950'
+                        : 'text-slate-350 hover:bg-slate-100/50'
                   }`}
                 >
                   {day.dayNum}

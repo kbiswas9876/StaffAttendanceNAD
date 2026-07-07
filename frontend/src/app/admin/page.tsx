@@ -3697,7 +3697,7 @@ export default function AdminPanel() {
                   <div className="pt-2 flex justify-end">
                     <button 
                       type="submit" 
-                      className="px-4 py-2.5 rounded-xl bg-blue-650 hover:bg-blue-700 text-white uppercase text-[10px] cursor-pointer shadow-md hover:shadow-lg transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 font-bold flex items-center gap-1.5 border-none"
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px] cursor-pointer shadow-md hover:shadow-lg transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 font-bold flex items-center gap-1.5 border-none"
                     >
                       <Save size={13} />
                       Save Rule
@@ -3734,7 +3734,7 @@ export default function AdminPanel() {
                             <td className="py-3.5 px-3 font-mono font-bold text-slate-550 break-all select-all">
                               {rule.pattern}
                             </td>
-                            <td className="py-3.5 px-3 text-center font-bold text-blue-650">
+                            <td className="py-3.5 px-3 text-center font-bold text-blue-600">
                               {rule.pattern.split(',').length} Days
                             </td>
                             <td className="py-3.5 px-3 text-center">
@@ -3758,17 +3758,17 @@ export default function AdminPanel() {
 
           {/* Schedule Configuration Modal (Relocated to root level for viewport centering and backdrop blur) */}
           {isScheduleModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40 animate-fade-in">
-              <div className="bg-white rounded-2xl shadow-2xl border-none w-full max-w-lg overflow-hidden animate-scale-up">
-                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/40">
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl animate-scale-up relative">
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                   <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                    <CalendarDays size={16} className="text-blue-600" />
+                    <CalendarDays size={16} className="text-theme-primary" />
                     Roster Schedule Configuration
                   </h3>
                   <button 
                     type="button"
                     onClick={() => setIsScheduleModalOpen(false)} 
-                    className="text-slate-400 hover:text-slate-650 font-bold text-sm transition border-none bg-transparent cursor-pointer"
+                    className="text-slate-400 hover:text-slate-655 font-bold text-sm transition border-none bg-transparent cursor-pointer"
                   >
                     ✕
                   </button>
@@ -3777,7 +3777,7 @@ export default function AdminPanel() {
                 <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
                   <div className="space-y-1">
                     <label className="block text-[10px] uppercase text-slate-400 tracking-wider">Schedule Type</label>
-                    <div className="grid grid-cols-5 gap-1.5 p-1 bg-[#FAF9F6] border border-slate-200/60 rounded-xl shadow-3xs">
+                    <div className="grid grid-cols-5 gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
                       {([ 'simple', 'rotating-3week', 'rotating', 'flexible', 'custom-rotation' ] as const).map(type => (
                         <button
                           key={type}
@@ -3788,7 +3788,7 @@ export default function AdminPanel() {
                               setActiveRotatingWeek('week1');
                             }
                           }}
-                          className={`py-1.5 rounded-lg text-[8px] font-extrabold uppercase transition-all duration-200 text-center cursor-pointer ${scheduleType === type ? 'bg-blue-650 text-white shadow-sm border-none' : 'text-slate-505 hover:text-slate-800 border-none bg-transparent'}`}
+                          className={`py-1.5 rounded text-[8px] font-extrabold uppercase transition-all duration-200 text-center cursor-pointer ${scheduleType === type ? 'bg-theme-primary text-white shadow' : 'text-slate-500 hover:text-slate-800 border-none bg-transparent'}`}
                         >
                           {type === 'simple' && '1-Week'}
                           {type === 'rotating-3week' && '3-Week'}
@@ -3801,7 +3801,7 @@ export default function AdminPanel() {
                   </div>
 
                   {scheduleType === 'flexible' && (
-                    <div className="p-4 bg-blue-50/20 border border-blue-200/50 rounded-xl text-slate-655 text-[10px] font-semibold leading-relaxed">
+                    <div className="p-4 bg-theme-active border border-theme-active rounded-lg text-slate-655 text-[10px] font-semibold leading-relaxed">
                       <strong>Flexible / No Fixed Roster Mode:</strong> This employee (e.g. SSE/JE/IC) does not follow a strict weekly or rotating duty cycle. Shift rules will be left blank by default in the attendance sheet and can be manually inputted.
                     </div>
                   )}
@@ -3834,14 +3834,14 @@ export default function AdminPanel() {
                         const r = rosterRules.find(rule => rule.id === Number(selectedRuleId));
                         if (!r) return null;
                         return (
-                          <div className="p-3.5 bg-blue-50/20 border border-blue-200/50 rounded-xl space-y-1.5 text-[10px]">
+                          <div className="p-3.5 bg-theme-active border border-theme-active rounded-xl space-y-1.5 text-[10px]">
                             <div className="flex justify-between items-center text-slate-500 font-bold uppercase tracking-wider">
                               <span>Rule Pattern Details</span>
-                              <span className="text-blue-650 bg-blue-100/50 px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
+                              <span className="text-theme-primary bg-theme-active px-2 py-0.5 rounded-full text-[8.5px] font-extrabold uppercase">
                                 {r.pattern.split(',').length} Days Cycle
                               </span>
                             </div>
-                            <p className="text-slate-700 font-bold leading-normal font-mono break-all bg-white/70 p-2 rounded-lg border border-slate-100/80">
+                            <p className="text-slate-700 font-bold leading-normal font-mono break-all bg-white/70 p-2 rounded-lg border border-slate-100">
                               {r.pattern}
                             </p>
                           </div>
@@ -3861,14 +3861,14 @@ export default function AdminPanel() {
                           required={scheduleType === 'rotating' || scheduleType === 'rotating-3week'}
                         />
                       </div>
-                      <div className="flex items-end text-[9px] text-slate-400 italic pb-2 font-medium">
+                      <div className="flex items-end text-[9px] text-slate-505 italic pb-2 font-medium">
                         This anchor date determines when "Week 1" cycle begins.
                       </div>
                     </div>
                   )}
 
                   {scheduleType !== 'flexible' && scheduleType !== 'custom-rotation' && (
-                    <div className="space-y-3 p-3.5 bg-[#FAF9F6]/30 border border-slate-200/60 rounded-xl shadow-3xs">
+                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                       {scheduleType === 'simple' ? (
                         <div className="space-y-1">
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Days Shift Settings</span>
@@ -3883,13 +3883,13 @@ export default function AdminPanel() {
                                     [day]: val
                                   }))}
                                   options={[
-                                    { value: 'G', label: 'G' },
-                                    { value: 'M', label: 'M' },
-                                    { value: 'E', label: 'E' },
-                                    { value: 'N', label: 'N' },
-                                    { value: 'R', label: 'R' }
+                                    { value: 'G', label: 'General (G)' },
+                                    { value: 'M', label: 'Morning (M)' },
+                                    { value: 'E', label: 'Evening (E)' },
+                                    { value: 'N', label: 'Night (N)' },
+                                    { value: 'R', label: 'Rest (R)' }
                                   ]}
-                                  className="w-16 text-[10px]"
+                                  className="w-full text-[10px]"
                                 />
                               </div>
                             ))}
@@ -3898,19 +3898,19 @@ export default function AdminPanel() {
                       ) : (
                         <div className="space-y-3">
                           {/* Week Tabs */}
-                          <div className="flex gap-1 border-b border-slate-100 pb-1.5">
+                          <div className="flex gap-1 border-b border-slate-200 pb-1">
                             {(scheduleType === 'rotating-3week' ? ['week1', 'week2', 'week3'] : ['week1', 'week2', 'week3', 'week4']).map(wk => (
                               <button
                                 key={wk}
                                 type="button"
                                 onClick={() => setActiveRotatingWeek(wk as any)}
-                                className={`px-3 py-1 rounded-lg text-[9px] font-extrabold uppercase cursor-pointer transition ${activeRotatingWeek === wk ? 'bg-blue-650 text-white shadow-xs' : 'bg-slate-105 text-slate-500 hover:text-slate-800'}`}
+                                className={`px-3 py-1 rounded text-[9px] font-extrabold uppercase ${activeRotatingWeek === wk ? 'bg-theme-primary text-white shadow-xs' : 'bg-slate-200/60 text-slate-500 hover:text-slate-800'}`}
                               >
                                 {wk.replace('week', 'W')}
                               </button>
                             ))}
                           </div>
-                          
+
                           <div className="grid grid-cols-4 gap-2">
                             {getWeekdaysStartingFrom(empAnchorDate).map(day => (
                               <div key={day} className="flex flex-col gap-0.5">
@@ -3925,13 +3925,13 @@ export default function AdminPanel() {
                                     }
                                   }))}
                                   options={[
-                                    { value: 'G', label: 'G' },
-                                    { value: 'M', label: 'M' },
-                                    { value: 'E', label: 'E' },
-                                    { value: 'N', label: 'N' },
-                                    { value: 'R', label: 'R' }
+                                    { value: 'G', label: 'General (G)' },
+                                    { value: 'M', label: 'Morning (M)' },
+                                    { value: 'E', label: 'Evening (E)' },
+                                    { value: 'N', label: 'Night (N)' },
+                                    { value: 'R', label: 'Rest (R)' }
                                   ]}
-                                  className="w-16 text-[10px]"
+                                  className="w-full text-[10px]"
                                 />
                               </div>
                             ))}
@@ -3941,7 +3941,7 @@ export default function AdminPanel() {
                     </div>
                   )}
 
-                  {/* Custom Night Weeks (Override) */}
+                  {/* Custom Overrides */}
                   <div className="border-t border-slate-100 pt-3 space-y-2">
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Custom Schedule Overrides</span>
                     <div className="grid grid-cols-4 gap-1.5 items-end">
@@ -3963,16 +3963,17 @@ export default function AdminPanel() {
                       </div>
                       <div>
                         <label className="text-[9px] font-bold text-slate-400 truncate block mb-1">Override Shift</label>
-                        <select
+                        <CustomSelect
                           value={overrideShift}
-                          onChange={(e) => setOverrideShift(e.target.value)}
-                          className="w-full bg-[#FAF9F6]/40 border border-slate-200 rounded-xl px-2.5 py-1.5 text-[10px] focus:outline-none focus:border-theme transition duration-150 font-semibold cursor-pointer shadow-3xs select-premium"
-                        >
-                          <option value="N">N (Night)</option>
-                          <option value="E">E (Eve)</option>
-                          <option value="G">G (Gen)</option>
-                          <option value="M">M (Morn)</option>
-                        </select>
+                          onChange={(val) => setOverrideShift(val)}
+                          options={[
+                            { value: 'G', label: 'General (G)' },
+                            { value: 'M', label: 'Morning (M)' },
+                            { value: 'E', label: 'Evening (E)' },
+                            { value: 'N', label: 'Night (N)' },
+                            { value: 'R', label: 'Rest (R)' }
+                          ]}
+                        />
                       </div>
                       <button
                         type="button"
@@ -3990,16 +3991,16 @@ export default function AdminPanel() {
                           setOverrideTo('');
                           setOverrideShift('N');
                         }}
-                        className="bg-blue-650 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold py-2 px-3.5 uppercase shadow-md transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer border-none h-[32px]"
+                        className="bg-theme-primary hover-bg-theme-primary text-white rounded text-[10px] font-bold py-1.5 px-2 uppercase shadow-sm cursor-pointer border-none h-[28px]"
                       >
                         Add Override
                       </button>
                     </div>
 
                     {customNightWeeks.length > 0 && (
-                      <div className="max-h-24 overflow-y-auto bg-[#FAF9F6]/40 border border-slate-200/60 rounded-xl p-3 space-y-1.5 shadow-2xs">
+                      <div className="max-h-24 overflow-y-auto bg-slate-100 border border-slate-200 rounded-lg p-2 space-y-1">
                         {customNightWeeks.map((w, index) => (
-                          <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-100 pb-1">
+                          <div key={index} className="flex justify-between items-center text-[10px] font-semibold text-slate-700 border-b border-slate-200/50 pb-0.5">
                             <span>{w.from_date} to {w.to_date} ({w.shift || 'N'})</span>
                             <button
                               type="button"
@@ -4014,11 +4015,42 @@ export default function AdminPanel() {
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex justify-end gap-2 text-xs">
+                  {/* Roster Section & Rest Day Persistence */}
+                  <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                    <div>
+                      <label className="block mb-1 text-[10px] uppercase text-slate-400 tracking-wider">Weekly Rest Day</label>
+                      <CustomSelect
+                        value={empRestDay}
+                        onChange={(val) => {
+                          setEmpRestDay(val);
+                          setEmpWeeklySchedule(getWeeklyScheduleDefault(val));
+                          setRotatingSchedule({
+                            week1: getWeeklyScheduleDefault(val),
+                            week2: getWeeklyScheduleDefault(val),
+                            week3: getWeeklyScheduleDefault(val),
+                            week4: getWeeklyScheduleDefault(val),
+                          });
+                        }}
+                        options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Flexible'].map(d => ({
+                          value: d,
+                          label: d
+                        }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-150 flex justify-end gap-2 text-xs">
                     <button 
                       type="button" 
                       onClick={() => setIsScheduleModalOpen(false)} 
-                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer shadow-md hover:shadow-lg border-none"
+                      className="px-4 py-2 border border-slate-200 rounded-lg text-slate-655 hover:bg-slate-50 font-bold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsScheduleModalOpen(false)} 
+                      className="px-4 py-2 bg-theme-primary hover-bg-theme-primary text-white rounded-lg font-bold transition cursor-pointer shadow-sm"
                     >
                       Apply & Close
                     </button>

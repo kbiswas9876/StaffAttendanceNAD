@@ -134,7 +134,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
         iconGlow: 'shadow-blue-500/20',
         logoBg: 'from-blue-600 to-indigo-600',
         dotColor: 'bg-blue-600',
-        accentText: 'text-blue-650',
+        accentText: 'text-blue-600',
         accentRing: 'ring-blue-100',
         activeBorder: 'border-blue-600'
       };
@@ -736,7 +736,7 @@ export default function NavigationWrapper({ children }: NavigationWrapperProps) 
                                           type="checkbox"
                                           checked={isChecked}
                                           onChange={() => toggleJoinSection(sec.section_code)}
-                                          className="w-3.5 h-3.5 text-blue-650 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
+                                          className="w-3.5 h-3.5 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
                                         />
                                         {sec.section_code}
                                       </label>

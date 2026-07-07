@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { verifyAdminPassword } from '../../lib/api';
 
@@ -11,6 +12,11 @@ interface AdminAuthModalProps {
 }
 
 export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuthModalProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [password, setPassword] = useState('');
   const [rememberSession, setRememberSession] = useState(true);
   const [rememberDevice, setRememberDevice] = useState(false);
@@ -18,7 +24,18 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  if (!isOpen) return null;
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,12 +75,12 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200 animate-scale-up">
         
         {/* Header */}
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
               <Lock size={16} />
@@ -80,7 +97,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <p className="text-xs text-slate-500 leading-relaxed font-semibold">
             This operation is protected. Please enter the Administrator password to authorize changes.
           </p>
 
@@ -88,12 +105,12 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Admin Password</label>
             <div className="relative">
               <input
+                ref={inputRef}
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter admin password"
                 className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition"
-                autoFocus
               />
               <button
                 type="button"
@@ -112,7 +129,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
           )}
 
           {/* Remember Checkboxes */}
-          <div className="flex flex-col gap-2 pt-1">
+          <div className="flex flex-col gap-2 pt-1 font-semibold">
             <label className="flex items-center gap-2 select-none cursor-pointer">
               <input
                 type="checkbox"
@@ -123,7 +140,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
                 }}
                 className="w-3.5 h-3.5 border-slate-355 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
               />
-              <span className="text-[11px] font-semibold text-slate-500">Remember for this session</span>
+              <span className="text-[11px] text-slate-500">Remember for this session</span>
             </label>
             <label className="flex items-center gap-2 select-none cursor-pointer">
               <input
@@ -135,7 +152,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
                 }}
                 className="w-3.5 h-3.5 border-slate-355 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
               />
-              <span className="text-[11px] font-semibold text-slate-550">Keep me logged in on this device</span>
+              <span className="text-[11px] text-slate-550">Keep me logged in on this device</span>
             </label>
           </div>
 
@@ -144,7 +161,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 transition rounded-xl cursor-pointer"
+              className="flex-1 py-2 text-xs font-bold text-slate-550 bg-white border border-slate-200 hover:bg-slate-50 transition rounded-xl cursor-pointer"
             >
               Cancel
             </button>
@@ -160,6 +177,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
         </form>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
