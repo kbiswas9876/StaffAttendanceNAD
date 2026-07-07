@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { EmployeeProfile360 } from './employees/page';
@@ -25,7 +25,7 @@ import {
 import { getEmployees, getAttendanceLogs, getSpecialEvents, getSections, Employee, AttendanceLog, SpecialEvent, parseLocalDate } from '../lib/api';
 import CustomDatePicker from './components/CustomDatePicker';
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const empIdStr = searchParams.get('id');
@@ -244,19 +244,21 @@ export default function Dashboard() {
     const diffTime = target.getTime() - anchor.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-    if (s.type === 'rotating-3week') {
-      const cycleDay = ((diffDays % 21) + 21) % 21;
-      const weekNum = Math.floor(cycleDay / 7) + 1;
-      const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-      const wk = `week${weekNum}`;
-      return s[wk]?.[dayOfWeek] || null;
-    } else {
-      const cycleDay = ((diffDays % 28) + 28) % 28;
-      const weekNum = Math.floor(cycleDay / 7) + 1;
-      const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-      const wk = `week${weekNum}`;
-      return s[wk]?.[dayOfWeek] || null;
+    // Determine how many weeks are configured dynamically
+    let numWeeks = 0;
+    while (s[`week${numWeeks + 1}`]) {
+      numWeeks++;
     }
+    if (numWeeks === 0) {
+      numWeeks = s.type === 'rotating-3week' ? 3 : 4;
+    }
+
+    const cycleDays = numWeeks * 7;
+    const cycleDay = ((diffDays % cycleDays) + cycleDays) % cycleDays;
+    const weekNum = Math.floor(cycleDay / 7) + 1;
+    const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+    const wk = `week${weekNum}`;
+    return s[wk]?.[dayOfWeek] || null;
   };
 
   const getShiftForDate = (employee: Employee, dateStr: string) => {
@@ -882,5 +884,13 @@ export default function Dashboard() {
       </div>
 
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-50">Loading Dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

@@ -154,19 +154,21 @@ const getBaseRotatingShift = (sched: any, dateStr: string) => {
   const diffTime = target.getTime() - anchor.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-  if (sched.type === 'rotating-3week') {
-    const cycleDay = ((diffDays % 21) + 21) % 21;
-    const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 3
-    const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-    const wk = `week${weekNum}`;
-    return sched[wk]?.[dayOfWeek] || null;
-  } else {
-    const cycleDay = ((diffDays % 28) + 28) % 28;
-    const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to 4
-    const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
-    const wk = `week${weekNum}`;
-    return sched[wk]?.[dayOfWeek] || null;
+  // Determine how many weeks are configured dynamically
+  let numWeeks = 0;
+  while (sched[`week${numWeeks + 1}`]) {
+    numWeeks++;
   }
+  if (numWeeks === 0) {
+    numWeeks = sched.type === 'rotating-3week' ? 3 : 4;
+  }
+
+  const cycleDays = numWeeks * 7;
+  const cycleDay = ((diffDays % cycleDays) + cycleDays) % cycleDays;
+  const weekNum = Math.floor(cycleDay / 7) + 1; // 1 to numWeeks
+  const dayOfWeek = target.toLocaleDateString('en-US', { weekday: 'long' });
+  const wk = `week${weekNum}`;
+  return sched[wk]?.[dayOfWeek] || null;
 };
 
 const getRotatingShift = (emp: any, dateStr: string) => {
