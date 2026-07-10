@@ -16,6 +16,7 @@ import {
   X,
   ClipboardList,
   CalendarDays,
+  Clock,
   FileText
 } from 'lucide-react';
 import {
@@ -112,17 +113,14 @@ export default function ManpowerPlanning() {
 
   // Advanced Date / Shift picker states for custom group modal
   const [isGroupModalOpen, setIsGroupModalOpen] = useState<boolean>(false);
-  const [dateType, setDateType] = useState<'single' | 'range' | 'custom'>('single');
-  const [singleDate, setSingleDate] = useState<string>('2026-05-17');
-  const [startDate, setStartDate] = useState<string>('2026-05-16');
-  const [endDate, setEndDate] = useState<string>('2026-05-17');
-  const [customDateText, setCustomDateText] = useState<string>("16/17 May '26");
+  const [groupDateType, setGroupDateType] = useState<'single' | 'overnight' | 'multiday'>('single');
+  const [groupStartDate, setGroupStartDate] = useState<string>('2026-05-17');
+  const [groupEndDate, setGroupEndDate] = useState<string>('2026-05-18');
+  const [groupStartTime, setGroupStartTime] = useState<string>('10:00');
+  const [groupEndTime, setGroupEndTime] = useState<string>('18:00');
+  const [groupDateText, setGroupDateText] = useState<string>('');
+  const [groupShiftText, setGroupShiftText] = useState<string>('');
 
-  const [shiftType, setShiftType] = useState<'night' | 'day' | 'evening' | 'custom'>('night');
-  const [startTime, setStartTime] = useState<string>('10:00');
-  const [endTime, setEndTime] = useState<string>('18:00');
-  const [customShiftText, setCustomShiftText] = useState<string>("10:00 hrs\nto\n18:00 hrs");
-  const [includeDatesInShift, setIncludeDatesInShift] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -140,6 +138,78 @@ export default function ManpowerPlanning() {
 
     return () => window.removeEventListener('erp_lang_changed', handleLangChange);
   }, []);
+
+  // Helper to format date strings like "17 May '26"
+  const formatDateLabel = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = d.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const yearStr = d.getFullYear().toString().substring(2);
+    return `${day} ${month} '${yearStr}`;
+  };
+
+  // Helper for ordinals like "16th"
+  const getOrdinalDay = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const day = d.getDate();
+    const j = day % 10, k = day % 100;
+    if (j === 1 && k !== 11) return `${day}st`;
+    if (j === 2 && k !== 12) return `${day}nd`;
+    if (j === 3 && k !== 13) return `${day}rd`;
+    return `${day}th`;
+  };
+
+  // Dynamic automatic calculation of date_text and shift_text when parameters change in group modal
+  useEffect(() => {
+    if (!isGroupModalOpen) return;
+
+    let generatedDate = '';
+    if (groupDateType === 'single') {
+      generatedDate = formatDateLabel(groupStartDate);
+    } else if (groupDateType === 'overnight') {
+      if (groupStartDate && groupEndDate) {
+        const startD = new Date(groupStartDate);
+        const endD = new Date(groupEndDate);
+        if (!isNaN(startD.getTime()) && !isNaN(endD.getTime())) {
+          const startDay = startD.getDate();
+          const endDDay = endD.getDate();
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const startMonth = months[startD.getMonth()];
+          const endMonth = months[endD.getMonth()];
+          const startYear = startD.getFullYear().toString().substring(2);
+          const endYear = endD.getFullYear().toString().substring(2);
+
+          if (startD.getFullYear() !== endD.getFullYear()) {
+            generatedDate = `${startDay} ${startMonth} '${startYear}/${endDDay} ${endMonth} '${endYear}`;
+          } else if (startD.getMonth() !== endD.getMonth()) {
+            generatedDate = `${startDay} ${startMonth}/${endDDay} ${endMonth} '${startYear}`;
+          } else {
+            generatedDate = `${startDay}/${endDDay} ${startMonth} '${startYear}`;
+          }
+        }
+      }
+    } else if (groupDateType === 'multiday') {
+      if (groupStartDate && groupEndDate) {
+        generatedDate = `${formatDateLabel(groupStartDate)} to ${formatDateLabel(groupEndDate)}`;
+      }
+    }
+
+    let generatedShift = '';
+    if (groupDateType === 'overnight') {
+      generatedShift = `${groupStartTime} hrs (${getOrdinalDay(groupStartDate)})\nto\n${groupEndTime} hrs`;
+    } else {
+      generatedShift = `${groupStartTime} hrs to ${groupEndTime} hrs`;
+    }
+
+    setGroupDateText(generatedDate);
+    setGroupShiftText(generatedShift);
+  }, [groupDateType, groupStartDate, groupEndDate, groupStartTime, groupEndTime, isGroupModalOpen]);
+
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -362,86 +432,75 @@ export default function ManpowerPlanning() {
   };
 
   const handleAddNewGroup = () => {
-    setDateType('single');
-    setSingleDate('2026-05-17');
-    setShiftType('night');
+    let defaultDate = '2026-05-17';
+    if (selectedPlan && selectedPlan.rows && selectedPlan.rows.length > 0) {
+      const lastRow = selectedPlan.rows[selectedPlan.rows.length - 1];
+      const dateMatch = lastRow.date_text.match(/(\d+)(?:\/\d+)?\s+(\w+)\s+'(\d+)/);
+      if (dateMatch) {
+        const day = parseInt(dateMatch[1]);
+        const monthStr = dateMatch[2];
+        const yearShort = dateMatch[3];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthIdx = months.findIndex(m => m.toLowerCase().startsWith(monthStr.toLowerCase()));
+        if (monthIdx !== -1) {
+          const fullYear = 2000 + parseInt(yearShort);
+          const d = new Date(fullYear, monthIdx, day);
+          if (!isNaN(d.getTime())) {
+            const offset = d.getTimezoneOffset();
+            const localD = new Date(d.getTime() - (offset*60*1000));
+            defaultDate = localD.toISOString().split('T')[0];
+          }
+        }
+      }
+    }
+    setGroupDateType('single');
+    setGroupStartDate(defaultDate);
+    const d = new Date(defaultDate);
+    d.setDate(d.getDate() + 1);
+    setGroupEndDate(d.toISOString().split('T')[0]);
+    setGroupStartTime('10:00');
+    setGroupEndTime('18:00');
+    setGroupDateText('');
+    setGroupShiftText('');
     setIsGroupModalOpen(true);
   };
 
-  // Format single/range dates dynamically
-  const formatDateString = (dateStr: string): string => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = d.getDate();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[d.getMonth()];
-    const yearStr = d.getFullYear().toString().substring(2);
-    return `${day} ${month} '${yearStr}`;
-  };
-
-  const getGroupFormattedDate = (): string => {
-    if (dateType === 'custom') return customDateText;
-    if (dateType === 'range') {
-      if (!startDate || !endDate) return '';
-      const startD = new Date(startDate);
-      const endD = new Date(endDate);
-      if (isNaN(startD.getTime()) || isNaN(endD.getTime())) return '';
-      
-      const startDay = startD.getDate();
-      const endDay = endD.getDate();
-      
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const startMonth = months[startD.getMonth()];
-      const endMonth = months[endD.getMonth()];
-      const startYear = startD.getFullYear().toString().substring(2);
-      const endYear = endD.getFullYear().toString().substring(2);
-      
-      return `${startDay} ${startMonth} '${startYear} to ${endDay} ${endMonth} '${endYear}`;
-    }
-    return formatDateString(singleDate);
-  };
-
-  // Format shifts dynamically
-  const getGroupFormattedShift = (): string => {
-    let baseShift = '';
-    if (shiftType === 'night') baseShift = '23:00 hrs to 07:00 hrs\n(Next Day)';
-    else if (shiftType === 'day') baseShift = '08:00 hrs to 16:00 hrs';
-    else if (shiftType === 'evening') baseShift = '16:00 hrs to 24:00 hrs';
-    else if (shiftType === 'custom') {
-      baseShift = `${startTime} hrs to ${endTime} hrs`;
+  const handleDateTypeChange = (type: 'single' | 'overnight' | 'multiday') => {
+    setGroupDateType(type);
+    if (type === 'overnight') {
+      setGroupStartTime('23:00');
+      setGroupEndTime('07:00');
+      if (groupStartDate) {
+        const d = new Date(groupStartDate);
+        d.setDate(d.getDate() + 1);
+        setGroupEndDate(d.toISOString().split('T')[0]);
+      }
     } else {
-      baseShift = customShiftText;
+      setGroupStartTime('10:00');
+      setGroupEndTime('18:00');
     }
+  };
 
-    if (includeDatesInShift) {
-      if (dateType === 'single' && singleDate) {
-        const formattedSingle = formatDateString(singleDate);
-        return `From ${formattedSingle} ${startTime || '23:00'} hrs\nto\n${formattedSingle} ${endTime || '07:00'} hrs`;
-      }
-      if (dateType === 'range' && startDate && endDate) {
-        const formattedStart = formatDateString(startDate);
-        const formattedEnd = formatDateString(endDate);
-        return `From ${formattedStart} ${startTime || '23:00'} hrs\nto\n${formattedEnd} ${endTime || '07:00'} hrs`;
-      }
+  const handleStartDateChange = (val: string) => {
+    setGroupStartDate(val);
+    if (groupDateType === 'overnight' || groupDateType === 'multiday') {
+      const d = new Date(val);
+      d.setDate(d.getDate() + 1);
+      setGroupEndDate(d.toISOString().split('T')[0]);
     }
-    return baseShift;
   };
 
   const handleCreateGroup = () => {
     if (!selectedPlan || !selectedPlan.rows) return;
     
-    const formattedDate = getGroupFormattedDate();
-    const formattedShift = getGroupFormattedShift();
-    
-    if (!formattedDate.trim() || !formattedShift.trim()) {
+    if (!groupDateText.trim() || !groupShiftText.trim()) {
       showToast("Please enter a valid date and shift.", "error");
       return;
     }
     
     const newRow: ManpowerPlanRow = {
-      date_text: formattedDate.trim(),
-      shift_text: formattedShift.trim(),
+      date_text: groupDateText.trim(),
+      shift_text: groupShiftText.trim(),
       station_text: '[Station]',
       work_activity: '',
       railway_manpower: '',
@@ -457,6 +516,7 @@ export default function ManpowerPlanning() {
     setIsGroupModalOpen(false);
     showToast("Shift group added!");
   };
+
 
   const handleDeleteGroupConfirm = () => {
     if (!groupToDelete || !selectedPlan || !selectedPlan.rows) return;
@@ -755,34 +815,39 @@ export default function ManpowerPlanning() {
           <div className="space-y-8 pb-16 animate-in fade-in slide-in-from-bottom-2 duration-200">
             
             {/* Plan Settings Card */}
-            <div className="bg-white border border-[#E2E0D9] p-6 rounded-2xl shadow-xs space-y-4">
-              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Plan Sheet Configuration</h2>
+            <div className="bg-white border border-slate-200/80 p-6 rounded-3xl shadow-sm space-y-5">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <FileText size={16} />
+                </div>
+                <h2 className="text-lg font-bold text-slate-800">Plan Sheet Configuration</h2>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-500 uppercase mb-2">Plan Name</label>
+                  <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">Plan Name</label>
                   <input
                     type="text"
                     value={selectedPlan.name}
                     onChange={(e) => setSelectedPlan({ ...selectedPlan, name: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[#E2E0D9] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold animate-none"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm font-semibold transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-500 uppercase mb-2">Excel Title (Cell A1)</label>
+                  <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">Excel Title (Cell A1)</label>
                   <input
                     type="text"
                     value={selectedPlan.title}
                     onChange={(e) => setSelectedPlan({ ...selectedPlan, title: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[#E2E0D9] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold animate-none"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm font-semibold transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-500 uppercase mb-2">Excel Subtitle (Cell A2)</label>
+                  <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">Excel Subtitle (Cell A2)</label>
                   <input
                     type="text"
                     value={selectedPlan.subtitle}
                     onChange={(e) => setSelectedPlan({ ...selectedPlan, subtitle: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[#E2E0D9] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold animate-none"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm font-semibold transition-all"
                   />
                 </div>
               </div>
@@ -794,9 +859,9 @@ export default function ManpowerPlanning() {
                 <h2 className="text-xl font-extrabold text-slate-800">Date & Shift Schedule Groups</h2>
                 <button
                   onClick={handleAddNewGroup}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-indigo-600 hover:bg-indigo-50 text-indigo-700 font-bold transition-all text-xs cursor-pointer select-none"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold transition-all text-xs cursor-pointer select-none shadow-md shadow-indigo-500/20 border-none transform active:scale-95 duration-150"
                 >
-                  <Plus size={14} />
+                  <Plus size={14} className="stroke-[3]" />
                   Add New Group
                 </button>
               </div>
@@ -814,34 +879,40 @@ export default function ManpowerPlanning() {
                 </div>
               ) : (
                 rowGroups.map((group, groupIdx) => (
-                  <div key={group.key} className="bg-white border border-[#E2E0D9] rounded-2xl shadow-xs overflow-hidden">
+                  <div key={group.key} className="bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                     
                     {/* Group Header */}
-                    <div className="bg-slate-50 border-b border-[#E2E0D9] p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-extrabold text-slate-400 uppercase">Date:</span>
-                          <input
-                            type="text"
-                            value={group.date}
-                            onChange={(e) => handleUpdateRowValue(group.rows[0].originalIndex, 'date_text', e.target.value)}
-                            className="px-3 py-1.5 border border-[#E2E0D9] bg-white rounded-lg focus:outline-hidden text-sm font-bold text-slate-800"
-                          />
+                    <div className="bg-slate-50/70 border-b border-slate-100 p-4.5 flex flex-col sm:flex-row items-center justify-between gap-4 border-l-4 border-l-indigo-600">
+                      <div className="flex flex-wrap items-center gap-5 w-full sm:w-auto">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Date:</span>
+                          <div className="relative flex items-center">
+                            <CalendarDays className="absolute left-3.5 text-slate-400" size={15} />
+                            <input
+                              type="text"
+                              value={group.date}
+                              onChange={(e) => handleUpdateRowValue(group.rows[0].originalIndex, 'date_text', e.target.value)}
+                              className="pl-10 pr-4 py-2 border border-slate-200 bg-white rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm font-bold text-slate-850 shadow-xs transition-all w-44 font-sans tracking-tight"
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-extrabold text-slate-400 uppercase">Shift / Time:</span>
-                          <input
-                            type="text"
-                            value={group.shift}
-                            onChange={(e) => handleUpdateRowValue(group.rows[0].originalIndex, 'shift_text', e.target.value)}
-                            className="px-3 py-1.5 border border-[#E2E0D9] bg-white rounded-lg focus:outline-hidden text-sm font-bold text-slate-800 w-64 h-9"
-                          />
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Shift / Time:</span>
+                          <div className="relative flex items-start pt-1.5">
+                            <Clock className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+                            <textarea
+                              rows={group.shift ? group.shift.split('\n').length : 1}
+                              value={group.shift}
+                              onChange={(e) => handleUpdateRowValue(group.rows[0].originalIndex, 'shift_text', e.target.value)}
+                              className="pl-10 pr-4 py-2 border border-slate-200 bg-white rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm font-bold text-slate-850 shadow-xs transition-all w-72 resize-none font-sans leading-snug"
+                            />
+                          </div>
                         </div>
                       </div>
                       
                       <button
                         onClick={() => setGroupToDelete({ date: group.date, shift: group.shift })}
-                        className="text-xs font-extrabold text-red-600 hover:text-red-800 flex items-center gap-1 cursor-pointer select-none"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold rounded-xl border border-rose-100/50 hover:border-rose-200 transition-all duration-150 shadow-xs cursor-pointer select-none"
                       >
                         <Trash2 size={13} />
                         Delete Group
@@ -853,11 +924,11 @@ export default function ManpowerPlanning() {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-white border-b border-slate-100 text-left">
-                            <th className="px-4 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider w-1/5">Station & Domain</th>
-                            <th className="px-4 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider w-1/4">Planned Work Activity</th>
-                            <th className="px-4 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider w-1/4">Railway Manpower</th>
-                            <th className="px-4 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider w-1/5">Agency / Contractor</th>
-                            <th className="px-4 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider w-32 text-center">Actions</th>
+                            <th className="px-4 py-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider w-1/5">Station & Domain</th>
+                            <th className="px-4 py-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider w-1/4">Planned Work Activity</th>
+                            <th className="px-4 py-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider w-1/4">Railway Manpower</th>
+                            <th className="px-4 py-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider w-1/5">Agency / Contractor</th>
+                            <th className="px-4 py-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider w-32 text-center">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -868,13 +939,13 @@ export default function ManpowerPlanning() {
                             return (
                               <tr key={origIdx} className="hover:bg-slate-50/40 transition-colors">
                                 {/* Station & Domain */}
-                                <td className="px-4 py-3 align-top">
+                                <td className="px-4 py-3.5 align-top">
                                   <input
                                     type="text"
                                     list="stations-datalist"
                                     value={row.station_text}
                                     onChange={(e) => handleUpdateRowValue(origIdx, 'station_text', e.target.value)}
-                                    className="w-full px-3 py-2 border border-[#E2E0D9] rounded-lg text-sm font-semibold focus:outline-hidden"
+                                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all bg-white"
                                   />
                                   <datalist id="stations-datalist">
                                     {COMMON_STATIONS.map(s => <option key={s} value={s} />)}
@@ -882,72 +953,72 @@ export default function ManpowerPlanning() {
                                 </td>
 
                                 {/* Planned Work Activity */}
-                                <td className="px-4 py-3 align-top">
+                                <td className="px-4 py-3.5 align-top">
                                   <div className="space-y-2">
                                     <textarea
                                       rows={3}
                                       value={row.work_activity}
                                       onChange={(e) => handleUpdateRowValue(origIdx, 'work_activity', e.target.value)}
                                       onKeyDown={(e) => handleTextareaKeyDown(e, origIdx, 'work_activity')}
-                                      className="w-full px-3 py-2 border border-[#E2E0D9] rounded-lg text-sm font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500/20 animate-none resize-y"
+                                      className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-y min-h-[80px]"
                                       placeholder="Type planned activities... (Auto-inserts prefix on Enter)"
                                     />
                                     {/* Advanced formatting toolbar - multi-choices */}
-                                    <div className="flex flex-wrap items-center gap-1.5 mt-1 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                      <span className="text-[9px] font-extrabold text-slate-400 uppercase mr-1">Insert Prefix:</span>
+                                    <div className="flex flex-wrap items-center gap-1.5 bg-slate-50/50 p-2 rounded-xl border border-slate-100/60">
+                                      <span className="text-[9px] font-extrabold text-slate-400 uppercase mr-1">Prefix:</span>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'bullet')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         • Bullet
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'circle')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         ◦ Circle
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'square')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         ▪ Square
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'dash')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         - Dash
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'number')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         1. Num
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'check')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         ✓ Tick
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'star')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         ✦ Star
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => handleFormatText(origIdx, 'work_activity', 'diamond')}
-                                        className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                       >
                                         ❖ Dia
                                       </button>
@@ -956,73 +1027,73 @@ export default function ManpowerPlanning() {
                                 </td>
 
                                 {/* Railway Manpower */}
-                                <td className="px-4 py-3 align-top">
+                                <td className="px-4 py-3.5 align-top">
                                   <div className="space-y-2">
                                     <textarea
                                       rows={3}
                                       value={row.railway_manpower}
                                       onChange={(e) => handleUpdateRowValue(origIdx, 'railway_manpower', e.target.value)}
                                       onKeyDown={(e) => handleTextareaKeyDown(e, origIdx, 'railway_manpower')}
-                                      className="w-full px-3 py-2 border border-[#E2E0D9] rounded-lg text-sm font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500/20 resize-y"
+                                      className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-y min-h-[80px]"
                                       placeholder="Railway staff lists... (Press Enter to carry prefix)"
                                     />
-                                    <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
+                                    <div className="flex flex-col gap-2 mt-1">
                                       {/* Format dropdown toolbar */}
-                                      <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                        <span className="text-[9px] font-extrabold text-slate-400 uppercase mr-1">Insert Prefix:</span>
+                                      <div className="flex flex-wrap items-center gap-1.5 bg-slate-50/50 p-2 rounded-xl border border-slate-100/60">
+                                        <span className="text-[9px] font-extrabold text-slate-400 uppercase mr-1">Prefix:</span>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'bullet')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           • Bullet
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'circle')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ◦ Circle
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'square')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ▪ Square
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'dash')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           - Dash
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'number')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           1. Num
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'check')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ✓ Tick
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'star')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ✦ Star
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'railway_manpower', 'diamond')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ❖ Dia
                                         </button>
@@ -1033,7 +1104,7 @@ export default function ManpowerPlanning() {
                                           setEmpSearchQuery('');
                                           setIsEmployeeModalOpen(true);
                                         }}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-855 flex items-center gap-1 bg-indigo-50 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer select-none"
+                                        className="text-xs font-bold text-indigo-650 hover:text-indigo-800 flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100/70 px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer select-none border-none justify-center"
                                       >
                                         <UserPlus size={12} />
                                         Assign Railway Employee
@@ -1043,72 +1114,72 @@ export default function ManpowerPlanning() {
                                 </td>
 
                                 {/* Agency / Contractor */}
-                                <td className="px-4 py-3 align-top">
+                                <td className="px-4 py-3.5 align-top">
                                   <div className="space-y-2">
                                     <textarea
                                       rows={3}
                                       value={row.agency_manpower}
                                       onChange={(e) => handleUpdateRowValue(origIdx, 'agency_manpower', e.target.value)}
                                       onKeyDown={(e) => handleTextareaKeyDown(e, origIdx, 'agency_manpower')}
-                                      className="w-full px-3 py-2 border border-[#E2E0D9] rounded-lg text-sm font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500/20 resize-y"
+                                      className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-y min-h-[80px]"
                                       placeholder="Agency/Contractor staff... (Auto list on Enter)"
                                     />
-                                    <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
-                                      <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                        <span className="text-[9px] font-extrabold text-slate-400 uppercase mr-1">Insert Prefix:</span>
+                                    <div className="flex flex-col gap-2 mt-1">
+                                      <div className="flex flex-wrap items-center gap-1.5 bg-slate-50/50 p-2 rounded-xl border border-slate-100/60">
+                                        <span className="text-[9px] font-extrabold text-slate-400 uppercase mr-1">Prefix:</span>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'bullet')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           • Bullet
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'circle')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ◦ Circle
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'square')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ▪ Square
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'dash')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           - Dash
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'number')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           1. Num
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'check')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ✓ Tick
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'star')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ✦ Star
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleFormatText(origIdx, 'agency_manpower', 'diamond')}
-                                          className="px-1.5 py-0.5 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
+                                          className="px-2 py-1 bg-slate-100 hover:bg-indigo-55 border-none text-[9px] font-bold text-slate-600 hover:text-indigo-700 rounded-md cursor-pointer transition-colors"
                                         >
                                           ❖ Dia
                                         </button>
@@ -1118,7 +1189,7 @@ export default function ManpowerPlanning() {
                                           setActiveRowIndex(origIdx);
                                           setIsAgencyModalOpen(true);
                                         }}
-                                        className="text-xs font-bold text-emerald-600 hover:text-emerald-855 flex items-center gap-1 bg-emerald-50 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer select-none"
+                                        className="text-xs font-bold text-emerald-650 hover:text-emerald-800 flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100/70 px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer select-none border-none justify-center"
                                       >
                                         <Plus size={12} />
                                         Add Agency Manpower
@@ -1128,12 +1199,12 @@ export default function ManpowerPlanning() {
                                 </td>
 
                                 {/* Reorder and Delete Actions */}
-                                <td className="px-4 py-3 align-top text-center">
+                                <td className="px-4 py-3.5 align-top text-center">
                                   <div className="flex items-center justify-center gap-1.5 h-10">
                                     <button
                                       onClick={() => handleMoveRow(origIdx, 'up')}
                                       disabled={origIdx === 0}
-                                      className="p-1 hover:bg-slate-100 rounded text-slate-500 disabled:opacity-20 cursor-pointer"
+                                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 disabled:opacity-20 cursor-pointer transition-colors"
                                       title="Move Up"
                                     >
                                       <ChevronUp size={16} />
@@ -1141,14 +1212,14 @@ export default function ManpowerPlanning() {
                                     <button
                                       onClick={() => handleMoveRow(origIdx, 'down')}
                                       disabled={origIdx === selectedPlan.rows!.length - 1}
-                                      className="p-1 hover:bg-slate-100 rounded text-slate-500 disabled:opacity-20 cursor-pointer"
+                                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 disabled:opacity-20 cursor-pointer transition-colors"
                                       title="Move Down"
                                     >
                                       <ChevronDown size={16} />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteRow(origIdx)}
-                                      className="p-1.5 hover:bg-red-50 text-red-600 hover:text-red-800 rounded cursor-pointer"
+                                      className="p-2 hover:bg-red-50 text-red-650 hover:text-red-800 rounded-lg cursor-pointer transition-colors"
                                       title="Delete Row"
                                     >
                                       <Trash2 size={15} />
@@ -1163,12 +1234,12 @@ export default function ManpowerPlanning() {
                     </div>
 
                     {/* Add Row Button under Group */}
-                    <div className="bg-slate-50/40 p-3 border-t border-[#E2E0D9] flex justify-center">
+                    <div className="bg-slate-50/50 p-3.5 border-t border-slate-100 flex justify-center">
                       <button
                         onClick={() => handleAddRowToGroup(group.date, group.shift)}
-                        className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer select-none"
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50/60 hover:bg-indigo-100/80 px-4.5 py-2 rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer select-none border-none shadow-xs"
                       >
-                        <Plus size={13} />
+                        <Plus size={14} className="stroke-[3]" />
                         Add Row to Group
                       </button>
                     </div>
@@ -1270,9 +1341,9 @@ export default function ManpowerPlanning() {
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
             <form
               onSubmit={handleCreatePlan}
-              className="bg-white border border-[#E2E0D9] rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-150 overflow-hidden"
+              className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <h3 className="font-extrabold text-slate-800">New Manpower Planning Sheet</h3>
                 <button
                   type="button"
@@ -1283,7 +1354,7 @@ export default function ManpowerPlanning() {
                 </button>
               </div>
               
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase mb-2">Plan / Event Name</label>
                   <input
@@ -1471,8 +1542,8 @@ export default function ManpowerPlanning() {
         {/* 3c. ADD AGENCY MANPOWER MODAL */}
         {isAgencyModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white border border-[#E2E0D9] rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-150 overflow-hidden">
-              <div className="bg-slate-50 px-6 py-4 border-b border-[#E2E0D9] flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh] overflow-hidden">
+              <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <h3 className="font-extrabold text-slate-800">Add Agency / Contractor Manpower</h3>
                 <button
                   type="button"
@@ -1484,7 +1555,7 @@ export default function ManpowerPlanning() {
               </div>
 
               {/* Custom prefix selector settings inside agency assignment modal - supports all 8 formats */}
-              <div className="px-6 py-3 bg-slate-100/60 border-b border-[#E2E0D9] flex flex-wrap items-center gap-3 shrink-0">
+              <div className="px-6 py-3 bg-slate-100/60 border-b border-slate-200 flex flex-wrap items-center gap-3 shrink-0">
                 <span className="text-xs font-extrabold text-slate-500 uppercase">Insert Format Prefix:</span>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {([
@@ -1514,7 +1585,7 @@ export default function ManpowerPlanning() {
                 </div>
               </div>
               
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 overflow-y-auto flex-1">
                 {/* Quick options list */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-extrabold text-slate-500 uppercase">Quick Select Agencies</h4>
@@ -1573,182 +1644,144 @@ export default function ManpowerPlanning() {
       {/* 3d. CUSTOM GROUP CREATION MODAL (Replaces Prompt Dialogs with pickers) */}
       {isGroupModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-[#E2E0D9] rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-150 overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 border-b border-[#E2E0D9] flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-800">Add Date & Shift Group</h3>
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="bg-slate-50/80 backdrop-blur-md px-6 py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">Add Date & Shift Group</h3>
               <button
                 type="button"
                 onClick={() => setIsGroupModalOpen(false)}
-                className="p-1 hover:bg-slate-200 rounded-full text-slate-400 cursor-pointer"
+                className="p-1.5 hover:bg-slate-200/85 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
             
-            <div className="p-6 space-y-6">
-              
-              {/* Date selection block */}
-              <div className="space-y-3">
-                <label className="block text-xs font-extrabold text-slate-500 uppercase">1. Date Configuration</label>
-                <div className="flex gap-2">
-                  {(['single', 'range', 'custom'] as const).map(type => (
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Type Selection Tabs */}
+              <div className="space-y-2">
+                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider">Shift Timing Category</label>
+                <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
+                  {([
+                    { id: 'single', label: 'Single Day' },
+                    { id: 'overnight', label: 'Overnight (Spans 2 Days)' },
+                    { id: 'multiday', label: 'Multi-Day Range' }
+                  ] as const).map(opt => (
                     <button
-                      key={type}
+                      key={opt.id}
                       type="button"
-                      onClick={() => setDateType(type)}
-                      className={`flex-1 py-2 border text-xs font-bold rounded-lg transition-colors cursor-pointer select-none ${
-                        dateType === type 
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                      onClick={() => handleDateTypeChange(opt.id)}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer select-none ${
+                        groupDateType === opt.id 
+                          ? 'bg-white text-indigo-600 shadow-xs border-none'
+                          : 'text-slate-600 hover:text-slate-800 border-none'
                       }`}
                     >
-                      {type === 'single' && 'Single Date'}
-                      {type === 'range' && 'Date Range'}
-                      {type === 'custom' && 'Custom Text'}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
-                
-                {dateType === 'single' && (
+              </div>
+              
+              {/* Date Inputs based on Category */}
+              <div className="space-y-3">
+                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider">Date Selection</label>
+                {groupDateType === 'single' ? (
                   <div>
                     <input
                       type="date"
-                      value={singleDate}
-                      onChange={(e) => setSingleDate(e.target.value)}
-                      className="w-full px-4 py-2 border border-[#E2E0D9] rounded-xl text-sm font-semibold focus:outline-hidden bg-white"
+                      value={groupStartDate}
+                      onChange={(e) => setGroupStartDate(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
                     />
                   </div>
-                )}
-                
-                {dateType === 'range' && (
-                  <div className="grid grid-cols-2 gap-3">
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Start Date</span>
+                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1.5">Start Date</span>
                       <input
                         type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full px-3 py-1.5 border border-[#E2E0D9] rounded-lg text-xs font-semibold focus:outline-hidden bg-white"
+                        value={groupStartDate}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
                       />
                     </div>
                     <div>
-                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">End Date</span>
+                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1.5">End Date</span>
                       <input
                         type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full px-3 py-1.5 border border-[#E2E0D9] rounded-lg text-xs font-semibold focus:outline-hidden bg-white"
+                        value={groupEndDate}
+                        onChange={(e) => setGroupEndDate(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
                       />
                     </div>
                   </div>
                 )}
-                
-                {dateType === 'custom' && (
+              </div>
+
+              {/* Time Configuration Inputs */}
+              <div className="space-y-3">
+                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider">Shift Working Hours</label>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1.5">Start Time</span>
+                    <input
+                      type="time"
+                      value={groupStartTime}
+                      onChange={(e) => setGroupStartTime(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1.5">End Time</span>
+                    <input
+                      type="time"
+                      value={groupEndTime}
+                      onChange={(e) => setGroupEndTime(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Generated Editable Group Preview */}
+              <div className="bg-indigo-50/40 border border-indigo-100/60 rounded-2xl p-5 space-y-4">
+                <span className="text-[10px] font-extrabold text-indigo-500 uppercase tracking-wider block">Real-time Group Preview & Override</span>
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1.5">Date Column Text</label>
                     <input
                       type="text"
-                      placeholder="e.g. 16/17 May '26"
-                      value={customDateText}
-                      onChange={(e) => setCustomDateText(e.target.value)}
-                      className="w-full px-4 py-2 border border-[#E2E0D9] rounded-xl text-sm font-semibold focus:outline-hidden bg-white"
+                      value={groupDateText}
+                      onChange={(e) => setGroupDateText(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
                     />
                   </div>
-                )}
-              </div>
-
-              {/* Shift selection block */}
-              <div className="space-y-3">
-                <label className="block text-xs font-extrabold text-slate-500 uppercase">2. Shift & Timing</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['night', 'day', 'evening', 'custom'] as const).map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setShiftType(type)}
-                      className={`py-1.5 border text-xs font-bold rounded-lg transition-colors cursor-pointer select-none ${
-                        shiftType === type 
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {type === 'night' && 'Night Shift'}
-                      {type === 'day' && 'Day Shift'}
-                      {type === 'evening' && 'Evening Shift'}
-                      {type === 'custom' && 'Custom Hours'}
-                    </button>
-                  ))}
-                </div>
-                
-                {shiftType === 'custom' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Start Time</span>
-                      <input
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="w-full px-3 py-1.5 border border-[#E2E0D9] rounded-lg text-xs font-semibold focus:outline-hidden bg-white"
-                      />
-                    </div>
-                    <div>
-                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">End Time</span>
-                      <input
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="w-full px-3 py-1.5 border border-[#E2E0D9] rounded-lg text-xs font-semibold focus:outline-hidden bg-white"
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                {shiftType === 'custom' && (
-                  <p className="text-[10px] text-slate-400 font-semibold italic">Formats to: {startTime} hrs to {endTime} hrs</p>
-                )}
-              </div>
-              {/* Optional Date detail inside shift time */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                <input
-                  type="checkbox"
-                  id="include-dates-toggle"
-                  checked={includeDatesInShift}
-                  onChange={(e) => setIncludeDatesInShift(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
-                />
-                <label htmlFor="include-dates-toggle" className="text-xs font-bold text-slate-600 cursor-pointer select-none">
-                  Include explicit date details in Shift/Time column
-                </label>
-              </div>
-
-              {/* Generated Group Preview */}
-              <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 space-y-2">
-                <span className="text-[10px] font-extrabold text-indigo-500 uppercase tracking-wider block">Generated Group Preview</span>
-                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-[9px] font-extrabold text-slate-400 uppercase block mb-0.5">Date Column</span>
-                    <p className="font-bold text-slate-800">{getGroupFormattedDate() || '(select date)'}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-extrabold text-slate-400 uppercase block mb-0.5">Shift/Time Column</span>
-                    <p className="font-bold text-slate-800 whitespace-pre-line">{getGroupFormattedShift() || '(select shift)'}</p>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1.5">Shift/Time Column Text</label>
+                    <textarea
+                      rows={groupShiftText ? groupShiftText.split('\n').length : 2}
+                      value={groupShiftText}
+                      onChange={(e) => setGroupShiftText(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 resize-none"
+                    />
                   </div>
                 </div>
               </div>
 
             </div>
             
-            <div className="bg-slate-50 px-6 py-4 border-t border-[#E2E0D9] flex items-center justify-end gap-3">
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setIsGroupModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-[#E2E0D9] hover:bg-slate-100 font-bold text-sm cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 font-bold text-sm text-slate-600 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleCreateGroup}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-500/20 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-500/20 hover:shadow-lg transition-all cursor-pointer"
               >
                 Add Group
               </button>
@@ -1757,11 +1790,12 @@ export default function ManpowerPlanning() {
         </div>
       )}
 
+
       {/* 3e. GROUP DELETE CONFIRMATION MODAL */}
       {groupToDelete && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-[#E2E0D9] rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-150 overflow-hidden">
-            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between shrink-0">
               <h3 className="font-extrabold text-red-800 flex items-center gap-2">
                 <Trash2 size={18} />
                 Delete Shift Group
@@ -1775,7 +1809,7 @@ export default function ManpowerPlanning() {
               </button>
             </div>
             
-            <div className="p-6 space-y-3">
+            <div className="p-6 space-y-3 overflow-y-auto flex-1">
               <p className="text-sm font-bold text-slate-800">
                 Are you sure you want to delete all rows in the group for:
               </p>
@@ -1794,18 +1828,18 @@ export default function ManpowerPlanning() {
               </p>
             </div>
             
-            <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setGroupToDelete(null)}
-                className="px-4 py-2 rounded-xl border border-[#E2E0D9] hover:bg-slate-100 font-bold text-sm cursor-pointer"
+                className="px-4.5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 font-bold text-sm text-slate-600 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeleteGroupConfirm}
-                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-500/20 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md shadow-rose-500/20 hover:shadow-lg transition-all cursor-pointer"
               >
                 Delete Group
               </button>
